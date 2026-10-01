@@ -162,3 +162,49 @@ if __name__ == "__main__":
             print(f"  {qn:7s} {q.bytes / GIB:6.1f} GB  downloaded={q.downloaded(name)}  "
                   f"resident@4k={m.resident_bytes(qn, 4096) / GIB:.1f} GB  "
                   f"src={q.repo or ('convert:' + q.convert_from)}")
+
+
+# ---------- Phase 1: safetensors + mlx quants ----------
+
+def load_extras() -> tuple[dict, dict]:
+    raw = yaml.safe_load(MODELS_YAML.read_text())
+    return raw.get("safetensors", {}), raw.get("mlx_quants", {})
+
+
+def safetensors_spec(model_name: str) -> dict | None:
+    st, _ = load_extras()
+    return st.get(model_name)
+
+
+def mlx_quant_repo(model_name: str, bits: str) -> str | None:
+    _, mq = load_extras()
+    return (mq.get(model_name) or {}).get(bits)
+
+
+def safetensors_dir(model_name: str) -> Path:
+    spec = safetensors_spec(model_name)
+    return MODELS_DIR / model_name.replace(":", "-") / spec["dir"]
+
+
+def safetensors_downloaded(model_name: str) -> bool:
+    d = safetensors_dir(model_name)
+    return d.exists() and any(d.glob("*.safetensors")) and (d / "config.json").exists()
+
+
+def download_safetensors(model_name: str) -> Path:
+    """Same disk policy as GGUF downloads: print size+destination, 20 GB floor."""
+    spec = safetensors_spec(model_name)
+    dest = safetensors_dir(model_name)
+    if safetensors_downloaded(model_name):
+        return dest
+    free = shutil.disk_usage(REPO_ROOT).free
+    if free - spec["bytes"] < MIN_FREE_AFTER_DOWNLOAD:
+        raise RuntimeError(
+            f"refusing download: {spec['bytes'] / GIB:.1f} GB to {dest} would leave "
+            f"{(free - spec['bytes']) / GIB:.1f} GB free (< 20 GB floor)")
+    print(f"downloading {model_name} bf16 safetensors: {spec['bytes'] / GIB:.1f} GB -> {dest}",
+          file=sys.stderr)
+    from huggingface_hub import snapshot_download
+    snapshot_download(spec["repo"], allow_patterns=["*.safetensors", "*.json"],
+                      local_dir=dest)
+    return dest

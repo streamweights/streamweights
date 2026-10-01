@@ -59,3 +59,16 @@ models:
         repo: bartowski/Llama-3.3-70B-Instruct-GGUF
         files: [Llama-3.3-70B-Instruct-Q4_K_M.gguf]
         bytes: 42520000000
+
+# Phase 1 additions: safetensors sources (macOS-native bf16 artifact) and
+# mlx-community quant repos. All six mlx-community repos below were verified to
+# exist on 2026-10-01 (HTTP 200): 8bit and 4bit for each model.
+safetensors:
+  qwen2.5:0.5b:  {repo: Qwen/Qwen2.5-0.5B-Instruct,       bytes: 988000000,    dir: bf16-st}
+  qwen2.5:32b:   {repo: Qwen/Qwen2.5-32B-Instruct,        bytes: 65500000000,  dir: bf16-st}
+  llama3.3:70b:  {repo: unsloth/Llama-3.3-70B-Instruct,   bytes: 141100000000, dir: bf16-st}
+
+mlx_quants:
+  qwen2.5:0.5b:  {8bit: mlx-community/Qwen2.5-0.5B-Instruct-8bit, 4bit: mlx-community/Qwen2.5-0.5B-Instruct-4bit}
+  qwen2.5:32b:   {8bit: mlx-community/Qwen2.5-32B-Instruct-8bit,  4bit: mlx-community/Qwen2.5-32B-Instruct-4bit}
+  llama3.3:70b:  {8bit: mlx-community/Llama-3.3-70B-Instruct-8bit, 4bit: mlx-community/Llama-3.3-70B-Instruct-4bit}
