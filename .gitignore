@@ -1,8 +1,9 @@
 __pycache__/
 *.egg-info/
 .venv/
-bin/
-models/
-jobs/
-state/hardware.json
+/bin/
+/models/
+/jobs/
+/state/hardware.json
 *.gguf
+nohup.out
