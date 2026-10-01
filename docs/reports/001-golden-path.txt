@@ -1,0 +1,87 @@
+Golden path transcript — fresh shell, clean clone, recorded 2026-09-30 20:38 PDT.
+Driver: scripted shell session; each command echoed with a wall-clock timestamp,
+full output captured. Lines from the driver's own poll loop (zsh "no matches
+found" while waiting for results.jsonl to exist) were removed; tool output is
+otherwise verbatim. The run was stopped with SIGINT (^C) after the first rows
+streamed, as the directive asks only for time-to-first-streamed-row.
+
+Timeline: pip install start 20:38:49 -> first streamed rows in results.jsonl
+20:39:31 (42 seconds, including the hardware probe, llama.cpp prebuilt fetch,
+and 0.6 GB model download).
+
+Required knowledge not printed by the tool itself:
+1. That the eval input even existed at examples/evals-2000.jsonl (the `models`
+   next-hint teaches it, but only if you run `spillway models` first).
+2. Nothing else: the bf16-has-no-published-GGUF dead end printed its own exit
+   (the exact --quant Q8_0 command to run next), the llama.cpp fetch and model
+   download announced themselves, and the banner stated model/quant/size/fit/
+   batch/estimate/cost/output path before running.
+
+Worst moment: the default path (bf16) for qwen2.5:0.5b is not runnable from a
+clean clone — it dead-ends on "no published bf16 GGUF; convert locally or pass
+--quant Q8_0". The tool prints the recovery command, but the first `spillway
+run` a new user types still fails; one install zero config held, one COMMAND
+zero config did not.
+
+================================================================================
+
+
+[20:38:48] $ git clone --quiet /Users/dev/spillway spillway
+[20:38:48] (exit 0)
+
+[20:38:48] $ python3.12 -m venv .venv
+[20:38:49] (exit 0)
+
+[20:38:49] $ source .venv/bin/activate
+[20:38:49] (exit 0)
+
+[20:38:49] $ pip install -q -e .
+
+[notice] A new release of pip is available: 26.1 -> 26.2.1
+[notice] To update, run: pip install --upgrade pip
+[20:38:57] (exit 0)
+
+[20:38:57] $ spillway models
+model          quant        size downloaded  fits resident
+qwen2.5:0.5b   bf16         1.2G      False           True
+qwen2.5:0.5b   Q8_0         0.6G      False           True
+qwen2.5:0.5b   Q4_K_M       0.5G      False           True
+qwen2.5:32b    bf16        61.0G      False          False
+qwen2.5:32b    Q8_0        32.4G      False           True
+qwen2.5:32b    Q4_K_M      18.5G      False           True
+llama3.3:70b   bf16       131.4G      False          False
+llama3.3:70b   Q8_0        69.8G      False          False
+llama3.3:70b   Q4_K_M      39.6G      False           True
+
+next: spillway run qwen2.5:0.5b examples/evals-2000.jsonl
+[20:38:59] (exit 0)
+
+[20:38:59] $ spillway run qwen2.5:0.5b examples/evals-2000.jsonl
+fetching llama.cpp b11311 prebuilt -> /private/tmp/claude-501/-Users-dev-spillway/8a7a1f63-3e9e-4d09-80a8-0deb1a2ada73/scratchpad/golden/spillway/bin
+downloading qwen2.5:0.5b bf16: 1.2 GB -> /private/tmp/claude-501/-Users-dev-spillway/8a7a1f63-3e9e-4d09-80a8-0deb1a2ada73/scratchpad/golden/spillway/models/qwen2.5-0.5b/bf16
+qwen2.5:0.5b has no published bf16 GGUF; convert from Qwen/Qwen2.5-0.5B-Instruct with llama.cpp's convert_hf_to_gguf.py --outtype bf16 into /private/tmp/claude-501/-Users-dev-spillway/8a7a1f63-3e9e-4d09-80a8-0deb1a2ada73/scratchpad/golden/spillway/models/qwen2.5-0.5b/bf16, or opt into a quant explicitly with --quant Q8_0
+
+next: spillway run qwen2.5:0.5b examples/evals-2000.jsonl --quant Q8_0
+[20:39:00] (exit 0)
+
+[20:39:00] $ spillway run qwen2.5:0.5b examples/evals-2000.jsonl --quant Q8_0   # (stopped with ^C after first rows streamed)
+quant: --quant Q8_0 (explicit opt-in)
+downloading qwen2.5:0.5b Q8_0: 0.6 GB -> /private/tmp/claude-501/-Users-dev-spillway/8a7a1f63-3e9e-4d09-80a8-0deb1a2ada73/scratchpad/golden/spillway/models/qwen2.5-0.5b/Q8_0
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Spillway: qwen2.5:0.5b Q8_0 (0.6 GB) fits in 48 GB RAM; resident. 2000 prompts, batch 256, est. 59 min. Cost: $0. Results -> /private/tmp/claude-501/-Users-dev-spillway/8a7a1f63-3e9e-4d09-80a8-0deb1a2ada73/scratchpad/golden/spillway/jobs/20260930-203909-34ed09/results.jsonl (tail with: spillway tail)
+1/2000 rows      2.6 tok/s  ETA 4.2 h   2/2000 rows      5.1 tok/s  ETA 2.2 h   3/2000 rows      7.6 tok/s  ETA 1.6 h   4/2000 rows      9.7 tok/s  ETA 71 min   5/2000 rows     11.6 tok/s  ETA 60 min   [20:39:31] >>> first streamed rows visible in results.jsonl (5 rows); pressing ^C
+
+5/2000 rows, 104 completion tokens, 9.9 tok/s aggregate
+
+next: spillway tail 20260930-203909-34ed09
+[20:39:33] (run exited)
+
+[20:39:33] $ spillway status
+job                          model          quant   progress        tok/s      eta status
+20260930-203909-34ed09       qwen2.5:0.5b   Q8_0    5/2000           11.2   60 min interrupted
+
+next: spillway tail
+[20:39:33] (exit 0)
+[20:39:33] $ head -c 400 jobs/*/results.jsonl
+{"id": "batch_req_099738f661c6", "custom_id": "eval-0095", "response": {"status_code": 200, "request_id": "chatcmpl-pAGNsFusX4DjyAWCPA659yeMzyj6iZIL", "body": {"choices": [{"finish_reason": "stop", "index": 0, "message": {"role": "assistant", "content": "This document concerns volcanoes, and the word that appears most often is \"volcanoes.\""}}], "created": 1790825970, "model": "/private/tmp/claud
+[20:39:33] golden path complete
