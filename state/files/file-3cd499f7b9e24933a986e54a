@@ -1,5 +1,0 @@
-{"custom_id": "smoke-0", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "qwen2.5:0.5b", "messages": [{"role": "user", "content": "What is the capital of France?"}], "max_tokens": 32}}
-{"custom_id": "smoke-1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "qwen2.5:0.5b", "messages": [{"role": "user", "content": "2+2?"}], "max_tokens": 32}}
-{"custom_id": "smoke-2", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "qwen2.5:0.5b", "messages": [{"role": "user", "content": "Name a prime number."}], "max_tokens": 32}}
-{"custom_id": "smoke-3", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "qwen2.5:0.5b", "messages": [{"role": "user", "content": "What color is the sky?"}], "max_tokens": 32}}
-{"custom_id": "smoke-4", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "qwen2.5:0.5b", "messages": [{"role": "user", "content": "Who wrote Hamlet?"}], "max_tokens": 32}}
