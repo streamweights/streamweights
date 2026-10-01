@@ -257,6 +257,7 @@ class BatchEngine:
                 if self._stop.is_set():
                     return
                 body = dict(row["body"])
+                body["model"] = job.model  # the job's model is authoritative
                 t0 = time.monotonic()
                 try:
                     r = await client.post(f"http://127.0.0.1:{self.port}/v1/chat/completions",
