@@ -1,0 +1,61 @@
+# Spillway model registry.
+# bf16 is the default quant on the batch tier (DX rule 6).
+# Where no bf16 GGUF repo exists, `bf16.convert_from` records the HF safetensors
+# repo; convert with llama.cpp's convert_hf_to_gguf.py --outtype bf16.
+# arch values are from the GGUF header (block_count, head_count_kv, head dim,
+# kv cache dtype f16) and drive the resident-bytes estimate; when a local GGUF
+# exists its header is read directly and takes precedence.
+
+models:
+  qwen2.5:0.5b:
+    arch: {n_layers: 24, n_kv_heads: 2, head_dim: 64}
+    quants:
+      bf16:
+        convert_from: Qwen/Qwen2.5-0.5B-Instruct   # no public bf16 GGUF exists
+        files: []
+        bytes: 1300000000
+      Q8_0:
+        repo: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+        files: [qwen2.5-0.5b-instruct-q8_0.gguf]
+        bytes: 676000000
+      Q4_K_M:
+        repo: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+        files: [qwen2.5-0.5b-instruct-q4_k_m.gguf]
+        bytes: 491000000
+
+  qwen2.5:32b:
+    arch: {n_layers: 64, n_kv_heads: 8, head_dim: 128}
+    quants:
+      bf16:
+        convert_from: Qwen/Qwen2.5-32B-Instruct    # no public bf16 GGUF exists (bartowski has f16 only)
+        files: []
+        bytes: 65500000000
+      Q8_0:
+        repo: bartowski/Qwen2.5-32B-Instruct-GGUF
+        files: [Qwen2.5-32B-Instruct-Q8_0.gguf]
+        bytes: 34820000000
+      Q4_K_M:
+        repo: bartowski/Qwen2.5-32B-Instruct-GGUF
+        files: [Qwen2.5-32B-Instruct-Q4_K_M.gguf]
+        bytes: 19850000000
+
+  llama3.3:70b:
+    arch: {n_layers: 80, n_kv_heads: 8, head_dim: 128}
+    quants:
+      bf16:
+        repo: unsloth/Llama-3.3-70B-Instruct-GGUF
+        files:
+          - BF16/Llama-3.3-70B-Instruct-BF16-00001-of-00003.gguf
+          - BF16/Llama-3.3-70B-Instruct-BF16-00002-of-00003.gguf
+          - BF16/Llama-3.3-70B-Instruct-BF16-00003-of-00003.gguf
+        bytes: 141120000000
+      Q8_0:
+        repo: bartowski/Llama-3.3-70B-Instruct-GGUF
+        files:
+          - Llama-3.3-70B-Instruct-Q8_0/Llama-3.3-70B-Instruct-Q8_0-00001-of-00002.gguf
+          - Llama-3.3-70B-Instruct-Q8_0/Llama-3.3-70B-Instruct-Q8_0-00002-of-00002.gguf
+        bytes: 74980000000
+      Q4_K_M:
+        repo: bartowski/Llama-3.3-70B-Instruct-GGUF
+        files: [Llama-3.3-70B-Instruct-Q4_K_M.gguf]
+        bytes: 42520000000
