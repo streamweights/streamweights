@@ -60,7 +60,15 @@ def run(
     if choice.quant not in ("bf16",):
         typer.echo(f"quant: {choice.reason}")
 
-    paths = download(m, choice.quant)
+    from .llamacpp import ensure_llama_server
+    ensure_llama_server()
+    try:
+        paths = download(m, choice.quant)
+    except RuntimeError as e:
+        typer.echo(str(e), err=True)
+        if "convert" in str(e):
+            _next_hint(f"spillway run {model} {input_jsonl} --quant Q8_0")
+        raise typer.Exit(1)
 
     ram = hw["ram_total_bytes"]
     vram = hw["gpu"]["vram_bytes"]

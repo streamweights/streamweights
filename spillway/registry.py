@@ -148,8 +148,9 @@ def download(model: Model, quant_name: str, progress: bool = True) -> list[Path]
             paths.append(target)
         return paths
     raise RuntimeError(
-        f"{model.name} {quant_name} has no GGUF repo; convert from {q.convert_from} with "
-        f"convert_hf_to_gguf.py --outtype bf16 into {dest}"
+        f"{model.name} has no published bf16 GGUF; convert from {q.convert_from} with "
+        f"llama.cpp's convert_hf_to_gguf.py --outtype bf16 into {dest}, or opt into a "
+        f"quant explicitly with --quant Q8_0"
     )
 
 
