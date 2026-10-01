@@ -1,3 +1,4 @@
+> Names changed in 003: Spillway → streamweights, CLI → spill. Command names and the `spillway` result-metadata key below are the historical Phase 0 record (now `spill` / `streamweights`).
 # Phase 0 report — the wedge on mmap
 
 Run 2026-09-30, Apple M4 Pro laptop. Directive: `docs/paste-sets/001-phase0-wedge.md`.
@@ -27,7 +28,7 @@ Release **b11311** (`0.5.0-dev, commit f7b384c1e`), prebuilt macOS arm64, in `bi
 (not vendored; the CLI re-fetches it on a clean clone). All four capabilities present:
 
 - **mmap loading** — via the new `-lm/--load-mode {auto,mmap,mmap+mlock}` flag (the old
-  `--no-mmap` is gone; `auto` defaults to mmap). Spillway passes `--load-mode mmap`.
+  `--no-mmap` is gone; `auto` defaults to mmap). streamweights passes `--load-mode mmap`.
 - **Partial GPU offload** — `-ngl/--n-gpu-layers`.
 - **Parallel slots + continuous batching** — `--parallel N`, `--cont-batching` (on by default).
 - **bf16 GGUF** — loads and generates on Metal (verified with a locally converted
@@ -92,7 +93,7 @@ throughput purposes.
 5. **Eval rows carry a placeholder model name**; the engine overwrites `body.model` with
    the job's model so CLI argument and metadata are authoritative.
 6. **Probe fix** — F_NOCACHE on both write and read fds (§1).
-7. **gitignore bug fixed** — `jobs/` pattern shadowed the `spillway/jobs` package;
+7. **gitignore bug fixed** — `jobs/` pattern shadowed the Python jobs package (now `streamweights/jobs`);
    root-anchored.
 8. **70B measurements used explicit `--parallel`** overrides (measurement mode); the
    engine's own KV-bound computation would have chosen N≈7 at 4k and avoided the OOMs.
@@ -120,7 +121,7 @@ RAM window, not a policy drop, and is stamped in every output row's metadata.
 **(d) Install → first streamed row, and the worst moment:** **42 seconds** from
 `pip install -e .` to rows streaming into results.jsonl on a clean clone (including the
 hardware probe, llama.cpp prebuilt fetch, and 0.6 GB model download). The single worst
-moment: the very first `spillway run` a new user types dead-ends, because the bf16
+moment: the very first run command a new user types (`spillway run`, now `spill run`) dead-ends, because the bf16
 default for qwen2.5:0.5b has no published GGUF — the tool prints the exact recovery
 command (`--quant Q8_0`), but "one install, zero config" held while "one command, zero
 config" did not. Fix candidates for Phase 1: publish/convert bf16 automatically on

@@ -67,7 +67,7 @@ def main() -> None:
             "method": "POST",
             "url": "/v1/chat/completions",
             "body": {
-                "model": "qwen2.5:0.5b",  # spillway run <model> overrides per job
+                "model": "qwen2.5:0.5b",  # spill run <model> overrides per job
                 "messages": [{"role": "user", "content": content}],
                 "max_tokens": 128,
             },

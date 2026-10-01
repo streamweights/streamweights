@@ -1,4 +1,6 @@
-# Spillway
+# streamweights
+
+(Working name "Spillway" retired in paste set 003: package `streamweights`, CLI `spill`.)
 
 **Purpose:** run the unmodified full-size model against my eval set, on my machine, for free, overnight, with no data leaving the building.
 
@@ -14,7 +16,7 @@
 
 ## Architecture rule
 
-Inference backends are upstream llama.cpp unmodified. Spillway owns only CLI, gateway, jobs, registry, router.
+Inference backends are upstream llama.cpp unmodified. streamweights owns only CLI, gateway, jobs, registry, router (and, from Phase 1, the streaming runner — see docs/plan.md).
 
 ## Stack
 

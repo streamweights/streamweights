@@ -1,4 +1,4 @@
-"""Spillway CLI. Every command ends by printing the one command most likely next."""
+"""streamweights CLI. Every command ends by printing the one command most likely next."""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def run(
     except RuntimeError as e:
         typer.echo(str(e), err=True)
         if "convert" in str(e):
-            _next_hint(f"spillway run {model} {input_jsonl} --quant Q8_0")
+            _next_hint(f"spill run {model} {input_jsonl} --quant Q8_0")
         raise typer.Exit(1)
 
     ram = hw["ram_total_bytes"]
@@ -96,10 +96,10 @@ def run(
     out_path = out or (job.results_path if job else "gateway batch output file")
 
     typer.echo(
-        f"Spillway: {model} {choice.quant} ({size / GIB:.1f} GB) "
+        f"spill: {model} {choice.quant} ({size / GIB:.1f} GB) "
         f"{'fits' if fits else 'does not fit'} in {ram / GIB:.0f} GB RAM; {placement}. "
         f"{n_prompts} prompts, batch {n}, est. {_fmt_dur(est)}. Cost: $0. "
-        f"Results -> {out_path} (tail with: spillway tail)"
+        f"Results -> {out_path} (tail with: spill tail)"
     )
 
     if use_gateway:
@@ -123,7 +123,7 @@ def run(
             time.sleep(2)
         sys.stderr.write("\n")
         typer.echo(f"batch {b['status']}")
-        _next_hint("spillway status")
+        _next_hint("spill status")
         return
 
     def show(p):
@@ -142,7 +142,7 @@ def run(
         Path(out).write_bytes(job.results_path.read_bytes())
     typer.echo(f"{prog.done}/{prog.total} rows, {prog.completion_tokens} completion tokens, "
                f"{prog.tokens_per_sec:.1f} tok/s aggregate")
-    _next_hint(f"spillway tail {job.id}" if prog.done < prog.total else "spillway status")
+    _next_hint(f"spill tail {job.id}" if prog.done < prog.total else "spill status")
 
 
 @app.command()
@@ -151,7 +151,7 @@ def tail(job: str = typer.Argument(None)):
     j = Job.load(job) if job else Job.latest()
     if not j:
         typer.echo("no jobs yet")
-        _next_hint("spillway run qwen2.5:0.5b examples/evals-2000.jsonl")
+        _next_hint("spill run qwen2.5:0.5b examples/evals-2000.jsonl")
         raise typer.Exit(1)
     typer.echo(f"tailing {j.results_path}  (^C to stop)")
     pos = 0
@@ -170,7 +170,7 @@ def tail(job: str = typer.Argument(None)):
             time.sleep(1)
     except KeyboardInterrupt:
         pass
-    _next_hint("spillway status")
+    _next_hint("spill status")
 
 
 @app.command()
@@ -179,12 +179,12 @@ def resume(job: str = typer.Argument(None)):
     j = Job.load(job) if job else Job.latest()
     if not j:
         typer.echo("no jobs to resume")
-        _next_hint("spillway run qwen2.5:0.5b examples/evals-2000.jsonl")
+        _next_hint("spill run qwen2.5:0.5b examples/evals-2000.jsonl")
         raise typer.Exit(1)
     done = len(j.done_ids())
     if done >= j.total:
         typer.echo(f"{j.id}: already complete ({done}/{j.total})")
-        _next_hint("spillway status")
+        _next_hint("spill status")
         return
     hw = probe_mod.load()
     reg = load_registry()
@@ -201,7 +201,7 @@ def resume(job: str = typer.Argument(None)):
     prog = asyncio.run(engine.run())
     sys.stderr.write("\n")
     typer.echo(f"{prog.done}/{prog.total} rows complete")
-    _next_hint("spillway status")
+    _next_hint("spill status")
 
 
 @app.command()
@@ -209,7 +209,7 @@ def status():
     """List jobs with progress, tokens/s, ETA."""
     if not JOBS_DIR.exists() or not any(JOBS_DIR.iterdir()):
         typer.echo("no jobs")
-        _next_hint("spillway run qwen2.5:0.5b examples/evals-2000.jsonl")
+        _next_hint("spill run qwen2.5:0.5b examples/evals-2000.jsonl")
         return
     typer.echo(f"{'job':28s} {'model':14s} {'quant':7s} {'progress':12s} {'tok/s':>8s} {'eta':>8s} status")
     for d in sorted(JOBS_DIR.iterdir()):
@@ -222,7 +222,7 @@ def status():
         typer.echo(f"{meta['id']:28s} {meta['model']:14s} {meta['quant']:7s} "
                    f"{f'{done}/{total}':12s} {meta.get('tokens_per_sec', 0):8.1f} "
                    f"{_fmt_dur(eta) if eta else '-':>8s} {meta.get('status', '?')}")
-    _next_hint("spillway tail")
+    _next_hint("spill tail")
 
 
 @app.command()
@@ -236,7 +236,7 @@ def models():
         for qn, q in m.quants.items():
             fits = m.resident_bytes(qn, 4096) <= ram
             typer.echo(f"{name:14s} {qn:7s} {q.bytes / GIB:8.1f}G {str(q.downloaded(name)):>10s} {str(fits):>14s}")
-    _next_hint("spillway run qwen2.5:0.5b examples/evals-2000.jsonl")
+    _next_hint("spill run qwen2.5:0.5b examples/evals-2000.jsonl")
 
 
 if __name__ == "__main__":

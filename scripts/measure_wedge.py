@@ -39,7 +39,7 @@ def run_setting(model: str, quant: str, parallel: int, input_file: Path,
     pg0, io0 = vm_pageins(), iostat_mb()
     samples = []
     proc = subprocess.Popen(
-        [str(REPO / ".venv/bin/spillway"), "run", model, str(input_file),
+        [str(REPO / ".venv/bin/spill"), "run", model, str(input_file),
          "--quant", quant, "--parallel", str(parallel), "--context", str(ctx)],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         cwd=REPO,
@@ -69,11 +69,11 @@ def run_setting(model: str, quant: str, parallel: int, input_file: Path,
     if rp.exists():
         for line in rp.read_text().splitlines():
             r = json.loads(line)
-            t = r["spillway"]["tokens"]
+            t = r["streamweights"]["tokens"]
             comp_tokens += t.get("completion", 0) or 0
             prompt_tokens += t.get("prompt", 0) or 0
-            if r["spillway"].get("latency_s"):
-                lat.append(r["spillway"]["latency_s"])
+            if r["streamweights"].get("latency_s"):
+                lat.append(r["streamweights"]["latency_s"])
             rows_done += 1
     return {
         "requested_parallel": parallel,

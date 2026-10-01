@@ -1,4 +1,4 @@
-"""Spillway gateway: OpenAI files+batches shapes and Ollama /api/tags, port 11435.
+"""streamweights gateway: OpenAI files+batches shapes and Ollama /api/tags, port 11435.
 Runs beside Ollama (11434). The CLI uses this if running, in-process otherwise."""
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from .jobs.engine import BatchEngine, Job, JOBS_DIR, compute_offload
 from .policy import choose_quant
 from .registry import GIB, REPO_ROOT, download, load_registry
 
-app = FastAPI(title="spillway")
+app = FastAPI(title="streamweights")
 
 FILES_DIR = REPO_ROOT / "state" / "files"
 BATCHES: dict[str, dict] = {}  # batch_id -> OpenAI batch object (+ _job_id)

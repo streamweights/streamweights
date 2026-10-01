@@ -1,3 +1,5 @@
+NOTE (paste set 003): Names changed since this recording: Spillway → streamweights, CLI command spillway → spill.
+The commands and output below are the historical Phase 0 record and intentionally show the old names.
 Golden path transcript — fresh shell, clean clone, recorded 2026-09-30 20:38 PDT.
 Driver: scripted shell session; each command echoed with a wall-clock timestamp,
 full output captured. Lines from the driver's own poll loop (zsh "no matches

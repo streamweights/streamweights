@@ -272,7 +272,7 @@ class BatchEngine:
                                      "request_id": rbody.get("id", ""),
                                      "body": rbody},
                         "error": None,
-                        "spillway": {
+                        "streamweights": {
                             "tier": self.tier,
                             "quant": job.quant,
                             "batch": parallel,
@@ -289,7 +289,7 @@ class BatchEngine:
                         "custom_id": row["custom_id"],
                         "response": None,
                         "error": {"code": "request_failed", "message": str(e)},
-                        "spillway": {"tier": self.tier, "quant": job.quant,
+                        "streamweights": {"tier": self.tier, "quant": job.quant,
                                      "batch": parallel, "tokens": {}, "latency_s": None},
                     }
                 async with lock:
@@ -298,7 +298,7 @@ class BatchEngine:
                     ckpt.write(row["custom_id"] + "\n")
                     ckpt.flush()
                     prog.done += 1
-                    tok = out["spillway"]["tokens"]
+                    tok = out["streamweights"]["tokens"]
                     prog.completion_tokens += tok.get("completion", 0) or 0
                     prog.prompt_tokens += tok.get("prompt", 0) or 0
                     if prog.done % 5 == 0 or prog.done == prog.total:

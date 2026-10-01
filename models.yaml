@@ -1,4 +1,4 @@
-# Spillway model registry.
+# streamweights model registry.
 # bf16 is the default quant on the batch tier (DX rule 6).
 # Where no bf16 GGUF repo exists, `bf16.convert_from` records the HF safetensors
 # repo; convert with llama.cpp's convert_hf_to_gguf.py --outtype bf16.

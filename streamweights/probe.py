@@ -97,7 +97,7 @@ def _disk_info(path: Path) -> dict:
 
 def _measure_seq_read(path: Path, size_bytes: int = 4 * GIB) -> dict:
     """Write a 4 GB file, drop page cache where the OS permits, read it sequentially."""
-    test = path / ".spillway-probe.bin"
+    test = path / ".streamweights-probe.bin"
     free = shutil.disk_usage(path).free
     if free < size_bytes + 20 * GIB:
         size_bytes = max(1 * GIB, free // 4)

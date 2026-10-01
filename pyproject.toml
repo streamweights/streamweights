@@ -1,5 +1,5 @@
 [project]
-name = "spillway"
+name = "streamweights"
 version = "0.0.1"
 description = "Run the unmodified full-size model against your eval set, on your machine, for free, overnight, with no data leaving the building."
 requires-python = ">=3.12"
@@ -14,11 +14,11 @@ dependencies = [
 ]
 
 [project.scripts]
-spillway = "spillway.cli:app"
+spill = "streamweights.cli:app"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["spillway"]
+packages = ["streamweights"]
