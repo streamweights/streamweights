@@ -21,3 +21,14 @@ Inference backends are upstream llama.cpp unmodified. streamweights owns only CL
 ## Stack
 
 Python 3.12, uv, FastAPI, Typer.
+
+## Phase 0 result (two lines)
+
+mmap reached only 11–13% of the probed NVMe sequential rate on a model 1.5× RAM (175 s per forward pass on 70B Q8_0).
+GPU OOM from batch 32 up at 4k context; batch 16 ran but completed zero rows in 25 minutes.
+
+## Phase 1 engine decision
+
+On macOS the engine is MLX with bf16 safetensors as the native artifact; llama.cpp is retained only as the non-Apple path. No GGUF conversion appears anywhere in the golden path.
+
+The seven DX rules in docs/plan.md remain binding — in particular "one command, zero config" must hold for `spill run <model> <file>` with no flags.
