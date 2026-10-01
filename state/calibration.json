@@ -1,0 +1,53 @@
+{
+  "isolated_read_mbps": 7909.0,
+  "chunk_mb": 64,
+  "threads": 4,
+  "grid": [
+    {
+      "chunk_mb": 4,
+      "threads": 2,
+      "mbps": 3305.5
+    },
+    {
+      "chunk_mb": 4,
+      "threads": 4,
+      "mbps": 7006.0
+    },
+    {
+      "chunk_mb": 4,
+      "threads": 8,
+      "mbps": 6715.2
+    },
+    {
+      "chunk_mb": 16,
+      "threads": 2,
+      "mbps": 6480.7
+    },
+    {
+      "chunk_mb": 16,
+      "threads": 4,
+      "mbps": 6369.4
+    },
+    {
+      "chunk_mb": 16,
+      "threads": 8,
+      "mbps": 6948.0
+    },
+    {
+      "chunk_mb": 64,
+      "threads": 2,
+      "mbps": 7098.4
+    },
+    {
+      "chunk_mb": 64,
+      "threads": 4,
+      "mbps": 7909.0
+    },
+    {
+      "chunk_mb": 64,
+      "threads": 8,
+      "mbps": 7739.0
+    }
+  ],
+  "calibrated_at": "2026-10-01T16:05:59-0700"
+}
