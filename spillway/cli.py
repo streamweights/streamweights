@@ -83,8 +83,9 @@ def run(
         placement = f"streaming from NVMe at ~{nvme / GIB:.1f} GB/s"
     est = est_completion_tokens / est_tps
 
-    job = Job.create(input_jsonl, model, choice.quant, context, n, out)
-    out_path = out or job.results_path
+    use_gateway = _gateway_up()
+    job = None if use_gateway else Job.create(input_jsonl, model, choice.quant, context, n, out)
+    out_path = out or (job.results_path if job else "gateway batch output file")
 
     typer.echo(
         f"Spillway: {model} {choice.quant} ({size / GIB:.1f} GB) "
@@ -92,6 +93,30 @@ def run(
         f"{n_prompts} prompts, batch {n}, est. {_fmt_dur(est)}. Cost: $0. "
         f"Results -> {out_path} (tail with: spillway tail)"
     )
+
+    if use_gateway:
+        # gateway owns execution; CLI just submits and follows
+        import httpx
+        with open(input_jsonl, "rb") as f:
+            fobj = httpx.post(f"{GATEWAY}/v1/files", files={"file": ("input.jsonl", f)},
+                              data={"purpose": "batch"}, timeout=60).json()
+        batch = httpx.post(f"{GATEWAY}/v1/batches",
+                           json={"input_file_id": fobj["id"],
+                                 "endpoint": "/v1/chat/completions",
+                                 "completion_window": "24h"}, timeout=60).json()
+        typer.echo(f"(via gateway {GATEWAY}, batch {batch['id']})")
+        while True:
+            b = httpx.get(f"{GATEWAY}/v1/batches/{batch['id']}", timeout=30).json()
+            rc = b["request_counts"]
+            sys.stderr.write(f"\r{rc['completed']}/{rc['total']} rows  status={b['status']}   ")
+            sys.stderr.flush()
+            if b["status"] in ("completed", "failed", "cancelled"):
+                break
+            time.sleep(2)
+        sys.stderr.write("\n")
+        typer.echo(f"batch {b['status']}")
+        _next_hint("spillway status")
+        return
 
     def show(p):
         eta = p.eta_seconds
