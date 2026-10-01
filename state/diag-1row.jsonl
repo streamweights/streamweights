@@ -1,0 +1,1 @@
+{"custom_id":"diag-0","method":"POST","url":"/v1/chat/completions","body":{"model":"llama3.3:70b","messages":[{"role":"user","content":"What is 2+2? Answer with one word."}],"max_tokens":8}}
