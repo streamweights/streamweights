@@ -1,0 +1,27 @@
+{
+  "probed_at": "2026-09-30T20:08:10-0700",
+  "os": "Darwin 24.6.0 (15.7.3)",
+  "cpu": "Apple M4 Pro",
+  "cpu_cores": 12,
+  "ram_total_bytes": 51539607552,
+  "ram_free_bytes": 24118788096,
+  "gpu": {
+    "vendor": "apple",
+    "model": "Apple M4 Pro",
+    "vram_bytes": 38654705664,
+    "bf16_compute": true,
+    "unified_memory": true
+  },
+  "disk": {
+    "free_bytes": 247270322176,
+    "total_bytes": 494384795648,
+    "device": "/dev/disk3s5"
+  },
+  "nvme_seq_read": {
+    "bytes_read": 4294967296,
+    "seconds": 0.784,
+    "bytes_per_sec": 5481095558,
+    "gb_per_sec": 5.1,
+    "page_cache_dropped": true
+  }
+}

@@ -4,6 +4,9 @@ __pycache__/
 /bin/
 /models/
 /jobs/
-/state/hardware.json
+/state/*.json
+!/state/hardware.json
+!/state/calibration.json
 *.gguf
 nohup.out
+# Files over 10 MB are blocked by .githooks/pre-commit (gitignore cannot match by size).
