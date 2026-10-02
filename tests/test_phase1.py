@@ -174,3 +174,48 @@ def test_identical_greedy_stream_vs_resident():
     stm = {c.custom_id: c.content
            for c in MlxStreamEngine().run_batch(rows, spec, MemoryBudget(36 * GIB))}
     assert res == stm
+
+
+@pytest.mark.skipif(not (REPO / "models/qwen2.5-0.5b/bf16-st/config.json").exists(),
+                    reason="0.5b safetensors not downloaded")
+def test_short_qa_stops_and_matches_mlx_lm_lengths():
+    """Phase 1.5 item 2: 20 short-QA prompts must produce a short answer then a
+    true EOS stop, identically in both engines, with output length (not just
+    first token) matching independent mlx_lm.generate."""
+    from mlx_lm import generate, load
+    from mlx_lm.sample_utils import make_sampler
+    from streamweights.engines.mlx_resident import MlxResidentEngine
+    from streamweights.engines.mlx_stream import MlxStreamEngine
+
+    topics = ["France", "Japan", "water", "the sun", "7*8", "gold", "Mars",
+              "a triangle", "oxygen", "Peru", "the alphabet", "a week",
+              "an octopus", "copper", "Egypt", "binary", "a violin", "ice",
+              "Canada", "pi"]
+    rows = [{"custom_id": f"qa{i}",
+             "body": {"messages": [{"role": "user",
+                                    "content": f"In five words or fewer, say one fact about {t}."}],
+                      "max_tokens": 64}} for i, t in enumerate(topics)]
+    spec = ModelSpec("qwen2.5:0.5b", "bf16",
+                     REPO / "models/qwen2.5-0.5b/bf16-st", {}, 4096)
+    res = {c.custom_id: c for c in MlxResidentEngine().run_batch(rows, spec, MemoryBudget(36 * GIB))}
+    stm = {c.custom_id: c for c in MlxStreamEngine().run_batch(rows, spec, MemoryBudget(36 * GIB))}
+    for k in res:
+        assert res[k].content == stm[k].content, k            # same text
+        assert res[k].completion_tokens == stm[k].completion_tokens, k  # same stop token
+        assert res[k].finish_reason == "stop", (k, res[k].content)      # truly stopped
+        assert res[k].completion_tokens < 64, k
+
+    # cross-check vs mlx_lm must compare like-for-like: single sequence
+    # (batched kernels reorder bf16 math and can flip near-tied tokens)
+    stm1 = {c.custom_id: c for c in MlxStreamEngine().run_batch(
+        rows, spec, MemoryBudget(36 * GIB, batch_override=1))}
+    model, tok = load(str(REPO / "models/qwen2.5-0.5b/bf16-st"))
+    sampler = make_sampler(temp=0.0)
+    for r in rows:
+        t = tok.apply_chat_template(r["body"]["messages"], add_generation_prompt=True)
+        txt = generate(model, tok, prompt=t, max_tokens=64, sampler=sampler,
+                       prefill_step_size=1_000_000)
+        mine = stm1[r["custom_id"]].content
+        # cross-check length against the independent implementation
+        assert abs(len(tok.encode(txt, add_special_tokens=False)) -
+                   stm1[r["custom_id"]].completion_tokens) <= 1, (r["custom_id"], txt, mine)

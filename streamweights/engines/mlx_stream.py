@@ -276,6 +276,34 @@ def save_calibration(cal: dict):
 
 # ---------------------------------------------------------------- compute
 
+def collect_eos_ids(model_dir: Path, tokenizer) -> set[int]:
+    """Every EOS id the model declares: generation_config.json and config.json
+    (int or list), the tokenizer's own ids, and the chat template's end-of-turn
+    token (for Llama 3.x that includes 128009)."""
+    ids: set[int] = set()
+    for fname in ("generation_config.json", "config.json"):
+        p = Path(model_dir) / fname
+        if p.exists():
+            v = json.loads(p.read_text()).get("eos_token_id")
+            if isinstance(v, int):
+                ids.add(v)
+            elif isinstance(v, list):
+                ids.update(int(x) for x in v)
+    if getattr(tokenizer, "eos_token_ids", None):
+        ids.update(tokenizer.eos_token_ids)
+    if getattr(tokenizer, "eos_token_id", None) is not None:
+        ids.add(tokenizer.eos_token_id)
+    # chat template end-of-turn token, resolved through the vocabulary
+    for tok in ("<|eot_id|>", "<|im_end|>", "<|end_of_text|>", "<|endoftext|>"):
+        try:
+            tid = tokenizer.convert_tokens_to_ids(tok)
+            if tid is not None and tid >= 0:
+                ids.add(tid)
+        except Exception:
+            pass
+    return ids
+
+
 def _model_modules(config: dict):
     """One reusable TransformerBlock + args for the model's architecture."""
     mt = config["model_type"]
@@ -466,7 +494,7 @@ class MlxStreamEngine:
         chunk_mb, n_threads = cal.get("chunk_mb", 16), cal.get("threads", 4)
 
         tokenizer = load_tokenizer(spec.path)
-        eos_ids = set(tokenizer.eos_token_ids or [tokenizer.eos_token_id])
+        eos_ids = collect_eos_ids(spec.path, tokenizer)
         block, args = _model_modules(index.config)
         kv_per_token = (2 * index.config["num_hidden_layers"]
                         * index.config["num_key_value_heads"]
