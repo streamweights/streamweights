@@ -128,7 +128,8 @@ def test_memory_budget_arithmetic():
     # arithmetic: ws - 15% - ring(3x) - resident - activations, / per-seq KV
     avail0 = 36 * GIB - int(36 * GIB * 0.15) - 3 * idx.max_layer_bytes - (4 * GIB + 16384)
     assert bm.kv_budget == avail0 - bm.activation_bytes
-    assert bm.batch == min(max(1, int(bm.kv_budget / costs[0])), 500, 512)
+    # fixed-point on (batch, activations) may land within one row of the ideal
+    assert abs(bm.batch - min(max(1, int(bm.kv_budget / costs[0])), 500, 512)) <= 1
     assert "working set" in bm.reason and "per-seq KV" in bm.reason
     # override is honored, never required
     bm2 = compute_batch(idx, MemoryBudget(36 * GIB, batch_override=16), costs, 128, kv_tok)

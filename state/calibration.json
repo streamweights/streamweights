@@ -50,7 +50,7 @@
     }
   ],
   "calibrated_at": "2026-10-01T16:05:59-0700",
-  "engine_read_mbps": 4138.2,
-  "measured_pass_s": 31.55,
-  "bind_ms_per_layer": 29.3
+  "engine_read_mbps": 12791.5,
+  "measured_pass_s": 0.05,
+  "bind_ms_per_layer": 0.7
 }

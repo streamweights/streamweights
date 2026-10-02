@@ -62,7 +62,12 @@ def test_policy_drop_no_bf16_compute():
     assert c.quant == "Q8_0" and "bf16 compute" in c.reason
 
 
-def test_policy_drop_slow_nvme():
+def test_policy_drop_slow_nvme(monkeypatch):
+    import collections
+    import streamweights.policy as pol
+    # pin disk free high so the disk rule cannot fire first (it depends on the machine)
+    Usage = collections.namedtuple("usage", "total used free")
+    monkeypatch.setattr(pol.shutil, "disk_usage", lambda p: Usage(1 << 40, 0, 1 << 40))
     m = load_registry()["llama3.3:70b"]
     hw = {**HW, "nvme_seq_read": {"bytes_per_sec": int(0.5 * GIB)}}  # 141GB/0.5GiB/s > 120s
     c = choose_quant(m, hw)

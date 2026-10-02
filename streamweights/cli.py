@@ -84,11 +84,21 @@ def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
         size = safetensors_spec(model)["bytes"]
     else:  # 8bit / 4bit via mlx-community
         repo = mlx_quant_repo(model, quant)
-        from huggingface_hub import snapshot_download
-        from .registry import MODELS_DIR
+        from huggingface_hub import HfApi, snapshot_download
+        from .registry import MIN_FREE_AFTER_DOWNLOAD, MODELS_DIR
         path = MODELS_DIR / model.replace(":", "-") / f"mlx-{quant}"
         if not (Path(path) / "config.json").exists():
-            typer.echo(f"downloading {model} {quant} (mlx) -> {path}", file=sys.stderr)
+            import shutil as _sh
+            info = HfApi().model_info(repo, files_metadata=True)
+            dl_bytes = sum(f.size or 0 for f in info.siblings)
+            free = _sh.disk_usage(path.parent.parent).free
+            if free - dl_bytes < MIN_FREE_AFTER_DOWNLOAD:
+                typer.echo(f"refusing download: {dl_bytes / GIB:.1f} GB to {path} would "
+                           f"leave {(free - dl_bytes) / GIB:.1f} GB free (< 20 GB floor)",
+                           err=True)
+                raise typer.Exit(1)
+            typer.echo(f"downloading {model} {quant} (mlx): {dl_bytes / GIB:.1f} GB -> {path}",
+                       file=sys.stderr)
             snapshot_download(repo, local_dir=path)
         size = sum(f.stat().st_size for f in Path(path).glob("*.safetensors"))
 

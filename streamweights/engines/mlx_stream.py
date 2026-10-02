@@ -33,6 +33,8 @@ ST_DTYPES = {
     "BF16": (np.uint16, mx.bfloat16, 2),
     "F16": (np.float16, mx.float16, 2),
     "F32": (np.float32, mx.float32, 4),
+    "U32": (np.uint32, mx.uint32, 4),   # packed quantized weights
+    "I32": (np.int32, mx.int32, 4),
 }
 
 
@@ -284,7 +286,12 @@ def _model_modules(config: dict):
     else:
         raise ValueError(f"mlx_stream: unsupported architecture {mt}")
     args = ModelArgs.from_dict(config)
-    return TransformerBlock(args), args
+    block = TransformerBlock(args)
+    q = config.get("quantization")
+    if q:
+        import mlx.nn as nn
+        nn.quantize(block, group_size=q["group_size"], bits=q["bits"])
+    return block, args
 
 
 class StreamKVCache:
@@ -354,6 +361,20 @@ def _load_resident(loc: TensorLoc) -> mx.array:
     npdt, mxdt, _ = ST_DTYPES[loc.st_dtype]
     a = mx.array(np.frombuffer(raw, dtype=npdt).reshape(loc.shape))
     return a.view(mx.bfloat16) if loc.st_dtype == "BF16" else a
+
+
+def _load_resident_maybe_quantized(index: "SafetensorsIndex", base: str) -> mx.array:
+    """Load `base`.weight; if the checkpoint is quantized, dequantize to bf16."""
+    loc = index.tensors[f"{base}.weight"]
+    w = _load_resident(loc)
+    q = index.config.get("quantization")
+    if q and loc.st_dtype in ("U32", "I32"):
+        scales = _load_resident(index.tensors[f"{base}.scales"])
+        biases = _load_resident(index.tensors[f"{base}.biases"])
+        w = mx.dequantize(w, scales, biases, group_size=q["group_size"],
+                          bits=q["bits"]).astype(mx.bfloat16)
+        mx.eval(w)
+    return w
 
 
 # ---------------------------------------------------------------- budget
@@ -475,9 +496,9 @@ class MlxStreamEngine:
             bind_costs.append(_bind(block, index.layers[k], buf, f"model.layers.{k}."))
             return slot
 
-        embed_w = _load_resident(index.embed)
-        norm_w = _load_resident(index.final_norm)
-        lm_w = embed_w if index.tied else _load_resident(index.lm_head)
+        embed_w = _load_resident_maybe_quantized(index, "model.embed_tokens")
+        norm_w = _load_resident(index.final_norm).astype(mx.bfloat16)
+        lm_w = embed_w if index.tied else _load_resident_maybe_quantized(index, "lm_head")
         eps = index.config.get("rms_norm_eps", 1e-5)
 
         stop_event = spec.extra.get("stop_event")
