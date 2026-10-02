@@ -41,7 +41,8 @@ def result_row(cr: CompletedRow, job: Job, engine_name: str) -> dict:
 
 def run_job(job: Job, engine, spec: ModelSpec, budget: MemoryBudget,
             progress_cb=None) -> Progress:
-    progress_cb = progress_cb or (lambda p: None)
+    progress_cb = progress_cb or (lambda p: None)  # may be a no-op; the engine's
+    # per-pass callback owns the single updating progress line
     done = job.done_ids()
     rows = []
     for line in job.input_path.read_text().splitlines():

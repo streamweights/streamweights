@@ -422,10 +422,28 @@ class BudgetMath:
 
 def compute_batch(index: SafetensorsIndex, budget: MemoryBudget,
                   seq_costs: list[int], max_tokens: int, kv_per_token: int,
-                  n_ring: int = 3) -> BudgetMath:
-    """Batch = (working set - margin - ring - resident - activations) / per-seq KV,
-    with per-seq KV from the ACTUAL token lengths of the input file."""
+                  n_ring: int = 3, calibration: dict | None = None,
+                  quant: str | None = None) -> BudgetMath:
+    """Batch sizing. Preferred: measured-memory mode — peak(B) calibrated from
+    probe runs at two batch sizes (state/calibration.json mem_model), solved for
+    85% of the Metal working set. Fallback: the Phase 1 analytic formula."""
     ws = budget.working_set_bytes
+    mem = (calibration or {}).get("mem_model", {}).get(quant or "")
+    if mem:
+        target = int(ws * 0.85)
+        worst_cost_tokens = max(seq_costs) / max(1, kv_per_token)  # Lmax + max_tokens
+        per_seq = mem["per_seq_token_bytes"] * worst_cost_tokens
+        batch = max(1, int((target - mem["base_bytes"]) / max(1, per_seq)))
+        batch = min(batch, max(1, len(seq_costs)), 512)
+        if budget.batch_override:
+            batch = budget.batch_override
+        reason = (f"batch {batch}: measured-memory mode — (0.85×{ws / GIB:.1f}G target "
+                  f"− {mem['base_bytes'] / GIB:.1f}G measured base) / "
+                  f"({mem['per_seq_token_bytes']:.0f} B/seq-token × {worst_cost_tokens:.0f} "
+                  f"worst-case tokens (actual longest prompt + {max_tokens} max_tokens)); "
+                  f"calibrated from probe runs at B={mem['probe_batches']}")
+        return BudgetMath(ws, int(ws * 0.15), 0, 0, 0, target - mem["base_bytes"],
+                          int(per_seq), batch, reason)
     margin = int(ws * budget.margin)
     ring = n_ring * index.max_layer_bytes
     resident = index.embed.nbytes + index.final_norm.nbytes + (
@@ -477,13 +495,17 @@ class ResidentProvider:
 class MlxStreamEngine:
     name = "mlx_stream"
 
-    def __init__(self, progress_note=None, resident=False):
+    def __init__(self, progress_note=None, resident=False, pass_cb=None):
         self.note = progress_note or (lambda s: None)
         self.resident = resident
+        self.pass_cb = pass_cb
         self.last_pass_times: list[float] = []
+        self._bind_costs: list[float] = []
 
     def run_batch(self, rows: list[dict], spec: ModelSpec,
-                  budget: MemoryBudget) -> Iterator[CompletedRow]:
+                  budget: MemoryBudget):
+        from itertools import cycle
+
         from mlx_lm.utils import load_tokenizer
 
         index = SafetensorsIndex(spec.path)
@@ -496,212 +518,232 @@ class MlxStreamEngine:
         tokenizer = load_tokenizer(spec.path)
         eos_ids = collect_eos_ids(spec.path, tokenizer)
         block, args = _model_modules(index.config)
-        kv_per_token = (2 * index.config["num_hidden_layers"]
-                        * index.config["num_key_value_heads"]
-                        * (index.config["hidden_size"] // index.config["num_attention_heads"])
-                        * 2)
+        cfg = index.config
+        kv_per_token = (2 * cfg["num_hidden_layers"] * cfg["num_key_value_heads"]
+                        * (cfg["hidden_size"] // cfg["num_attention_heads"]) * 2)
+        n_layers = index.n_layers
+        H = cfg["num_key_value_heads"]
+        D = cfg["hidden_size"] // cfg["num_attention_heads"]
+        eps = cfg.get("rms_norm_eps", 1e-5)
 
         prompts = []
         for r in rows:
             toks = tokenizer.apply_chat_template(
                 r["body"]["messages"], add_generation_prompt=True)
             prompts.append((r, toks, r["body"].get("max_tokens", 128)))
-        # sort by length so chunks pad little; per-seq KV from actual lengths
         prompts.sort(key=lambda p: len(p[1]))
+        total_rows = len(prompts)
         max_tokens_job = max(p[2] for p in prompts)
         seq_costs = [(len(t) + mt) * kv_per_token for _, t, mt in prompts]
-        bm = compute_batch(index, budget, seq_costs, max_tokens_job, kv_per_token)
+        bm = compute_batch(index, budget, seq_costs, max_tokens_job, kv_per_token,
+                           calibration=cal, quant=spec.quant)
         self.note(bm.reason)
+        auto_batch = bm.batch
+        first_group = min(spec.extra.get("first_group", 8), total_rows)
 
         provider = ResidentProvider(index) if self.resident else None
 
         def bind_layer(k, ring, seqno):
-            """Bind layer k's weights to the block; from memory or from the ring."""
             if provider is not None:
                 block.update(provider.trees[k])
                 return None
             slot, buf = ring.get(seqno)
-            bind_costs.append(_bind(block, index.layers[k], buf, f"model.layers.{k}."))
+            self._bind_costs.append(_bind(block, index.layers[k], buf, f"model.layers.{k}."))
             return slot
 
+        self._bind_costs = []
         embed_w = _load_resident_maybe_quantized(index, "model.embed_tokens")
         norm_w = _load_resident(index.final_norm).astype(mx.bfloat16)
         lm_w = embed_w if index.tied else _load_resident_maybe_quantized(index, "lm_head")
-        eps = index.config.get("rms_norm_eps", 1e-5)
 
         stop_event = spec.extra.get("stop_event")
-        bind_costs = []
-        n_layers = index.n_layers
+        max_passes = spec.extra.get("max_passes")  # probe/timebox hook
 
-        for c0 in range(0, len(prompts), bm.batch):
-            chunk = prompts[c0:c0 + bm.batch]
-            if stop_event and stop_event.is_set():
-                return
-            B = len(chunk)
-            lens = [len(t) for _, t, _ in chunk]
-            Lpad = max(lens)
-            deltas = [Lpad - l for l in lens]
-            t_chunk0 = time.monotonic()
+        pending = list(prompts)          # sorted ascending by prompt length
+        # active-row state (parallel lists)
+        act_rows: list = []              # (row, toks, max_tokens)
+        act_start: list[int] = []        # first valid cache column per row
+        act_gen: list[list[int]] = []    # generated ids per row
+        caches = [StreamKVCache() for _ in range(n_layers)]
+        tokens = None                    # [b, 1] next input ids
+        completed = 0
+        gen_tokens_total = 0
+        t_job0 = time.monotonic()
+        pass_no = 0
 
-            # ---- prefill: per-seq causal (exact; uniform rope shift per row) ----
-            caches = [StreamKVCache() for _ in range(n_layers)]
-            # per-seq hidden states during prefill
-            hs = [embed_w[mx.array(t)][None] for _, t, _ in chunk]
-            sched = list(range(n_layers))
-            ring = None
-            if provider is None:
-                ring = RingReader(index, 3, chunk_mb * MB, n_threads)
-                ring.start(sched)
-            prefill_t0 = time.monotonic()
-            seq_caches = [[StreamKVCache(offset=deltas[i]) for i in range(B)]
-                          for _ in range(n_layers)]
-            for seq, k in enumerate(sched):
+        ring = None
+        if provider is None:
+            ring = RingReader(index, 3, chunk_mb * MB, n_threads)
+            ring.start(cycle(range(n_layers)))
+        seqno = 0
+
+        def emit(i):
+            r, toks, mt = act_rows[i]
+            out = act_gen[i]
+            stopped = bool(out) and out[-1] in eos_ids
+            text_ids = out[:-1] if stopped else out
+            return CompletedRow(
+                custom_id=r["custom_id"], content=tokenizer.decode(text_ids),
+                prompt_tokens=len(toks), completion_tokens=len(out),
+                latency_s=round(time.monotonic() - t_job0, 3),
+                finish_reason="stop" if stopped else "length",
+                batch_size=len(act_rows))
+
+        try:
+            while act_rows or pending:
                 if stop_event and stop_event.is_set():
-                    if ring:
-                        ring.stop()
                     return
-                slot = bind_layer(k, ring, seq)
-                for i in range(B):
-                    hs[i] = block(hs[i], mask="causal", cache=seq_caches[k][i])
-                mx.eval(*[h for h in hs])
-                if slot is not None:
-                    ring.release(slot)
-            if ring:
-                ring.stop()
-            prefill_s = time.monotonic() - prefill_t0
+                if max_passes and pass_no >= max_passes:
+                    return
 
-            # merge per-seq caches into batched caches with physical left-pad
-            H = index.config["num_key_value_heads"]
-            D = index.config["hidden_size"] // index.config["num_attention_heads"]
-            for k in range(n_layers):
-                ks, vs = [], []
-                for i in range(B):
-                    sk = seq_caches[k][i]
-                    kk = sk.keys[..., :sk._len, :]
-                    vv = sk.values[..., :sk._len, :]
-                    if deltas[i]:
-                        pad = mx.zeros((1, H, deltas[i], D), kk.dtype)
-                        kk = mx.concatenate([pad, kk], axis=2)
-                        vv = mx.concatenate([pad, vv], axis=2)
-                    ks.append(kk)
-                    vs.append(vv)
-                c = caches[k]
-                c.keys = mx.concatenate(ks, axis=0)
-                c.values = mx.concatenate(vs, axis=0)
-                c._used = Lpad
-                c.offset = Lpad
-                mx.eval(c.keys, c.values)
-            del seq_caches
-            mx.clear_cache()
-
-            # last real token logits -> first generated token
-            last_h = mx.concatenate([h[:, -1:, :] for h in hs], axis=0)
-            del hs
-            logits = mx.fast.rms_norm(last_h, norm_w, eps) @ lm_w.T
-            tokens = mx.argmax(logits, axis=-1)  # [B,1]
-            mx.eval(tokens)
-
-            generated = [[int(tokens[i, 0])] for i in range(B)]
-            active = list(range(B))
-            delta_vec = list(deltas)
-            maxtoks = [mt for _, _, mt in chunk]
-            finished = [False] * B
-
-            def finish(i_global, reason):
-                r, toks, _ = chunk[i_global]
-                out = generated[i_global]
-                if out and out[-1] in eos_ids:
-                    out = out[:-1]
-                yield_row = CompletedRow(
-                    custom_id=r["custom_id"],
-                    content=tokenizer.decode(out),
-                    prompt_tokens=len(toks),
-                    completion_tokens=len(generated[i_global]),
-                    latency_s=round(time.monotonic() - t_chunk0, 3),
-                    finish_reason=reason, batch_size=B)
-                return yield_row
-
-            # immediate EOS check
-            for i in list(active):
-                if generated[i][-1] in eos_ids or len(generated[i]) >= maxtoks[i]:
-                    finished[i] = True
-
-            # ---- decode: batched, one weight stream per token ----
-            decode_t0 = time.monotonic()
-            n_decode_passes = 0
-            ring = None
-            if provider is None:
-                ring = RingReader(index, 3, chunk_mb * MB, n_threads)
-                # schedule enough passes for the worst case; stop early via ring.stop()
-                ring.start([k for _ in range(max(maxtoks)) for k in range(n_layers)])
-            seqno = 0
-            try:
-                while active:
-                    # emit finished rows, drop them from the batch at this pass boundary
-                    if any(finished[i] for i in active):
-                        keep_pos = [p for p, i in enumerate(active) if not finished[i]]
-                        for i in list(active):
-                            if finished[i]:
-                                yield finish(i, "stop" if generated[i][-1] in eos_ids
-                                             else "length")
-                        active = [i for i in active if not finished[i]]
-                        if not active:
+                K = caches[0].offset  # current cache length == next write slot
+                # ---- admission ----
+                admits = []
+                cap = first_group if (not act_rows and completed == 0 and pass_no == 0) \
+                    else auto_batch
+                if not act_rows and pending:
+                    group = pending[:cap]
+                    pending = pending[cap:]
+                    Lpad = max(len(t) for _, t, _ in group)
+                    # fresh group: prompt ends align at slot Lpad-1; next write = Lpad
+                    admits = [(p, Lpad - len(p[1])) for p in group]
+                    caches = [StreamKVCache() for _ in range(n_layers)]
+                    for c in caches:
+                        c.offset = 0
+                    K = Lpad - 1  # so that s = K+1-L matches Lpad-L below
+                else:
+                    while pending and len(act_rows) + len(admits) < auto_batch:
+                        cand = pending[0]
+                        if len(cand[1]) <= K + 1:
+                            admits.append((cand, K + 1 - len(cand[1])))
+                            pending = pending[1:]
+                        else:
                             break
-                        for c in caches:
-                            c.keep_rows(keep_pos)
-                        tokens = tokens[mx.array(keep_pos)]
-                        delta_vec = [delta_vec[p] for p in keep_pos]
-                        mx.eval(tokens)
-                    if stop_event and stop_event.is_set():
-                        return
-                    pass_t0 = time.monotonic()
-                    x = embed_w[tokens]          # [b,1,D]
-                    K = caches[0].offset + 1
-                    pad_mask = (mx.arange(K)[None, None, None, :]
-                                < mx.array(delta_vec)[:, None, None, None])
+
+                pass_t0 = time.monotonic()
+                admit_h = [embed_w[mx.array(t)][None] for (_, t, _), _ in admits]
+                admit_caches = [[StreamKVCache(offset=s) for _, s in admits]
+                                for _ in range(n_layers)]
+                x = embed_w[tokens] if act_rows else None   # [b,1,D]
+                if act_rows:
+                    Kcur = K + 1
+                    pad_mask = (mx.arange(Kcur)[None, None, None, :]
+                                < mx.array(act_start)[:, None, None, None])
                     mask = mx.where(pad_mask, mx.array(-mx.inf, x.dtype),
                                     mx.array(0, x.dtype))
-                    for k in range(n_layers):
-                        slot = bind_layer(k, ring, seqno)
-                        seqno += 1
+
+                for k in range(n_layers):
+                    slot = bind_layer(k, ring, seqno)
+                    seqno += 1
+                    if act_rows:
                         x = block(x, mask=mask, cache=caches[k])
-                        mx.eval(x)
-                        if slot is not None:
-                            ring.release(slot)
-                    logits = mx.fast.rms_norm(x, norm_w, eps) @ lm_w.T
-                    tokens = mx.argmax(logits, axis=-1)
-                    mx.eval(tokens)
-                    self.last_pass_times.append(time.monotonic() - pass_t0)
-                    n_decode_passes += 1
-                    self._gen_tokens = getattr(self, "_gen_tokens", 0) + len(active)
-                    if n_decode_passes % 10 == 0:
-                        self.note(f"gen progress: passes {n_decode_passes}, "
-                                  f"active {len(active)}, gen_tokens {self._gen_tokens}, "
-                                  f"median pass {float(np.median(self.last_pass_times)):.1f}s, "
-                                  f"peak mem {mx.get_peak_memory() / GIB:.1f}G")
-                    for pos, i in enumerate(active):
-                        generated[i].append(int(tokens[pos, 0]))
-                        if generated[i][-1] in eos_ids or len(generated[i]) >= maxtoks[i]:
-                            finished[i] = True
-            finally:
-                if ring:
-                    ring.stop()
-                mx.clear_cache()
+                    for a in range(len(admits)):
+                        admit_h[a] = block(admit_h[a], mask="causal",
+                                           cache=admit_caches[k][a])
+                    ev = ([x] if act_rows else []) + admit_h
+                    if ev:
+                        mx.eval(*ev)
+                    if slot is not None:
+                        ring.release(slot)
 
-            self.note(f"chunk done: prefill {prefill_s:.1f}s, "
-                      f"{n_decode_passes} decode passes, "
-                      f"median pass {np.median(self.last_pass_times or [0]):.1f}s, "
-                      f"bind cost median {np.median(bind_costs or [0]) * 1000:.0f}ms/layer, "
-                      f"peak mem {mx.get_peak_memory() / GIB:.1f}G")
+                # merge admits into the batch (prompt end aligned at slot K)
+                if admits:
+                    new_len = caches[0].offset if act_rows else (K + 1)
+                    for k in range(n_layers):
+                        c = caches[k]
+                        ks, vs = ([c.keys[..., :c._len, :]] if act_rows else []), \
+                                 ([c.values[..., :c._len, :]] if act_rows else [])
+                        for a in range(len(admits)):
+                            sk = admit_caches[k][a]
+                            kk = sk.keys[..., :sk._len, :]
+                            vv = sk.values[..., :sk._len, :]
+                            padlen = new_len - kk.shape[2]
+                            if padlen > 0:
+                                z = mx.zeros((1, H, padlen, D), kk.dtype)
+                                kk = mx.concatenate([z, kk], axis=2)
+                                vv = mx.concatenate([z, vv], axis=2)
+                            ks.append(kk)
+                            vs.append(vv)
+                        c.keys = mx.concatenate(ks, axis=0)
+                        c.values = mx.concatenate(vs, axis=0)
+                        c._used = new_len
+                        c.offset = new_len
+                        mx.eval(c.keys, c.values)
+                        for a in range(len(admits)):
+                            admit_caches[k][a] = None
+                    for (p, s) in admits:
+                        act_rows.append(p)
+                        act_start.append(s)
+                        act_gen.append([])
+                    mx.clear_cache()
 
-        # refresh calibration with measured pass times (policy rule source)
+                # logits for this pass: actives' decode step + admits' first token
+                hs_last = []
+                if x is not None:
+                    hs_last.append(x)
+                hs_last += [h[:, -1:, :] for h in admit_h]
+                if not hs_last:
+                    break
+                h_all = mx.concatenate(hs_last, axis=0)
+                logits = mx.fast.rms_norm(h_all, norm_w, eps) @ lm_w.T
+                tokens = mx.argmax(logits, axis=-1)
+                mx.eval(tokens)
+                pass_s = time.monotonic() - pass_t0
+                self.last_pass_times.append(pass_s)
+                pass_no += 1
+
+                for i in range(len(act_rows)):
+                    act_gen[i].append(int(tokens[i, 0]))
+                gen_tokens_total += len(act_rows)
+
+                # finish + compress
+                done_idx = [i for i in range(len(act_rows))
+                            if act_gen[i][-1] in eos_ids
+                            or len(act_gen[i]) >= act_rows[i][2]]
+                if done_idx:
+                    for i in done_idx:
+                        yield emit(i)
+                    completed += len(done_idx)
+                    keep = [i for i in range(len(act_rows)) if i not in set(done_idx)]
+                    if keep:
+                        kidx = mx.array(keep)
+                        tokens = tokens[kidx]
+                        for c in caches:
+                            c.keep_rows(keep)
+                        mx.eval(tokens)
+                    else:
+                        tokens = None
+                    act_rows = [act_rows[i] for i in keep]
+                    act_start = [act_start[i] for i in keep]
+                    act_gen = [act_gen[i] for i in keep]
+                    if not act_rows:
+                        caches = [StreamKVCache() for _ in range(n_layers)]
+                        mx.clear_cache()
+
+                if self.pass_cb:
+                    elapsed = time.monotonic() - t_job0
+                    rate = gen_tokens_total / elapsed if elapsed else 0
+                    done_avg = (gen_tokens_total / max(1, completed)
+                                if completed else max_tokens_job)
+                    remaining = (total_rows - completed) * min(done_avg, max_tokens_job)
+                    self.pass_cb({
+                        "rows_done": completed, "total": total_rows,
+                        "pass_no": pass_no, "pass_s": pass_s,
+                        "tok_s": rate,
+                        "eta_s": remaining / rate if rate else None,
+                        "quant": spec.quant, "batch": len(act_rows),
+                        "peak_gb": mx.get_peak_memory() / GIB,
+                    })
+        finally:
+            if ring:
+                ring.stop()
+            mx.clear_cache()
+
         model_bytes_total = sum(p.nbytes for p in index.layers)
-        # only streaming-scale models produce a trustworthy engine rate; small
-        # models sit in page cache and would pollute the calibration
         if self.last_pass_times and provider is None and model_bytes_total > 10 * GIB:
             cal = load_calibration()
             med = float(np.median(self.last_pass_times))
             cal["engine_read_mbps"] = round(model_bytes_total / med / MB, 1)
             cal["measured_pass_s"] = round(med, 2)
-            cal["bind_ms_per_layer"] = round(float(np.median(bind_costs)) * 1000, 1)
+            cal["bind_ms_per_layer"] = round(float(np.median(self._bind_costs or [0])) * 1000, 1)
             save_calibration(cal)

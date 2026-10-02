@@ -68,6 +68,22 @@ def _progress_line(p):
     sys.stderr.flush()
 
 
+def _fmt_eta(s):
+    if s is None:
+        return "..."
+    if s < 3600:
+        return f"{int(s // 60)}m {int(s % 60):02d}s"
+    return f"{int(s // 3600)}h {int(s % 3600 // 60):02d}m"
+
+
+def _pass_line(info):
+    sys.stderr.write(
+        f"\rrows {info['rows_done']}/{info['total']} · pass {info['pass_no']} "
+        f"({info['pass_s']:.1f} s) · {info['tok_s']:.1f} tok/s · "
+        f"ETA {_fmt_eta(info['eta_s'])} · {info['quant']} · batch {info['batch']}   ")
+    sys.stderr.flush()
+
+
 def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
              est_s: float | None, out: Path | None, context: int,
              parallel: int | None, hw: dict, rows: list[dict]) -> None:
@@ -108,12 +124,14 @@ def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
 
     if fits:
         engine = MlxResidentEngine()
+        engine.pass_cb = _pass_line
         batch = 1
         placement = "resident"
         est = est_s or n_prompts * max_tokens / 150
         why = f"{reason}; model fits working set -> mlx_resident"
     else:
-        engine = MlxStreamEngine(progress_note=lambda s: typer.echo(f"   {s}", err=True))
+        engine = MlxStreamEngine(progress_note=lambda s: typer.echo(f"   {s}", err=True),
+                                 pass_cb=_pass_line)
         index = SafetensorsIndex(path)
         from mlx_lm.utils import load_tokenizer
         tokenizer = load_tokenizer(Path(path))
@@ -125,10 +143,11 @@ def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
             toks = tokenizer.apply_chat_template(r["body"]["messages"],
                                                  add_generation_prompt=True)
             costs.append((len(toks) + r["body"].get("max_tokens", 128)) * kv_tok)
-        bm = compute_batch(index, MemoryBudget(ws, batch_override=parallel),
-                           costs, max_tokens, kv_tok)
-        batch = bm.batch
         cal = load_calibration()
+        bm = compute_batch(index, MemoryBudget(ws, batch_override=parallel),
+                           costs, max_tokens, kv_tok, calibration=cal,
+                           quant=quant)
+        batch = bm.batch
         rate, rate_src = engine_read_rate(cal, hw)
         pass_s = size / rate
         est = math.ceil(n_prompts / batch) * (max_tokens + 1) * pass_s
@@ -148,7 +167,7 @@ def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
                      context)
     from .jobs.runner import run_job
     prog = run_job(job, engine, spec, MemoryBudget(ws, batch_override=parallel),
-                   _progress_line)
+                   progress_cb=None)  # the per-pass line is the only line
     sys.stderr.write("\n")
     if out and Path(out) != job.results_path:
         Path(out).write_bytes(job.results_path.read_bytes())
@@ -309,9 +328,10 @@ def _run_mlx_resume(j: Job, quant: str, hw: dict) -> None:
         size = sum(f.stat().st_size for f in path.glob("*.safetensors"))
     engine = MlxResidentEngine() if size <= ws * 0.70 else \
         MlxStreamEngine(progress_note=lambda s: typer.echo(f"   {s}", err=True))
+    engine.pass_cb = _pass_line
     spec = ModelSpec(j.model, quant, Path(path),
                      reg[j.model].arch if j.model in reg else {}, j.ctx)
-    prog = run_job(j, engine, spec, MemoryBudget(ws, batch_override=None), _progress_line)
+    prog = run_job(j, engine, spec, MemoryBudget(ws, batch_override=None), progress_cb=None)
     sys.stderr.write("\n")
     typer.echo(f"{prog.done}/{prog.total} rows complete")
 
