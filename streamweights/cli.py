@@ -249,9 +249,9 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
         cal = load_calibration()
         bm = compute_batch(index, MemoryBudget(ws, batch_override=parallel),
                            costs, max_tokens, kv_tok, calibration=cal,
-                           quant=quant)
+                           quant=f"{model}|{quant}")
         batch = bm.batch
-        rate, rate_src = engine_read_rate(cal, hw)
+        rate, rate_src = engine_read_rate(cal, hw, key=f"{model}|{quant}")
         pass_s = size / rate
         est = math.ceil(n_prompts / batch) * (max_tokens + 1) * pass_s
         placement = f"streaming from NVMe at ~{rate / GIB:.1f} GB/s ({rate_src})"
