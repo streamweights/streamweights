@@ -572,11 +572,23 @@ class MlxStreamEngine:
         def row_cost(p):
             return per_tok_cost * (len(p[1]) + p[2]) if per_tok_cost else 0
 
-        def may_admit(p, n_active):
+        def may_admit(p, n_active, K_now, rem_max, pending_cost=0):
             if committed is None:
                 return n_active < auto_batch
-            return n_active < 512 and (n_active == 0 or
-                                       committed + row_cost(p) <= admit_budget)
+            if n_active == 0:
+                return True
+            if n_active >= 512:
+                return False
+            # (1) calibrated per-row cost must fit the budget
+            if committed + pending_cost + row_cost(p) > admit_budget:
+                return False
+            # (2) physical allocation: every row's cache occupies the batch's
+            # padded length, allocated in 256-token steps — the term the
+            # per-row model misses (this is what let 512 short rows in)
+            horizon = K_now + max(rem_max, p[2])
+            phys_len = ((horizon + 255) // 256) * 256
+            phys = (n_active + 1) * phys_len * kv_per_token
+            return phys <= admit_budget
         # active-row state (parallel lists)
         act_rows: list = []              # (row, toks, max_tokens)
         act_start: list[int] = []        # first valid cache column per row
@@ -621,10 +633,15 @@ class MlxStreamEngine:
                 if not act_rows and pending:
                     if committed is not None:
                         group = []
+                        gcost = 0
+                        Lp = 0
                         for p in pending:
-                            if len(group) >= cap or not may_admit(p, len(group)):
+                            Lp = max(Lp, len(p[1]))
+                            if len(group) >= cap or not may_admit(
+                                    p, len(group), Lp, p[2], pending_cost=gcost):
                                 break
                             group.append(p)
+                            gcost += row_cost(p)
                         group = group or pending[:1]
                     else:
                         group = pending[:cap]
@@ -637,10 +654,16 @@ class MlxStreamEngine:
                         c.offset = 0
                     K = Lpad - 1  # so that s = K+1-L matches Lpad-L below
                 else:
-                    while pending and may_admit(pending[0], len(act_rows) + len(admits)):
+                    rem_max = max((act_rows[i][2] - len(act_gen[i])
+                                   for i in range(len(act_rows))), default=0)
+                    acost = 0
+                    while pending and may_admit(pending[0],
+                                                len(act_rows) + len(admits), K,
+                                                rem_max, pending_cost=acost):
                         cand = pending[0]
                         if len(cand[1]) <= K + 1:
                             admits.append((cand, K + 1 - len(cand[1])))
+                            acost += row_cost(cand)
                             pending = pending[1:]
                         else:
                             break
