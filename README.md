@@ -15,6 +15,13 @@ The pre-run line above shows this machine's real numbers (Apple M4 Pro, 48 GB RA
 
 ## Status
 
-Phase 0 complete, Phase 1 (streaming runner) in progress. Phase 0 measured the mmap baseline on a model 1.5× RAM (llama3.3:70b Q8_0, 75 GB on a 48 GB machine): mmap paging reached only 11–13% of the drive's probed sequential rate, a single forward pass took 175 s on 70B Q8_0 (one full weight read per token), and batch sizes from 32 up OOM'd the GPU at 4k context. The streaming runner targets 70%+ of the sequential rate, which is roughly an 8–12× improvement. Full numbers: docs/reports/001-phase0.md.
+Phase 1 (streaming runner, MLX) complete. On a 48 GB M4 Pro, the runner streams
+llama3.3:70b bf16 (141 GB) from NVMe at 79% of the drive's probed rate during
+decode (Phase 0's mmap managed 11–13%), cutting a forward pass from 175 s to
+31.6 s (17.1 s at 8-bit) and running batch 128 where mmap OOM'd at 32. Streamed
+and resident execution produce identical greedy output (20/20). The no-flags
+golden path runs the full 2,000-row eval against the 70B overnight (~11 h at
+8-bit, chosen and explained by the policy; bf16 would be ~25 h). Phase 0 baseline:
+docs/reports/001-phase0.md. Phase 1 numbers: docs/reports/002-phase1.md.
 
 Plan: see [docs/plan.md](docs/plan.md).
