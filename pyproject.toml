@@ -25,4 +25,4 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["streamweights"]
-artifacts = ["streamweights/data/*.jsonl"]
+artifacts = ["streamweights/data/*.jsonl", "streamweights/models.yaml"]

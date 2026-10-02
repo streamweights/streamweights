@@ -10,7 +10,8 @@ import tarfile
 import urllib.request
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from .registry import REPO_ROOT
+
 BIN_DIR = REPO_ROOT / "bin"
 LLAMA_SERVER = BIN_DIR / "llama-server"
 

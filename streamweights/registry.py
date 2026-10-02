@@ -10,8 +10,22 @@ from pathlib import Path
 
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-MODELS_YAML = REPO_ROOT / "models.yaml"
+def _home() -> Path:
+    """Data root: the git checkout when running from one, else ~/.streamweights
+    (installed packages must not write into site-packages). SPILL_HOME overrides."""
+    import os
+    env = os.environ.get("SPILL_HOME")
+    if env:
+        return Path(env).expanduser()
+    cand = Path(__file__).resolve().parent.parent
+    if (cand / "pyproject.toml").exists():
+        return cand
+    return Path.home() / ".streamweights"
+
+
+REPO_ROOT = _home()
+REPO_ROOT.mkdir(parents=True, exist_ok=True)
+MODELS_YAML = Path(__file__).resolve().parent / "models.yaml"
 MODELS_DIR = REPO_ROOT / "models"
 
 GIB = 1024**3

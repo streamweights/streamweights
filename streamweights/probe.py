@@ -11,7 +11,9 @@ import subprocess
 import time
 from pathlib import Path
 
-STATE_DIR = Path(__file__).resolve().parent.parent / "state"
+from .registry import REPO_ROOT
+
+STATE_DIR = REPO_ROOT / "state"
 HARDWARE_JSON = STATE_DIR / "hardware.json"
 
 GIB = 1024**3
@@ -167,7 +169,7 @@ def probe(fast: bool = False) -> dict:
     if fast and prior:
         return prior
 
-    repo_root = STATE_DIR.parent
+    repo_root = REPO_ROOT
     disk = _disk_info(repo_root)
     hw = {
         "probed_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
