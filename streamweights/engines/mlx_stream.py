@@ -547,7 +547,6 @@ class MlxStreamEngine:
         seq_costs = [(len(t) + mt) * kv_per_token for _, t, mt in prompts]
         bm = compute_batch(index, budget, seq_costs, max_tokens_job, kv_per_token,
                            calibration=cal, quant=f"{spec.name}|{spec.quant}")
-        self.note(bm.reason)
         auto_batch = bm.batch
 
         provider = ResidentProvider(index) if self.resident else None
@@ -840,7 +839,10 @@ class MlxStreamEngine:
         if self.last_pass_times and provider is None and model_bytes_total > 10 * GIB:
             cal = load_calibration()
             med = float(np.median(self.last_pass_times))
-            cal["engine_read_mbps"] = round(model_bytes_total / med / MB, 1)
+            # keyed per model|quant: a smaller model's (often page-cache-warm)
+            # rate must never masquerade as another model's streaming rate
+            cal.setdefault("engine_rates", {})[f"{spec.name}|{spec.quant}"] = \
+                round(model_bytes_total / med / MB, 1)
             cal["measured_pass_s"] = round(med, 2)
             cal["bind_ms_per_layer"] = round(float(np.median(self._bind_costs or [0])) * 1000, 1)
             save_calibration(cal)

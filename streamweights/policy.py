@@ -26,10 +26,15 @@ class QuantChoice:
     pass_seconds: float | None = None
 
 
-def engine_read_rate(calibration: dict, hardware: dict) -> tuple[float, str]:
-    """Bytes/sec the streaming engine actually achieves, best available source."""
+def engine_read_rate(calibration: dict, hardware: dict,
+                     key: str | None = None) -> tuple[float, str]:
+    """Bytes/sec the streaming engine actually achieves, best available source.
+    Rates are keyed per model|quant; generic fallbacks follow."""
+    rates = calibration.get("engine_rates", {})
+    if key and rates.get(key):
+        return rates[key] * MB, "measured engine rate"
     if calibration.get("engine_read_mbps"):
-        return calibration["engine_read_mbps"] * MB, "measured engine rate"
+        return calibration["engine_read_mbps"] * MB, "measured engine rate (machine)"
     if calibration.get("isolated_read_mbps"):
         return calibration["isolated_read_mbps"] * MB, "isolated read ceiling"
     return hardware["nvme_seq_read"]["bytes_per_sec"], "probed NVMe rate (uncalibrated)"
@@ -46,11 +51,12 @@ def estimate_job_seconds(model_bytes: int, n_rows: int, max_tokens: int,
 
 def choose_quant_v2(model_bytes: int, bf16_downloaded: bool, n_rows: int,
                     max_tokens: int, est_batch: int, calibration: dict,
-                    hardware: dict, explicit: str | None = None) -> QuantChoice:
+                    hardware: dict, explicit: str | None = None,
+                    rate_key: str | None = None) -> QuantChoice:
     if explicit:
         return QuantChoice(explicit, f"--quant {explicit} (explicit opt-in)")
 
-    rate, rate_src = engine_read_rate(calibration, hardware)
+    rate, rate_src = engine_read_rate(calibration, hardware, key=rate_key)
     est_s, pass_s = estimate_job_seconds(model_bytes, n_rows, max_tokens, est_batch, rate)
 
     free = shutil.disk_usage(REPO_ROOT).free

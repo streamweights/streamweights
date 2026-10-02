@@ -331,7 +331,8 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet):
                                  hw["gpu"]["vram_bytes"])
         choice = choose_quant_v2(res.st_bytes, downloaded,
                                  len(rows), max_tokens, est_batch,
-                                 load_calibration(), hw, explicit=quant)
+                                 load_calibration(), hw, explicit=quant,
+                                 rate_key=f"{res.name}|bf16")
         if choice.quant != "bf16":
             typer.echo(f"quant: {choice.reason}")
         if res.kind == "hf" and choice.quant in ("8bit", "4bit") and quant is None:
