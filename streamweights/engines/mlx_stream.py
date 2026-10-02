@@ -792,6 +792,12 @@ class MlxStreamEngine:
                     done_avg = (gen_tokens_total / max(1, completed)
                                 if completed else max_tokens_job)
                     remaining = (total_rows - completed) * min(done_avg, max_tokens_job)
+                    slots = []
+                    for i in range(min(8, len(act_rows))):
+                        txt = tokenizer.decode(act_gen[i][-40:]) if act_gen[i] else ""
+                        slots.append({"custom_id": act_rows[i][0]["custom_id"],
+                                      "tokens": len(act_gen[i]),
+                                      "tail": txt[-80:].replace("\n", " ")})
                     self.pass_cb({
                         "rows_done": completed, "total": total_rows,
                         "pass_no": pass_no, "pass_s": pass_s,
@@ -799,6 +805,7 @@ class MlxStreamEngine:
                         "eta_s": remaining / rate if rate else None,
                         "quant": spec.quant, "batch": len(act_rows),
                         "peak_gb": mx.get_peak_memory() / GIB,
+                        "slots": slots,
                     })
         finally:
             if ring:

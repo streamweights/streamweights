@@ -20,6 +20,7 @@ from .registry import (GIB, download, load_registry, mlx_quant_repo,
                        safetensors_spec, download_safetensors)
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+_DEBUG = False
 
 GATEWAY = "http://127.0.0.1:11435"
 MB = 1024 * 1024
@@ -84,17 +85,54 @@ def _fmt_eta(s):
     return f"{int(s // 3600)}h {int(s % 3600 // 60):02d}m"
 
 
-def _pass_line(info):
-    sys.stderr.write(
-        f"\rrows {info['rows_done']}/{info['total']} · pass {info['pass_no']} "
-        f"({info['pass_s']:.1f} s) · {info['tok_s']:.1f} tok/s · "
-        f"ETA {_fmt_eta(info['eta_s'])} · {info['quant']} · batch {info['batch']}   ")
-    sys.stderr.flush()
+class _LiveRenderer:
+    """One progress line plus a fixed-height block of up to 8 active slots,
+    redrawn in place every pass. Also persists live.json for tail/status."""
+
+    def __init__(self, job_dir=None, quiet=False):
+        self.job_dir = Path(job_dir) if job_dir else None
+        self.quiet = quiet
+        self._lines = 0
+
+    def line(self, info):
+        return (f"rows {info['rows_done']}/{info['total']} · pass {info['pass_no']} "
+                f"({info['pass_s']:.1f} s) · {info['tok_s']:.1f} tok/s · "
+                f"ETA {_fmt_eta(info['eta_s'])} · {info['quant']} · batch {info['batch']}"
+                f" · ~{info['pass_s']:.1f} s per token per prompt"
+                f" · {info.get('peak_gb', 0):.1f} GB peak")
+
+    def __call__(self, info):
+        if self.job_dir:
+            try:
+                (self.job_dir / "live.json").write_text(json.dumps(info))
+            except OSError:
+                pass
+        block = [self.line(info)]
+        if not self.quiet:
+            for s in info.get("slots", []):
+                block.append(f"  {s['custom_id'][:18]:18s} {s['tokens']:4d} tok │ {s['tail']}")
+        if self._lines:
+            sys.stderr.write(f"\x1b[{self._lines}F")  # cursor to start of block
+        out = "\n".join(l[:200] + "\x1b[K" for l in block)
+        pad = self._lines - len(block)
+        if pad > 0:
+            out += ("\n" + "\x1b[K") * pad
+            sys.stderr.write(out + f"\x1b[{pad}F")
+        else:
+            sys.stderr.write(out)
+        sys.stderr.write("\n")
+        self._lines = max(self._lines, len(block))
+        sys.stderr.flush()
+
+
+def _pass_line(info):  # retained for callers without a job dir
+    _LiveRenderer()(info)
 
 
 def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
              est_s: float | None, out: Path | None, context: int,
-             parallel: int | None, hw: dict, rows: list[dict]) -> None:
+             parallel: int | None, hw: dict, rows: list[dict],
+             quiet: bool = False) -> None:
     from .engines.mlx_resident import MlxResidentEngine
     from .engines.mlx_stream import (MlxStreamEngine, SafetensorsIndex,
                                      compute_batch, load_calibration)
@@ -132,14 +170,12 @@ def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
 
     if fits:
         engine = MlxResidentEngine()
-        engine.pass_cb = _pass_line
         batch = 1
         placement = "resident"
         est = est_s or n_prompts * max_tokens / 150
         why = f"{reason}; model fits working set -> mlx_resident"
     else:
-        engine = MlxStreamEngine(progress_note=lambda s: typer.echo(f"   {s}", err=True),
-                                 pass_cb=_pass_line)
+        engine = MlxStreamEngine(progress_note=lambda s: typer.echo(f"   {s}", err=True))
         index = SafetensorsIndex(path)
         from mlx_lm.utils import load_tokenizer
         tokenizer = load_tokenizer(Path(path))
@@ -163,6 +199,7 @@ def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
         why = f"{bm.reason}; quant: {reason}"
 
     job = Job.create(input_jsonl, model, quant, context, batch, out)
+    engine.pass_cb = _LiveRenderer(job.dir, quiet)
     out_path = out or job.results_path
     typer.echo(
         f"spill: {model} {quant} ({size / GIB:.1f} GB) "
@@ -193,8 +230,12 @@ def run(
     out: Path = typer.Option(None, "--out"),
     context: int = typer.Option(4096, "--context"),
     parallel: int = typer.Option(None, "--parallel", help="override computed batch (never required)"),
+    quiet: bool = typer.Option(False, "--quiet", help="suppress the live tail block"),
+    debug: bool = typer.Option(False, "--debug", help="show tracebacks"),
 ):
     """Run an OpenAI batch JSONL against a local model."""
+    global _DEBUG
+    _DEBUG = debug
     hw = probe_mod.load(probe_if_missing=True)
     reg = load_registry()
     if model not in reg:
@@ -214,7 +255,7 @@ def run(
         if choice.quant != "bf16":
             typer.echo(f"quant: {choice.reason}")
         _run_mlx(model, input_jsonl, choice.quant, choice.reason, choice.est_seconds,
-                 out, context, parallel, hw, rows)
+                 out, context, parallel, hw, rows, quiet=quiet)
         return
 
     # non-Apple path (or explicit GGUF quant): llama.cpp, Phase 0 policy
@@ -266,8 +307,16 @@ def tail(job: str = typer.Argument(None)):
         raise typer.Exit(1)
     typer.echo(f"tailing {j.results_path}  (^C to stop)")
     pos = 0
+    live = _LiveRenderer()
     try:
         while True:
+            meta0 = j.read_meta()
+            lp = j.dir / "live.json"
+            if meta0.get("status") == "running" and lp.exists():
+                try:
+                    live(json.loads(lp.read_text()))
+                except (json.JSONDecodeError, OSError):
+                    pass
             if j.results_path.exists():
                 with open(j.results_path) as f:
                     f.seek(pos)
@@ -336,7 +385,7 @@ def _run_mlx_resume(j: Job, quant: str, hw: dict) -> None:
         size = sum(f.stat().st_size for f in path.glob("*.safetensors"))
     engine = MlxResidentEngine() if size <= ws * 0.70 else \
         MlxStreamEngine(progress_note=lambda s: typer.echo(f"   {s}", err=True))
-    engine.pass_cb = _pass_line
+    engine.pass_cb = _LiveRenderer(j.dir, quiet=False)
     spec = ModelSpec(j.model, quant, Path(path),
                      reg[j.model].arch if j.model in reg else {}, j.ctx)
     prog = run_job(j, engine, spec, MemoryBudget(ws, batch_override=None), progress_cb=None)
@@ -362,6 +411,11 @@ def status():
         typer.echo(f"{meta['id']:28s} {meta['model']:14s} {meta['quant']:7s} "
                    f"{f'{done}/{total}':12s} {meta.get('tokens_per_sec', 0):8.1f} "
                    f"{_fmt_dur(eta) if eta else '-':>8s} {meta.get('status', '?')}")
+        if meta.get("status") == "running" and (d / "live.json").exists():
+            try:
+                _LiveRenderer()(json.loads((d / "live.json").read_text()))
+            except (json.JSONDecodeError, OSError):
+                pass
     _next_hint("spill tail")
 
 
