@@ -19,8 +19,61 @@ from .registry import (GIB, download, load_registry, mlx_quant_repo,
                        safetensors_dir, safetensors_downloaded,
                        safetensors_spec, download_safetensors)
 
+if sys.version_info < (3, 10):  # pragma: no cover
+    sys.stderr.write("spill needs Python 3.10 or newer; this is "
+                     f"{sys.version.split()[0]} — try: uv tool install "
+                     "git+https://github.com/streamweights/streamweights\n")
+    raise SystemExit(1)
+
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 _DEBUG = False
+
+SAMPLE_PATH = Path(__file__).parent / "data" / "sample-20.jsonl"
+
+
+def _fail(e):
+    from .errors import SpillError
+    if _DEBUG:
+        raise e
+    if isinstance(e, SpillError):
+        typer.echo(f"spill: {e.line()}", err=True)
+    else:
+        typer.echo(f"spill: {type(e).__name__}: {e} — rerun with --debug for the traceback",
+                   err=True)
+    raise typer.Exit(1)
+
+
+def _resolve_input(input_arg: str) -> Path:
+    from .errors import SpillError
+    if input_arg == "sample":
+        typer.echo("(using the packaged 20-prompt sample: spill run <model> sample)")
+        return SAMPLE_PATH
+    p = Path(input_arg)
+    if not p.exists():
+        raise SpillError(f"input file {input_arg} does not exist",
+                         "spill run <model> sample")
+    return p
+
+
+def _validate_rows(path: Path) -> list[dict]:
+    from .errors import SpillError
+    rows = []
+    for n, line in enumerate(path.read_text().splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            r = json.loads(line)
+            assert isinstance(r.get("custom_id"), str)
+            assert isinstance(r["body"]["messages"], list) and r["body"]["messages"]
+        except (json.JSONDecodeError, KeyError, AssertionError, TypeError):
+            raise SpillError(
+                f"malformed input at line {n}: each line must be JSON like "
+                '{"custom_id": "x", "body": {"messages": [{"role": "user", '
+                '"content": "..."}], "max_tokens": 48}}')
+        rows.append(r)
+    if not rows:
+        raise SpillError(f"{path} contains no rows", "spill run <model> sample")
+    return rows
 
 GATEWAY = "http://127.0.0.1:11435"
 MB = 1024 * 1024
@@ -129,19 +182,25 @@ def _pass_line(info):  # retained for callers without a job dir
     _LiveRenderer()(info)
 
 
-def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
+def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
              est_s: float | None, out: Path | None, context: int,
              parallel: int | None, hw: dict, rows: list[dict],
              quiet: bool = False) -> None:
     from .engines.mlx_resident import MlxResidentEngine
     from .engines.mlx_stream import (MlxStreamEngine, SafetensorsIndex,
                                      compute_batch, load_calibration)
+    from .engines.supported import classify
+    from .resolve import download_hf
 
+    model = res.name
     reg = load_registry()
     ws = hw["gpu"]["vram_bytes"]
     ram = hw["ram_total_bytes"]
 
-    if quant == "bf16":
+    if res.kind == "hf":
+        path = download_hf(res)
+        size = res.st_bytes
+    elif quant == "bf16":
         path = download_safetensors(model)
         size = safetensors_spec(model)["bytes"]
     else:  # 8bit / 4bit via mlx-community
@@ -198,11 +257,12 @@ def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
         placement = f"streaming from NVMe at ~{rate / GIB:.1f} GB/s ({rate_src})"
         why = f"{bm.reason}; quant: {reason}"
 
+    fam = classify(json.loads((Path(path) / "config.json").read_text()))
     job = Job.create(input_jsonl, model, quant, context, batch, out)
     engine.pass_cb = _LiveRenderer(job.dir, quiet)
     out_path = out or job.results_path
     typer.echo(
-        f"spill: {model} {quant} ({size / GIB:.1f} GB) "
+        f"spill: {model} {quant} ({size / GIB:.1f} GB, {fam.label}: {fam.state}) "
         f"{'fits' if size <= ram else 'does not fit'} in {ram / GIB:.0f} GB RAM; {placement}. "
         f"{n_prompts} prompts, batch {batch}, est. {_fmt_dur(est)}. Cost: $0. "
         f"Results -> {out_path} (tail with: spill tail)")
@@ -211,8 +271,19 @@ def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
     spec = ModelSpec(model, quant, Path(path), reg[model].arch if model in reg else {},
                      context)
     from .jobs.runner import run_job
-    prog = run_job(job, engine, spec, MemoryBudget(ws, batch_override=parallel),
-                   progress_cb=None)  # the per-pass line is the only line
+    try:
+        prog = run_job(job, engine, spec, MemoryBudget(ws, batch_override=parallel),
+                       progress_cb=None)  # the per-pass line is the only line
+    except Exception as e:
+        if any(k in str(e) for k in ("Insufficient Memory", "kIOGPU", "OutOfMemory",
+                                     "metal::malloc")):
+            typer.echo("spill: Metal ran out of memory; retrying with a smaller batch "
+                       "(completed rows are checkpointed)", err=True)
+            prog = run_job(job, engine, spec,
+                           MemoryBudget(int(ws * 0.72), batch_override=parallel),
+                           progress_cb=None)
+        else:
+            raise
     sys.stderr.write("\n")
     if out and Path(out) != job.results_path:
         Path(out).write_bytes(job.results_path.read_bytes())
@@ -223,8 +294,8 @@ def _run_mlx(model: str, input_jsonl: Path, quant: str, reason: str,
 
 @app.command()
 def run(
-    model: str = typer.Argument(..., help="registry model name, e.g. llama3.3:70b"),
-    input_jsonl: Path = typer.Argument(..., exists=True, readable=True),
+    model: str = typer.Argument(..., help="curated tag (llama3.3:70b) or HF repo id (org/name[@rev])"),
+    input_jsonl: str = typer.Argument(..., help="OpenAI batch JSONL path, or `sample`"),
     quant: str = typer.Option(None, "--quant",
                               help="8bit|4bit (mlx) or Q8_0|Q4_K_M (gguf); bf16 is the default"),
     out: Path = typer.Option(None, "--out"),
@@ -233,33 +304,55 @@ def run(
     quiet: bool = typer.Option(False, "--quiet", help="suppress the live tail block"),
     debug: bool = typer.Option(False, "--debug", help="show tracebacks"),
 ):
-    """Run an OpenAI batch JSONL against a local model."""
+    """Run an OpenAI batch JSONL (or `sample`) against a tag or any HF repo id."""
     global _DEBUG
     _DEBUG = debug
+    try:
+        _run_impl(model, input_jsonl, quant, out, context, parallel, quiet)
+    except Exception as e:
+        _fail(e)
+
+
+def _run_impl(model, input_arg, quant, out, context, parallel, quiet):
+    from .resolve import arch_from_config, resolve_model
     hw = probe_mod.load(probe_if_missing=True)
     reg = load_registry()
-    if model not in reg:
-        typer.echo(f"unknown model {model}; registry has: {', '.join(reg)}", err=True)
-        raise typer.Exit(1)
-    rows = [json.loads(l) for l in input_jsonl.read_text().splitlines() if l.strip()]
+    res = resolve_model(model)
+    input_jsonl = _resolve_input(input_arg)
+    rows = _validate_rows(input_jsonl)
     max_tokens = max(r["body"].get("max_tokens", 128) for r in rows)
 
     if _is_mac() and quant in (None, "bf16", "8bit", "4bit"):
-        st = safetensors_spec(model)
         from .engines.mlx_stream import load_calibration
-        est_batch = _rough_batch(st["bytes"], reg[model].arch, rows, max_tokens,
+        arch = reg[model].arch if res.kind == "tag" else arch_from_config(res.config)
+        downloaded = safetensors_downloaded(model) if res.kind == "tag" else (
+            res.local_dir.exists() and any(res.local_dir.glob("*.safetensors")))
+        est_batch = _rough_batch(res.st_bytes, arch, rows, max_tokens,
                                  hw["gpu"]["vram_bytes"])
-        choice = choose_quant_v2(st["bytes"], safetensors_downloaded(model),
+        choice = choose_quant_v2(res.st_bytes, downloaded,
                                  len(rows), max_tokens, est_batch,
                                  load_calibration(), hw, explicit=quant)
         if choice.quant != "bf16":
             typer.echo(f"quant: {choice.reason}")
-        _run_mlx(model, input_jsonl, choice.quant, choice.reason, choice.est_seconds,
+        if res.kind == "hf" and choice.quant in ("8bit", "4bit") and quant is None:
+            typer.echo(f"note: no {choice.quant} artifact is registered for {res.name}; "
+                       f"staying at bf16 (the drop rule applies to curated tags)")
+            choice.quant = "bf16"
+        _run_mlx(res, input_jsonl, choice.quant, choice.reason, choice.est_seconds,
                  out, context, parallel, hw, rows, quiet=quiet)
         return
+    model = res.name
+    if not _is_mac():
+        typer.echo("spill: not Apple silicon / no Metal — using the llama.cpp GGUF path, "
+                   "which works but is slow; the streaming runner needs Metal")
+    if res.kind == "hf":
+        from .errors import SpillError
+        raise SpillError("arbitrary HF repos run on the Metal streaming path only; "
+                         "on this machine use a curated tag", "spill models")
 
     # non-Apple path (or explicit GGUF quant): llama.cpp, Phase 0 policy
     m = reg[model]
+    input_jsonl = _resolve_input(input_arg) if res.kind == "tag" else input_jsonl
     choice = choose_quant(m, hw, explicit=quant)
     if choice.quant != "bf16":
         typer.echo(f"quant: {choice.reason}")
@@ -419,25 +512,43 @@ def status():
     _next_hint("spill tail")
 
 
+PARAMS = {"qwen2.5:0.5b": "0.5B", "qwen2.5:32b": "32B", "llama3.3:70b": "70B"}
+MLX8_BYTES = {"qwen2.5:0.5b": 700_000_000, "qwen2.5:32b": 35_000_000_000,
+              "llama3.3:70b": 75_000_000_000}
+
+
 @app.command()
-def models():
-    """List registry entries, downloaded artifacts, and resident fit on this machine."""
+def models(architectures: bool = typer.Option(False, "--architectures",
+                                              help="print the architecture support table")):
+    """Curated tags: size, family, placement on this machine, disk needed, downloaded."""
+    from .engines.supported import FAMILIES, table
+    if architectures:
+        typer.echo(table())
+        typer.echo('\nAny Hugging Face repo id with a supported architecture also works: '
+                   'spill run org/name sample.')
+        return
     hw = probe_mod.load()
-    ram = hw["ram_total_bytes"]
+    ws = hw["gpu"]["vram_bytes"]
     reg = load_registry()
-    typer.echo(f"{'model':14s} {'quant':7s} {'size':>9s} {'downloaded':>10s} {'fits resident':>14s}")
-    for name, m in reg.items():
+    from .registry import MODELS_DIR
+    typer.echo(f"{'tag':14s} {'params':7s} {'family (state)':26s} {'bf16':>8s} {'8-bit':>8s} "
+               f"{'placement':10s} {'disk needed':>12s} {'downloaded':>10s}")
+    fam_of = {"qwen2.5:0.5b": "qwen2", "qwen2.5:32b": "qwen2", "llama3.3:70b": "llama"}
+    for name in reg:
         st = safetensors_spec(name)
-        if st:
-            typer.echo(f"{name:14s} {'bf16':7s} {st['bytes'] / GIB:8.1f}G "
-                       f"{str(safetensors_downloaded(name)):>10s} "
-                       f"{str(st['bytes'] <= ram):>14s}")
-        for qn, q in m.quants.items():
-            if qn == "bf16":
-                continue
-            fits = m.resident_bytes(qn, 4096) <= ram
-            typer.echo(f"{name:14s} {qn:7s} {q.bytes / GIB:8.1f}G {str(q.downloaded(name)):>10s} {str(fits):>14s}")
-    _next_hint("spill run qwen2.5:0.5b examples/evals-2000.jsonl")
+        fam = FAMILIES[fam_of[name]]
+        bf16_g = st["bytes"] / GIB
+        q8_g = MLX8_BYTES[name] / GIB
+        placement = "resident" if st["bytes"] <= ws * 0.70 else "streamed"
+        need = st["bytes"] / GIB + 20
+        dl = safetensors_downloaded(name) or \
+            (MODELS_DIR / name.replace(":", "-") / "mlx-8bit" / "config.json").exists()
+        typer.echo(f"{name:14s} {PARAMS[name]:7s} {fam.label + ' (' + fam.state + ')':26s} "
+                   f"{bf16_g:7.1f}G {q8_g:7.1f}G {placement:10s} {need:10.0f}G+ "
+                   f"{str(dl):>10s}")
+    typer.echo('\nAny Hugging Face repo id with a supported architecture also works: '
+               'spill run org/name sample.')
+    _next_hint("spill run llama3.3:70b sample")
 
 
 if __name__ == "__main__":

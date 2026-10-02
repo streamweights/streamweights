@@ -50,9 +50,9 @@
     }
   ],
   "calibrated_at": "2026-10-01T16:05:59-0700",
-  "engine_read_mbps": 3851.5,
-  "measured_pass_s": 33.9,
-  "bind_ms_per_layer": 37.2,
+  "engine_read_mbps": 20285.9,
+  "measured_pass_s": 0.66,
+  "bind_ms_per_layer": 7.0,
   "mem_model": {
     "llama3.3:70b|8bit": {
       "base_bytes": 9299972360,

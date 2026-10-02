@@ -305,21 +305,23 @@ def collect_eos_ids(model_dir: Path, tokenizer) -> set[int]:
 
 
 def _model_modules(config: dict):
-    """One reusable TransformerBlock + args for the model's architecture."""
-    mt = config["model_type"]
-    if mt == "llama":
-        from mlx_lm.models.llama import ModelArgs, TransformerBlock
-    elif mt == "qwen2":
-        from mlx_lm.models.qwen2 import ModelArgs, TransformerBlock
-    else:
-        raise ValueError(f"mlx_stream: unsupported architecture {mt}")
-    args = ModelArgs.from_dict(config)
-    block = TransformerBlock(args)
+    """One reusable TransformerBlock + args + family for the architecture."""
+    import importlib
+
+    from .supported import NOT_YET, classify
+    fam = classify(config)
+    if fam.state == NOT_YET or not fam.module:
+        raise ValueError(
+            f"unsupported architecture: {fam.label} is '{fam.state}' "
+            f"({fam.note}) — see: spill models --architectures")
+    mod = importlib.import_module(f"mlx_lm.models.{fam.module}")
+    args = mod.ModelArgs.from_dict(config)
+    block = mod.TransformerBlock(args)
     q = config.get("quantization")
     if q:
         import mlx.nn as nn
         nn.quantize(block, group_size=q["group_size"], bits=q["bits"])
-    return block, args
+    return block, args, fam
 
 
 class StreamKVCache:
@@ -526,13 +528,12 @@ class MlxStreamEngine:
 
         tokenizer = load_tokenizer(spec.path)
         eos_ids = collect_eos_ids(spec.path, tokenizer)
-        block, args = _model_modules(index.config)
+        block, args, fam = _model_modules(index.config)
         cfg = index.config
-        kv_per_token = (2 * cfg["num_hidden_layers"] * cfg["num_key_value_heads"]
-                        * (cfg["hidden_size"] // cfg["num_attention_heads"]) * 2)
+        D = cfg.get("head_dim") or cfg["hidden_size"] // cfg["num_attention_heads"]
+        kv_per_token = 2 * cfg["num_hidden_layers"] * cfg["num_key_value_heads"] * D * 2
         n_layers = index.n_layers
         H = cfg["num_key_value_heads"]
-        D = cfg["hidden_size"] // cfg["num_attention_heads"]
         eps = cfg.get("rms_norm_eps", 1e-5)
 
         prompts = []
@@ -562,7 +563,22 @@ class MlxStreamEngine:
         self._bind_costs = []
         embed_w = _load_resident_maybe_quantized(index, "model.embed_tokens")
         norm_w = _load_resident(index.final_norm).astype(mx.bfloat16)
+        if fam.norm_plus_one:
+            norm_w = norm_w + 1.0
         lm_w = embed_w if index.tied else _load_resident_maybe_quantized(index, "lm_head")
+        embed_scale = (index.config["hidden_size"] ** 0.5) if fam.embed_scale else None
+        softcap = (index.config.get(fam.final_softcap_key)
+                   if fam.final_softcap_key else None)
+
+        def embed(ids):
+            h = embed_w[ids]
+            return (h * embed_scale).astype(h.dtype) if embed_scale else h
+
+        def lm_logits(h):
+            logits = mx.fast.rms_norm(h, norm_w, eps) @ lm_w.T
+            if softcap:
+                logits = mx.tanh(logits / softcap) * softcap
+            return logits
 
         stop_event = spec.extra.get("stop_event")
         max_passes = spec.extra.get("max_passes")  # probe/timebox hook
@@ -675,17 +691,20 @@ class MlxStreamEngine:
                             break
 
                 pass_t0 = time.monotonic()
-                admit_h = [embed_w[mx.array(t)][None] for (_, t, _), _ in admits]
+                admit_h = [embed(mx.array(t))[None] for (_, t, _), _ in admits]
                 # physical pad start s vs absolute rope start: differ after compaction
                 admit_caches = [[StreamKVCache(offset=abs_off + 1 - len(p[1]))
                                  for p, _ in admits] for _ in range(n_layers)]
-                x = embed_w[tokens] if act_rows else None   # [b,1,D]
+                x = embed(tokens) if act_rows else None   # [b,1,D]
                 if act_rows:
                     Kcur = K + 1  # physical columns
                     pad_mask = (mx.arange(Kcur)[None, None, None, :]
                                 < mx.array(act_start)[:, None, None, None])
                     mask = mx.where(pad_mask, mx.array(-mx.inf, x.dtype),
                                     mx.array(0, x.dtype))
+                    if fam.needs_array_mask:
+                        # eager GQA attention scores are 5-D [B, Hkv, rep, L, K]
+                        mask = mask[:, :, None, :, :]
 
                 for k in range(n_layers):
                     slot = bind_layer(k, ring, seqno)
@@ -693,7 +712,12 @@ class MlxStreamEngine:
                     if act_rows:
                         x = block(x, mask=mask, cache=caches[k])
                     for a in range(len(admits)):
-                        admit_h[a] = block(admit_h[a], mask="causal",
+                        la = admit_h[a].shape[1]
+                        amask = "causal" if not fam.needs_array_mask else \
+                            mx.where(mx.arange(la)[:, None] >= mx.arange(la)[None, :],
+                                     mx.array(0, admit_h[a].dtype),
+                                     mx.array(-mx.inf, admit_h[a].dtype))
+                        admit_h[a] = block(admit_h[a], mask=amask,
                                            cache=admit_caches[k][a])
                     ev = ([x] if act_rows else []) + admit_h
                     if ev:
@@ -742,7 +766,7 @@ class MlxStreamEngine:
                 if not hs_last:
                     break
                 h_all = mx.concatenate(hs_last, axis=0)
-                logits = mx.fast.rms_norm(h_all, norm_w, eps) @ lm_w.T
+                logits = lm_logits(h_all)
                 tokens = mx.argmax(logits, axis=-1)
                 mx.eval(tokens)
                 pass_s = time.monotonic() - pass_t0
