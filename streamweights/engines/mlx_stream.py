@@ -507,6 +507,10 @@ class MlxStreamEngine:
             seq_caches = [[StreamKVCache(offset=deltas[i]) for i in range(B)]
                           for _ in range(n_layers)]
             for seq, k in enumerate(sched):
+                if stop_event and stop_event.is_set():
+                    if ring:
+                        ring.stop()
+                    return
                 slot = bind_layer(k, ring, seq)
                 for i in range(B):
                     hs[i] = block(hs[i], mask="causal", cache=seq_caches[k][i])
@@ -620,6 +624,12 @@ class MlxStreamEngine:
                     mx.eval(tokens)
                     self.last_pass_times.append(time.monotonic() - pass_t0)
                     n_decode_passes += 1
+                    self._gen_tokens = getattr(self, "_gen_tokens", 0) + len(active)
+                    if n_decode_passes % 10 == 0:
+                        self.note(f"gen progress: passes {n_decode_passes}, "
+                                  f"active {len(active)}, gen_tokens {self._gen_tokens}, "
+                                  f"median pass {float(np.median(self.last_pass_times)):.1f}s, "
+                                  f"peak mem {mx.get_peak_memory() / GIB:.1f}G")
                     for pos, i in enumerate(active):
                         generated[i].append(int(tokens[pos, 0]))
                         if generated[i][-1] in eos_ids or len(generated[i]) >= maxtoks[i]:
