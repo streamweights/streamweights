@@ -667,11 +667,13 @@ class MlxStreamEngine:
                       f"peak mem {mx.get_peak_memory() / GIB:.1f}G")
 
         # refresh calibration with measured pass times (policy rule source)
-        if self.last_pass_times and provider is None:
+        model_bytes_total = sum(p.nbytes for p in index.layers)
+        # only streaming-scale models produce a trustworthy engine rate; small
+        # models sit in page cache and would pollute the calibration
+        if self.last_pass_times and provider is None and model_bytes_total > 10 * GIB:
             cal = load_calibration()
             med = float(np.median(self.last_pass_times))
-            model_bytes = sum(p.nbytes for p in index.layers)
-            cal["engine_read_mbps"] = round(model_bytes / med / MB, 1)
+            cal["engine_read_mbps"] = round(model_bytes_total / med / MB, 1)
             cal["measured_pass_s"] = round(med, 2)
             cal["bind_ms_per_layer"] = round(float(np.median(bind_costs)) * 1000, 1)
             save_calibration(cal)
