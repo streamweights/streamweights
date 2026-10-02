@@ -1,0 +1,575 @@
+Phase 1.6 golden path — fresh dir, the public install one-liner, no flags.
+Recorded 2026-10-02 16:43 PDT. Operator deviation: model artifacts symlinked into
+the fresh SPILL_HOME (a fresh machine sees the printed download lines instead).
+
+Timeline: pip install git+https://github.com/streamweights/streamweights done in
+11 s. spill run qwen2.5:0.5b sample: 20/20 rows in 6 s (211.6 tok/s). spill run
+llama3.3:70b sample: pre-run line 16:43:28, FIRST VISIBLE PARTIAL TEXT 16:44:09
+= 41 s (59 s from venv creation). Clean ^C; spill resume continued the job from
+its checkpoint. No Hugging Face login, no prompts, anywhere.
+
+================================================================================
+
+
+[16:43:09] $ python3.12 -m venv .venv
+[16:43:10] (exit 0)
+
+[16:43:10] $ source .venv/bin/activate
+[16:43:10] (exit 0)
+
+[16:43:10] $ pip install git+https://github.com/streamweights/streamweights
+[notice] A new release of pip is available: 26.1 -> 26.2.1
+[notice] To update, run: pip install --upgrade pip
+[16:43:21] (exit 0)
+
+[16:43:21] $ spill run qwen2.5:0.5b sample
+(using the packaged 20-prompt sample: spill run <model> sample)
+spill: qwen2.5:0.5b bf16 (0.9 GB, Qwen2/2.5: verified) fits in 48 GB RAM; resident. 20 prompts, batch 1, est. 6 s. Cost: $0. Results -> /private/tmp/claude-501/-Users-amrishkapoor-spillway/8a7a1f63-3e9e-4d09-80a8-0deb1a2ada73/scratchpad/golden-p16/home/jobs/20261002-164324-27641e/results.jsonl (tail with: spill tail)
+   why: bf16 (batch-tier default); est from isolated read ceiling; model fits working set -> mlx_resident
+rows 0/20 · pass 1 (0.3 s) · 74.8 tok/s · ETA 0m 12s · bf16 · batch 20 · ~0.3 s per token per prompt · 1.0 GB peak[K
+  hamlet-author         1 tok │ Ham[K
+  continents            1 tok │ There[K
+  mona-lisa             1 tok │ The[K
+  capital-france        1 tok │ The[K
+  smallest-prime        1 tok │ The[K
+  red-planet            1 tok │ The[K
+  seven-times-eight     1 tok │ 7[K
+  largest-ocean         1 tok │ The[K
+[9Frows 0/20 · pass 2 (0.0 s) · 137.3 tok/s · ETA 0m 06s · bf16 · batch 20 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author         2 tok │ Hamlet[K
+  continents            2 tok │ There are[K
+  mona-lisa             2 tok │ The Mona[K
+  capital-france        2 tok │ The capital[K
+  smallest-prime        2 tok │ The smallest[K
+  red-planet            2 tok │ The planet[K
+  seven-times-eight     2 tok │ 7 times[K
+  largest-ocean         2 tok │ The largest[K
+[9Frows 0/20 · pass 3 (0.0 s) · 193.0 tok/s · ETA 0m 04s · bf16 · batch 20 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author         3 tok │ Hamlet is[K
+  continents            3 tok │ There are currently[K
+  mona-lisa             3 tok │ The Mona Lisa[K
+  capital-france        3 tok │ The capital of[K
+  smallest-prime        3 tok │ The smallest prime[K
+  red-planet            3 tok │ The planet called[K
+  seven-times-eight     3 tok │ 7 times [K
+  largest-ocean         3 tok │ The largest ocean[K
+[9Frows 0/20 · pass 4 (0.0 s) · 242.1 tok/s · ETA 0m 03s · bf16 · batch 20 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author         4 tok │ Hamlet is a[K
+  continents            4 tok │ There are currently [K
+  mona-lisa             4 tok │ The Mona Lisa is[K
+  capital-france        4 tok │ The capital of France[K
+  smallest-prime        4 tok │ The smallest prime number[K
+  red-planet            4 tok │ The planet called the[K
+  seven-times-eight     4 tok │ 7 times 8[K
+  largest-ocean         4 tok │ The largest ocean on[K
+[9Frows 0/20 · pass 5 (0.0 s) · 286.4 tok/s · ETA 0m 03s · bf16 · batch 20 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author         5 tok │ Hamlet is a play[K
+  continents            5 tok │ There are currently 5[K
+  mona-lisa             5 tok │ The Mona Lisa is a[K
+  capital-france        5 tok │ The capital of France is[K
+  smallest-prime        5 tok │ The smallest prime number is[K
+  red-planet            5 tok │ The planet called the "[K
+  seven-times-eight     5 tok │ 7 times 8 is[K
+  largest-ocean         5 tok │ The largest ocean on Earth[K
+[9Frows 0/20 · pass 6 (0.0 s) · 325.8 tok/s · ETA 0m 02s · bf16 · batch 20 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author         6 tok │ Hamlet is a play by[K
+  continents            6 tok │ There are currently 5 continents[K
+  mona-lisa             6 tok │ The Mona Lisa is a famous[K
+  capital-france        6 tok │ The capital of France is Paris[K
+  smallest-prime        6 tok │ The smallest prime number is [K
+  red-planet            6 tok │ The planet called the "red[K
+  seven-times-eight     6 tok │ 7 times 8 is [K
+  largest-ocean         6 tok │ The largest ocean on Earth is[K
+[9Frows 0/20 · pass 7 (0.0 s) · 361.8 tok/s · ETA 0m 02s · bf16 · batch 20 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author         7 tok │ Hamlet is a play by William[K
+  continents            7 tok │ There are currently 5 continents:[K
+  mona-lisa             7 tok │ The Mona Lisa is a famous painting[K
+  capital-france        7 tok │ The capital of France is Paris.[K
+  smallest-prime        7 tok │ The smallest prime number is 2[K
+  red-planet            7 tok │ The planet called the "red planet[K
+  seven-times-eight     7 tok │ 7 times 8 is 5[K
+  largest-ocean         7 tok │ The largest ocean on Earth is the[K
+[9Frows 1/20 · pass 8 (0.0 s) · 392.0 tok/s · ETA 0m 02s · bf16 · batch 19 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author         8 tok │ Hamlet is a play by William Shakespeare[K
+  continents            8 tok │ There are currently 5 continents: Asia[K
+  mona-lisa             8 tok │ The Mona Lisa is a famous painting by[K
+  smallest-prime        8 tok │ The smallest prime number is 2.[K
+  red-planet            8 tok │ The planet called the "red planet"[K
+  seven-times-eight     8 tok │ 7 times 8 is 56[K
+  largest-ocean         8 tok │ The largest ocean on Earth is the Pacific[K
+  chemical-gold         8 tok │ The chemical symbol for gold is Au.[K
+[9Frows 3/20 · pass 9 (0.0 s) · 415.7 tok/s · ETA 0m 01s · bf16 · batch 17 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author         9 tok │ Hamlet is a play by William Shakespeare,[K
+  continents            9 tok │ There are currently 5 continents: Asia,[K
+  mona-lisa             9 tok │ The Mona Lisa is a famous painting by the[K
+  red-planet            9 tok │ The planet called the "red planet" is[K
+  seven-times-eight     9 tok │ 7 times 8 is 56.[K
+  largest-ocean         9 tok │ The largest ocean on Earth is the Pacific Ocean[K
+  days-in-week          9 tok │ There are 7 days in a week.[K
+  binary-ten            9 tok │ The number ten in binary is 10[K
+[9Frows 5/20 · pass 10 (0.0 s) · 431.4 tok/s · ETA 0m 01s · bf16 · batch 15 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        10 tok │ Hamlet is a play by William Shakespeare, written[K
+  continents           10 tok │ There are currently 5 continents: Asia, Africa[K
+  mona-lisa            10 tok │ The Mona Lisa is a famous painting by the Italian[K
+  red-planet           10 tok │ The planet called the "red planet" is Mars[K
+  largest-ocean        10 tok │ The largest ocean on Earth is the Pacific Ocean.[K
+  binary-ten           10 tok │ The number ten in binary is 101[K
+  great-wall           10 tok │ The Great Wall of China is located in the northern[K
+  water-formula        10 tok │ The chemical formula of water is H2O.[K
+[9Frows 6/20 · pass 11 (0.0 s) · 447.3 tok/s · ETA 0m 01s · bf16 · batch 14 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        11 tok │ Hamlet is a play by William Shakespeare, written in[K
+  continents           11 tok │ There are currently 5 continents: Asia, Africa,[K
+  mona-lisa            11 tok │ The Mona Lisa is a famous painting by the Italian artist[K
+  red-planet           11 tok │ The planet called the "red planet" is Mars.[K
+  largest-ocean        11 tok │ The largest ocean on Earth is the Pacific Ocean. It[K
+  binary-ten           11 tok │ The number ten in binary is 1010[K
+  great-wall           11 tok │ The Great Wall of China is located in the northern part[K
+  photosynthesis-gas   11 tok │ Plants absorb carbon dioxide (CO2) during photos[K
+[9Frows 7/20 · pass 12 (0.0 s) · 461.3 tok/s · ETA 0m 00s · bf16 · batch 13 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        12 tok │ Hamlet is a play by William Shakespeare, written in the[K
+  continents           12 tok │ There are currently 5 continents: Asia, Africa, North[K
+  mona-lisa            12 tok │ The Mona Lisa is a famous painting by the Italian artist Leonardo[K
+  largest-ocean        12 tok │ The largest ocean on Earth is the Pacific Ocean. It covers[K
+  binary-ten           12 tok │ The number ten in binary is 1010.[K
+  great-wall           12 tok │ The Great Wall of China is located in the northern part of[K
+  photosynthesis-gas   12 tok │ Plants absorb carbon dioxide (CO2) during photosynthesis[K
+  tallest-mountain     12 tok │ The tallest mountain above sea level is Mount Everest, which is[K
+[9Frows 8/20 · pass 13 (0.0 s) · 471.7 tok/s · ETA 0m 00s · bf16 · batch 12 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        13 tok │ Hamlet is a play by William Shakespeare, written in the late[K
+  continents           13 tok │ There are currently 5 continents: Asia, Africa, North America[K
+  mona-lisa            13 tok │ The Mona Lisa is a famous painting by the Italian artist Leonardo da[K
+  largest-ocean        13 tok │ The largest ocean on Earth is the Pacific Ocean. It covers an[K
+  great-wall           13 tok │ The Great Wall of China is located in the northern part of China[K
+  photosynthesis-gas   13 tok │ Plants absorb carbon dioxide (CO2) during photosynthesis.[K
+  tallest-mountain     13 tok │ The tallest mountain above sea level is Mount Everest, which is located[K
+  longest-river        13 tok │ The longest river in the world is the Nile, which flows through[K
+[9Frows 8/20 · pass 14 (0.0 s) · 479.1 tok/s · ETA 0m 00s · bf16 · batch 12 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        14 tok │ Hamlet is a play by William Shakespeare, written in the late [K
+  continents           14 tok │ There are currently 5 continents: Asia, Africa, North America,[K
+  mona-lisa            14 tok │ The Mona Lisa is a famous painting by the Italian artist Leonardo da Vinci[K
+  largest-ocean        14 tok │ The largest ocean on Earth is the Pacific Ocean. It covers an area[K
+  great-wall           14 tok │ The Great Wall of China is located in the northern part of China,[K
+  photosynthesis-gas   14 tok │ Plants absorb carbon dioxide (CO2) during photosynthesis. This[K
+  tallest-mountain     14 tok │ The tallest mountain above sea level is Mount Everest, which is located in[K
+  longest-river        14 tok │ The longest river in the world is the Nile, which flows through Egypt[K
+[9Frows 8/20 · pass 15 (0.0 s) · 489.6 tok/s · ETA 0m 00s · bf16 · batch 12 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        15 tok │ Hamlet is a play by William Shakespeare, written in the late 1[K
+  continents           15 tok │ There are currently 5 continents: Asia, Africa, North America, South[K
+  mona-lisa            15 tok │ The Mona Lisa is a famous painting by the Italian artist Leonardo da Vinci.[K
+  largest-ocean        15 tok │ The largest ocean on Earth is the Pacific Ocean. It covers an area of[K
+  great-wall           15 tok │ The Great Wall of China is located in the northern part of China, spanning[K
+  photosynthesis-gas   15 tok │ Plants absorb carbon dioxide (CO2) during photosynthesis. This process[K
+  tallest-mountain     15 tok │ The tallest mountain above sea level is Mount Everest, which is located in the[K
+  longest-river        15 tok │ The longest river in the world is the Nile, which flows through Egypt and[K
+[9Frows 8/20 · pass 16 (0.0 s) · 500.1 tok/s · ETA 0m 00s · bf16 · batch 12 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        16 tok │ Hamlet is a play by William Shakespeare, written in the late 16[K
+  continents           16 tok │ There are currently 5 continents: Asia, Africa, North America, South America[K
+  mona-lisa            16 tok │ The Mona Lisa is a famous painting by the Italian artist Leonardo da Vinci. It[K
+  largest-ocean        16 tok │  largest ocean on Earth is the Pacific Ocean. It covers an area of approximately[K
+  great-wall           16 tok │ The Great Wall of China is located in the northern part of China, spanning from[K
+  photosynthesis-gas   16 tok │ Plants absorb carbon dioxide (CO2) during photosynthesis. This process is[K
+  tallest-mountain     16 tok │ tallest mountain above sea level is Mount Everest, which is located in the Himal[K
+  longest-river        16 tok │ The longest river in the world is the Nile, which flows through Egypt and Sudan[K
+[9Frows 8/20 · pass 17 (0.0 s) · 510.1 tok/s · ETA 0m 00s · bf16 · batch 12 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        17 tok │ Hamlet is a play by William Shakespeare, written in the late 16th[K
+  continents           17 tok │ There are currently 5 continents: Asia, Africa, North America, South America,[K
+  mona-lisa            17 tok │ e Mona Lisa is a famous painting by the Italian artist Leonardo da Vinci. It was[K
+  largest-ocean        17 tok │ largest ocean on Earth is the Pacific Ocean. It covers an area of approximately [K
+  great-wall           17 tok │  Great Wall of China is located in the northern part of China, spanning from the[K
+  photosynthesis-gas   17 tok │ lants absorb carbon dioxide (CO2) during photosynthesis. This process is crucial[K
+  tallest-mountain     17 tok │ est mountain above sea level is Mount Everest, which is located in the Himalayas[K
+  longest-river        17 tok │ The longest river in the world is the Nile, which flows through Egypt and Sudan.[K
+[9Frows 8/20 · pass 18 (0.0 s) · 519.5 tok/s · ETA 0m 00s · bf16 · batch 12 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        18 tok │ Hamlet is a play by William Shakespeare, written in the late 16th century[K
+  continents           18 tok │ here are currently 5 continents: Asia, Africa, North America, South America, and[K
+  mona-lisa            18 tok │ isa is a famous painting by the Italian artist Leonardo da Vinci. It was painted[K
+  largest-ocean        18 tok │ argest ocean on Earth is the Pacific Ocean. It covers an area of approximately 1[K
+  great-wall           18 tok │ t Wall of China is located in the northern part of China, spanning from the foot[K
+  photosynthesis-gas   18 tok │ s absorb carbon dioxide (CO2) during photosynthesis. This process is crucial for[K
+  tallest-mountain     18 tok │ mountain above sea level is Mount Everest, which is located in the Himalayas and[K
+  longest-river        18 tok │ longest river in the world is the Nile, which flows through Egypt and Sudan. The[K
+[9Frows 8/20 · pass 19 (0.0 s) · 528.7 tok/s · ETA 0m 00s · bf16 · batch 12 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        19 tok │ Hamlet is a play by William Shakespeare, written in the late 16th century.[K
+  continents           19 tok │ e currently 5 continents: Asia, Africa, North America, South America, and Europe[K
+  mona-lisa            19 tok │  is a famous painting by the Italian artist Leonardo da Vinci. It was painted in[K
+  largest-ocean        19 tok │ rgest ocean on Earth is the Pacific Ocean. It covers an area of approximately 14[K
+  great-wall           19 tok │ all of China is located in the northern part of China, spanning from the foot of[K
+  photosynthesis-gas   19 tok │ sorb carbon dioxide (CO2) during photosynthesis. This process is crucial for the[K
+  tallest-mountain     19 tok │ ntain above sea level is Mount Everest, which is located in the Himalayas and is[K
+  longest-river        19 tok │ st river in the world is the Nile, which flows through Egypt and Sudan. The Nile[K
+[9Frows 8/20 · pass 20 (0.0 s) · 537.3 tok/s · ETA 0m 00s · bf16 · batch 12 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        20 tok │ Hamlet is a play by William Shakespeare, written in the late 16th century. The[K
+  continents           20 tok │  currently 5 continents: Asia, Africa, North America, South America, and Europe.[K
+  mona-lisa            20 tok │ a famous painting by the Italian artist Leonardo da Vinci. It was painted in the[K
+  largest-ocean        20 tok │ gest ocean on Earth is the Pacific Ocean. It covers an area of approximately 14.[K
+  great-wall           20 tok │ of China is located in the northern part of China, spanning from the foot of the[K
+  photosynthesis-gas   20 tok │  dioxide (CO2) during photosynthesis. This process is crucial for the production[K
+  tallest-mountain     20 tok │ n above sea level is Mount Everest, which is located in the Himalayas and is the[K
+  longest-river        20 tok │ river in the world is the Nile, which flows through Egypt and Sudan. The Nile is[K
+[9Frows 9/20 · pass 21 (0.0 s) · 543.1 tok/s · ETA 0m 00s · bf16 · batch 11 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        21 tok │ let is a play by William Shakespeare, written in the late 16th century. The play[K
+  mona-lisa            21 tok │ us painting by the Italian artist Leonardo da Vinci. It was painted in the early[K
+  largest-ocean        21 tok │ est ocean on Earth is the Pacific Ocean. It covers an area of approximately 14.5[K
+  great-wall           21 tok │ hina is located in the northern part of China, spanning from the foot of the Qin[K
+  photosynthesis-gas   21 tok │ oxide (CO2) during photosynthesis. This process is crucial for the production of[K
+  tallest-mountain     21 tok │ sea level is Mount Everest, which is located in the Himalayas and is the highest[K
+  longest-river        21 tok │ orld is the Nile, which flows through Egypt and Sudan. The Nile is approximately[K
+  freezing-f           21 tok │ s a fundamental temperature conversion between the Celsius and Fahrenheit scales[K
+[9Frows 9/20 · pass 22 (0.0 s) · 548.6 tok/s · ETA 0m 00s · bf16 · batch 11 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        22 tok │ is a play by William Shakespeare, written in the late 16th century. The play was[K
+  mona-lisa            22 tok │ s painting by the Italian artist Leonardo da Vinci. It was painted in the early [K
+  largest-ocean        22 tok │ n on Earth is the Pacific Ocean. It covers an area of approximately 14.5 million[K
+  great-wall           22 tok │  is located in the northern part of China, spanning from the foot of the Qinling[K
+  photosynthesis-gas   22 tok │ CO2) during photosynthesis. This process is crucial for the production of oxygen[K
+  tallest-mountain     22 tok │ evel is Mount Everest, which is located in the Himalayas and is the highest peak[K
+  longest-river        22 tok │ rld is the Nile, which flows through Egypt and Sudan. The Nile is approximately [K
+  freezing-f           22 tok │  a fundamental temperature conversion between the Celsius and Fahrenheit scales.[K
+[9Frows 10/20 · pass 23 (0.0 s) · 554.4 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        23 tok │ lay by William Shakespeare, written in the late 16th century. The play was first[K
+  mona-lisa            23 tok │  painting by the Italian artist Leonardo da Vinci. It was painted in the early 1[K
+  largest-ocean        23 tok │ rth is the Pacific Ocean. It covers an area of approximately 14.5 million square[K
+  great-wall           23 tok │ d in the northern part of China, spanning from the foot of the Qinling Mountains[K
+  photosynthesis-gas   23 tok │ 2) during photosynthesis. This process is crucial for the production of oxygen ([K
+  tallest-mountain     23 tok │ l is Mount Everest, which is located in the Himalayas and is the highest peak in[K
+  longest-river        23 tok │ ld is the Nile, which flows through Egypt and Sudan. The Nile is approximately 6[K
+  first-president      23 tok │  president of the United States was George Washington. He served from 1789 to 17[K
+[9Frows 10/20 · pass 24 (0.0 s) · 558.5 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        24 tok │ liam Shakespeare, written in the late 16th century. The play was first performed[K
+  mona-lisa            24 tok │ painting by the Italian artist Leonardo da Vinci. It was painted in the early 16[K
+  largest-ocean        24 tok │ Pacific Ocean. It covers an area of approximately 14.5 million square kilometers[K
+  great-wall           24 tok │ n the northern part of China, spanning from the foot of the Qinling Mountains in[K
+  photosynthesis-gas   24 tok │ ) during photosynthesis. This process is crucial for the production of oxygen (O[K
+  tallest-mountain     24 tok │  Mount Everest, which is located in the Himalayas and is the highest peak in the[K
+  longest-river        24 tok │ d is the Nile, which flows through Egypt and Sudan. The Nile is approximately 6,[K
+  first-president      24 tok │ president of the United States was George Washington. He served from 1789 to 179[K
+[9Frows 10/20 · pass 25 (0.0 s) · 563.6 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        25 tok │ m Shakespeare, written in the late 16th century. The play was first performed in[K
+  mona-lisa            25 tok │ inting by the Italian artist Leonardo da Vinci. It was painted in the early 16th[K
+  largest-ocean        25 tok │ cific Ocean. It covers an area of approximately 14.5 million square kilometers ([K
+  great-wall           25 tok │ e northern part of China, spanning from the foot of the Qinling Mountains in the[K
+  photosynthesis-gas   25 tok │  during photosynthesis. This process is crucial for the production of oxygen (O2[K
+  tallest-mountain     25 tok │  Everest, which is located in the Himalayas and is the highest peak in the world[K
+  longest-river        25 tok │  is the Nile, which flows through Egypt and Sudan. The Nile is approximately 6,6[K
+  first-president      25 tok │ resident of the United States was George Washington. He served from 1789 to 1797[K
+[9Frows 10/20 · pass 26 (0.0 s) · 568.7 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        26 tok │  Shakespeare, written in the late 16th century. The play was first performed in [K
+  mona-lisa            26 tok │ y the Italian artist Leonardo da Vinci. It was painted in the early 16th century[K
+  largest-ocean        26 tok │ ific Ocean. It covers an area of approximately 14.5 million square kilometers (5[K
+  great-wall           26 tok │ thern part of China, spanning from the foot of the Qinling Mountains in the east[K
+  photosynthesis-gas   26 tok │ during photosynthesis. This process is crucial for the production of oxygen (O2)[K
+  tallest-mountain     26 tok │ Everest, which is located in the Himalayas and is the highest peak in the world.[K
+  longest-river        26 tok │ is the Nile, which flows through Egypt and Sudan. The Nile is approximately 6,65[K
+  first-president      26 tok │ esident of the United States was George Washington. He served from 1789 to 1797.[K
+[9Frows 10/20 · pass 27 (0.0 s) · 573.3 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        27 tok │ Shakespeare, written in the late 16th century. The play was first performed in 1[K
+  mona-lisa            27 tok │ e Italian artist Leonardo da Vinci. It was painted in the early 16th century and[K
+  largest-ocean        27 tok │ fic Ocean. It covers an area of approximately 14.5 million square kilometers (5.[K
+  great-wall           27 tok │ rn part of China, spanning from the foot of the Qinling Mountains in the east to[K
+  photosynthesis-gas   27 tok │ ng photosynthesis. This process is crucial for the production of oxygen (O2) and[K
+  tallest-mountain     27 tok │ rest, which is located in the Himalayas and is the highest peak in the world. It[K
+  longest-river        27 tok │ s the Nile, which flows through Egypt and Sudan. The Nile is approximately 6,650[K
+  first-president      27 tok │ the United States was George Washington. He served from 1789 to 1797. Washington[K
+[9Frows 10/20 · pass 28 (0.0 s) · 577.4 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        28 tok │ hakespeare, written in the late 16th century. The play was first performed in 15[K
+  mona-lisa            28 tok │ talian artist Leonardo da Vinci. It was painted in the early 16th century and is[K
+  largest-ocean        28 tok │ ic Ocean. It covers an area of approximately 14.5 million square kilometers (5.6[K
+  great-wall           28 tok │ art of China, spanning from the foot of the Qinling Mountains in the east to the[K
+  photosynthesis-gas   28 tok │ hotosynthesis. This process is crucial for the production of oxygen (O2) and the[K
+  tallest-mountain     28 tok │ hich is located in the Himalayas and is the highest peak in the world. It stands[K
+  longest-river        28 tok │  which flows through Egypt and Sudan. The Nile is approximately 6,650 kilometers[K
+  first-president      28 tok │ United States was George Washington. He served from 1789 to 1797. Washington was[K
+[9Frows 10/20 · pass 29 (0.0 s) · 581.9 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        29 tok │ akespeare, written in the late 16th century. The play was first performed in 159[K
+  mona-lisa            29 tok │ artist Leonardo da Vinci. It was painted in the early 16th century and is housed[K
+  largest-ocean        29 tok │ . It covers an area of approximately 14.5 million square kilometers (5.6 million[K
+  great-wall           29 tok │ f China, spanning from the foot of the Qinling Mountains in the east to the foot[K
+  photosynthesis-gas   29 tok │ is. This process is crucial for the production of oxygen (O2) and the production[K
+  tallest-mountain     29 tok │ h is located in the Himalayas and is the highest peak in the world. It stands at[K
+  longest-river        29 tok │ hich flows through Egypt and Sudan. The Nile is approximately 6,650 kilometers ([K
+  first-president      29 tok │ ited States was George Washington. He served from 1789 to 1797. Washington was a[K
+[9Frows 10/20 · pass 30 (0.0 s) · 586.1 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        30 tok │ kespeare, written in the late 16th century. The play was first performed in 1599[K
+  mona-lisa            30 tok │ ist Leonardo da Vinci. It was painted in the early 16th century and is housed in[K
+  largest-ocean        30 tok │ vers an area of approximately 14.5 million square kilometers (5.6 million square[K
+  great-wall           30 tok │ hina, spanning from the foot of the Qinling Mountains in the east to the foot of[K
+  photosynthesis-gas   30 tok │  This process is crucial for the production of oxygen (O2) and the production of[K
+  tallest-mountain     30 tok │ s located in the Himalayas and is the highest peak in the world. It stands at an[K
+  longest-river        30 tok │ ich flows through Egypt and Sudan. The Nile is approximately 6,650 kilometers (4[K
+  first-president      30 tok │ s was George Washington. He served from 1789 to 1797. Washington was a prominent[K
+[9Frows 10/20 · pass 31 (0.0 s) · 588.0 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        31 tok │ espeare, written in the late 16th century. The play was first performed in 1599,[K
+  mona-lisa            31 tok │ Leonardo da Vinci. It was painted in the early 16th century and is housed in the[K
+  largest-ocean        31 tok │ n area of approximately 14.5 million square kilometers (5.6 million square miles[K
+  great-wall           31 tok │ , spanning from the foot of the Qinling Mountains in the east to the foot of the[K
+  photosynthesis-gas   31 tok │ ocess is crucial for the production of oxygen (O2) and the production of glucose[K
+  tallest-mountain     31 tok │ in the Himalayas and is the highest peak in the world. It stands at an elevation[K
+  longest-river        31 tok │ ch flows through Egypt and Sudan. The Nile is approximately 6,650 kilometers (4,[K
+  first-president      31 tok │ eorge Washington. He served from 1789 to 1797. Washington was a prominent figure[K
+[9Frows 10/20 · pass 32 (0.0 s) · 591.9 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        32 tok │ are, written in the late 16th century. The play was first performed in 1599, and[K
+  mona-lisa            32 tok │ ardo da Vinci. It was painted in the early 16th century and is housed in the Lou[K
+  largest-ocean        32 tok │  area of approximately 14.5 million square kilometers (5.6 million square miles)[K
+  great-wall           32 tok │ spanning from the foot of the Qinling Mountains in the east to the foot of the H[K
+  photosynthesis-gas   32 tok │ ess is crucial for the production of oxygen (O2) and the production of glucose ([K
+  tallest-mountain     32 tok │ the Himalayas and is the highest peak in the world. It stands at an elevation of[K
+  longest-river        32 tok │ h flows through Egypt and Sudan. The Nile is approximately 6,650 kilometers (4,1[K
+  first-president      32 tok │ ge Washington. He served from 1789 to 1797. Washington was a prominent figure in[K
+[9Frows 10/20 · pass 33 (0.0 s) · 595.6 tok/s · ETA 0m 00s · bf16 · batch 10 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        33 tok │ , written in the late 16th century. The play was first performed in 1599, and it[K
+  mona-lisa            33 tok │ o da Vinci. It was painted in the early 16th century and is housed in the Louvre[K
+  largest-ocean        33 tok │ a of approximately 14.5 million square kilometers (5.6 million square miles) and[K
+  great-wall           33 tok │ nning from the foot of the Qinling Mountains in the east to the foot of the Heng[K
+  photosynthesis-gas   33 tok │ ss is crucial for the production of oxygen (O2) and the production of glucose (C[K
+  tallest-mountain     33 tok │ he Himalayas and is the highest peak in the world. It stands at an elevation of [K
+  longest-river        33 tok │  flows through Egypt and Sudan. The Nile is approximately 6,650 kilometers (4,13[K
+  first-president      33 tok │ ashington. He served from 1789 to 1797. Washington was a prominent figure in the[K
+[9Frows 11/20 · pass 34 (0.0 s) · 598.6 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        34 tok │ ritten in the late 16th century. The play was first performed in 1599, and it is[K
+  mona-lisa            34 tok │ nci. It was painted in the early 16th century and is housed in the Louvre Museum[K
+  largest-ocean        34 tok │ f approximately 14.5 million square kilometers (5.6 million square miles) and is[K
+  great-wall           34 tok │ ing from the foot of the Qinling Mountains in the east to the foot of the Hengdu[K
+  photosynthesis-gas   34 tok │ s is crucial for the production of oxygen (O2) and the production of glucose (C6[K
+  tallest-mountain     34 tok │ e Himalayas and is the highest peak in the world. It stands at an elevation of 8[K
+  longest-river        34 tok │ flows through Egypt and Sudan. The Nile is approximately 6,650 kilometers (4,130[K
+  first-president      34 tok │ . He served from 1789 to 1797. Washington was a prominent figure in the American[K
+[9Frows 11/20 · pass 35 (0.0 s) · 599.5 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        35 tok │ he late 16th century. The play was first performed in 1599, and it is considered[K
+  mona-lisa            35 tok │ . It was painted in the early 16th century and is housed in the Louvre Museum in[K
+  largest-ocean        35 tok │ proximately 14.5 million square kilometers (5.6 million square miles) and is the[K
+  great-wall           35 tok │ g from the foot of the Qinling Mountains in the east to the foot of the Hengduan[K
+  photosynthesis-gas   35 tok │  is crucial for the production of oxygen (O2) and the production of glucose (C6H[K
+  tallest-mountain     35 tok │  Himalayas and is the highest peak in the world. It stands at an elevation of 8,[K
+  longest-river        35 tok │ through Egypt and Sudan. The Nile is approximately 6,650 kilometers (4,130 miles[K
+  first-president      35 tok │  from 1789 to 1797. Washington was a prominent figure in the American Revolution[K
+[9Frows 11/20 · pass 36 (0.0 s) · 601.4 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        36 tok │ ate 16th century. The play was first performed in 1599, and it is considered one[K
+  mona-lisa            36 tok │ as painted in the early 16th century and is housed in the Louvre Museum in Paris[K
+  largest-ocean        36 tok │ tely 14.5 million square kilometers (5.6 million square miles) and is the second[K
+  great-wall           36 tok │  foot of the Qinling Mountains in the east to the foot of the Hengduan Mountains[K
+  photosynthesis-gas   36 tok │ is crucial for the production of oxygen (O2) and the production of glucose (C6H1[K
+  tallest-mountain     36 tok │ Himalayas and is the highest peak in the world. It stands at an elevation of 8,8[K
+  longest-river        36 tok │ hrough Egypt and Sudan. The Nile is approximately 6,650 kilometers (4,130 miles)[K
+  first-president      36 tok │ m 1789 to 1797. Washington was a prominent figure in the American Revolution and[K
+[9Frows 11/20 · pass 37 (0.0 s) · 603.8 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        37 tok │  16th century. The play was first performed in 1599, and it is considered one of[K
+  mona-lisa            37 tok │ s painted in the early 16th century and is housed in the Louvre Museum in Paris,[K
+  largest-ocean        37 tok │ 5 million square kilometers (5.6 million square miles) and is the second-largest[K
+  great-wall           37 tok │ ot of the Qinling Mountains in the east to the foot of the Hengduan Mountains in[K
+  photosynthesis-gas   37 tok │ s crucial for the production of oxygen (O2) and the production of glucose (C6H12[K
+  tallest-mountain     37 tok │ imalayas and is the highest peak in the world. It stands at an elevation of 8,84[K
+  longest-river        37 tok │ h Egypt and Sudan. The Nile is approximately 6,650 kilometers (4,130 miles) long[K
+  first-president      37 tok │  to 1797. Washington was a prominent figure in the American Revolution and later[K
+[9Frows 11/20 · pass 38 (0.0 s) · 605.9 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        38 tok │ y. The play was first performed in 1599, and it is considered one of Shakespeare[K
+  mona-lisa            38 tok │ ed in the early 16th century and is housed in the Louvre Museum in Paris, France[K
+  largest-ocean        38 tok │ ion square kilometers (5.6 million square miles) and is the second-largest ocean[K
+  great-wall           38 tok │ f the Qinling Mountains in the east to the foot of the Hengduan Mountains in the[K
+  photosynthesis-gas   38 tok │  crucial for the production of oxygen (O2) and the production of glucose (C6H12O[K
+  tallest-mountain     38 tok │ malayas and is the highest peak in the world. It stands at an elevation of 8,848[K
+  longest-river        38 tok │  Egypt and Sudan. The Nile is approximately 6,650 kilometers (4,130 miles) long,[K
+  first-president      38 tok │ 7. Washington was a prominent figure in the American Revolution and later became[K
+[9Frows 11/20 · pass 39 (0.0 s) · 607.9 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        39 tok │  The play was first performed in 1599, and it is considered one of Shakespeare's[K
+  mona-lisa            39 tok │ d in the early 16th century and is housed in the Louvre Museum in Paris, France.[K
+  largest-ocean        39 tok │  square kilometers (5.6 million square miles) and is the second-largest ocean in[K
+  great-wall           39 tok │  Qinling Mountains in the east to the foot of the Hengduan Mountains in the west[K
+  photosynthesis-gas   39 tok │ crucial for the production of oxygen (O2) and the production of glucose (C6H12O6[K
+  tallest-mountain     39 tok │  and is the highest peak in the world. It stands at an elevation of 8,848 meters[K
+  longest-river        39 tok │ pt and Sudan. The Nile is approximately 6,650 kilometers (4,130 miles) long, and[K
+  first-president      39 tok │ ashington was a prominent figure in the American Revolution and later became the[K
+[9Frows 11/20 · pass 40 (0.0 s) · 610.1 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        40 tok │ play was first performed in 1599, and it is considered one of Shakespeare's most[K
+  mona-lisa            40 tok │  the early 16th century and is housed in the Louvre Museum in Paris, France. The[K
+  largest-ocean        40 tok │ are kilometers (5.6 million square miles) and is the second-largest ocean in the[K
+  great-wall           40 tok │ Qinling Mountains in the east to the foot of the Hengduan Mountains in the west.[K
+  photosynthesis-gas   40 tok │ rucial for the production of oxygen (O2) and the production of glucose (C6H12O6)[K
+  tallest-mountain     40 tok │ nd is the highest peak in the world. It stands at an elevation of 8,848 meters ([K
+  longest-river        40 tok │ and Sudan. The Nile is approximately 6,650 kilometers (4,130 miles) long, and it[K
+  first-president      40 tok │ ton was a prominent figure in the American Revolution and later became the first[K
+[9Frows 11/20 · pass 41 (0.0 s) · 612.0 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        41 tok │ s first performed in 1599, and it is considered one of Shakespeare's most famous[K
+  mona-lisa            41 tok │ y 16th century and is housed in the Louvre Museum in Paris, France. The painting[K
+  largest-ocean        41 tok │ lometers (5.6 million square miles) and is the second-largest ocean in the world[K
+  great-wall           41 tok │ ling Mountains in the east to the foot of the Hengduan Mountains in the west. It[K
+  photosynthesis-gas   41 tok │ or the production of oxygen (O2) and the production of glucose (C6H12O6) through[K
+  tallest-mountain     41 tok │ d is the highest peak in the world. It stands at an elevation of 8,848 meters (2[K
+  longest-river        41 tok │  Sudan. The Nile is approximately 6,650 kilometers (4,130 miles) long, and it is[K
+  first-president      41 tok │ prominent figure in the American Revolution and later became the first President[K
+[9Frows 11/20 · pass 42 (0.0 s) · 614.3 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        42 tok │ t performed in 1599, and it is considered one of Shakespeare's most famous works[K
+  mona-lisa            42 tok │ 6th century and is housed in the Louvre Museum in Paris, France. The painting is[K
+  largest-ocean        42 tok │ rs (5.6 million square miles) and is the second-largest ocean in the world after[K
+  great-wall           42 tok │ g Mountains in the east to the foot of the Hengduan Mountains in the west. It is[K
+  photosynthesis-gas   42 tok │ he production of oxygen (O2) and the production of glucose (C6H12O6) through the[K
+  tallest-mountain     42 tok │  is the highest peak in the world. It stands at an elevation of 8,848 meters (29[K
+  longest-river        42 tok │ an. The Nile is approximately 6,650 kilometers (4,130 miles) long, and it is the[K
+  first-president      42 tok │ minent figure in the American Revolution and later became the first President of[K
+[9Frows 11/20 · pass 43 (0.0 s) · 616.4 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        43 tok │  performed in 1599, and it is considered one of Shakespeare's most famous works.[K
+  mona-lisa            43 tok │ ntury and is housed in the Louvre Museum in Paris, France. The painting is known[K
+  largest-ocean        43 tok │ 5.6 million square miles) and is the second-largest ocean in the world after the[K
+  great-wall           43 tok │ Mountains in the east to the foot of the Hengduan Mountains in the west. It is a[K
+  photosynthesis-gas   43 tok │ ction of oxygen (O2) and the production of glucose (C6H12O6) through the process[K
+  tallest-mountain     43 tok │ is the highest peak in the world. It stands at an elevation of 8,848 meters (29,[K
+  longest-river        43 tok │ Nile is approximately 6,650 kilometers (4,130 miles) long, and it is the longest[K
+  first-president      43 tok │ nt figure in the American Revolution and later became the first President of the[K
+[9Frows 11/20 · pass 44 (0.0 s) · 618.3 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        44 tok │ formed in 1599, and it is considered one of Shakespeare's most famous works. The[K
+  mona-lisa            44 tok │ y and is housed in the Louvre Museum in Paris, France. The painting is known for[K
+  largest-ocean        44 tok │ on square miles) and is the second-largest ocean in the world after the Atlantic[K
+  great-wall           44 tok │ ns in the east to the foot of the Hengduan Mountains in the west. It is a series[K
+  photosynthesis-gas   44 tok │ on of oxygen (O2) and the production of glucose (C6H12O6) through the process of[K
+  tallest-mountain     44 tok │ s the highest peak in the world. It stands at an elevation of 8,848 meters (29,0[K
+  longest-river        44 tok │ s approximately 6,650 kilometers (4,130 miles) long, and it is the longest river[K
+  first-president      44 tok │ re in the American Revolution and later became the first President of the United[K
+[9Frows 11/20 · pass 45 (0.0 s) · 620.4 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        45 tok │ in 1599, and it is considered one of Shakespeare's most famous works. The author[K
+  mona-lisa            45 tok │ d is housed in the Louvre Museum in Paris, France. The painting is known for its[K
+  largest-ocean        45 tok │ are miles) and is the second-largest ocean in the world after the Atlantic Ocean[K
+  great-wall           45 tok │ in the east to the foot of the Hengduan Mountains in the west. It is a series of[K
+  photosynthesis-gas   45 tok │ xygen (O2) and the production of glucose (C6H12O6) through the process of photos[K
+  tallest-mountain     45 tok │  the highest peak in the world. It stands at an elevation of 8,848 meters (29,02[K
+  longest-river        45 tok │ pproximately 6,650 kilometers (4,130 miles) long, and it is the longest river in[K
+  first-president      45 tok │ he American Revolution and later became the first President of the United States[K
+[9Frows 11/20 · pass 46 (0.0 s) · 622.2 tok/s · ETA 0m 00s · bf16 · batch 9 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        46 tok │ 1599, and it is considered one of Shakespeare's most famous works. The author of[K
+  mona-lisa            46 tok │ s housed in the Louvre Museum in Paris, France. The painting is known for its en[K
+  largest-ocean        46 tok │ re miles) and is the second-largest ocean in the world after the Atlantic Ocean.[K
+  great-wall           46 tok │  east to the foot of the Hengduan Mountains in the west. It is a series of stone[K
+  photosynthesis-gas   46 tok │ 2) and the production of glucose (C6H12O6) through the process of photosynthesis[K
+  tallest-mountain     46 tok │ the highest peak in the world. It stands at an elevation of 8,848 meters (29,029[K
+  longest-river        46 tok │ ximately 6,650 kilometers (4,130 miles) long, and it is the longest river in the[K
+  first-president      46 tok │ e American Revolution and later became the first President of the United States.[K
+[9Frows 13/20 · pass 47 (0.0 s) · 623.2 tok/s · ETA 0m 00s · bf16 · batch 7 · ~0.0 s per token per prompt · 1.0 GB peak[K
+  hamlet-author        47 tok │ , and it is considered one of Shakespeare's most famous works. The author of Ham[K
+  mona-lisa            47 tok │ d in the Louvre Museum in Paris, France. The painting is known for its enigmatic[K
+  largest-ocean        47 tok │ iles) and is the second-largest ocean in the world after the Atlantic Ocean. The[K
+  great-wall           47 tok │ to the foot of the Hengduan Mountains in the west. It is a series of stone walls[K
+  photosynthesis-gas   47 tok │ ) and the production of glucose (C6H12O6) through the process of photosynthesis.[K
+  tallest-mountain     47 tok │ ighest peak in the world. It stands at an elevation of 8,848 meters (29,029 feet[K
+  longest-river        47 tok │ ly 6,650 kilometers (4,130 miles) long, and it is the longest river in the world[K
+[K[1F
+[9Frows 20/20 · pass 48 (0.0 s) · 618.7 tok/s · ETA 0m 00s · bf16 · batch 0 · ~0.0 s per token per prompt · 1.0 GB peak[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K
+[K[8F
+
+20/20 rows, 590 completion tokens, 211.6 tok/s aggregate
+
+next: spill status
+[16:43:27] (exit 0)
+
+[16:43:27] $ spill run llama3.3:70b sample   # ^C after first visible text
+(using the packaged 20-prompt sample: spill run <model> sample)
+spill: llama3.3:70b bf16 (131.4 GB, Llama 3.x: verified) does not fit in 48 GB RAM; streaming from NVMe at ~7.7 GB/s (isolated read ceiling). 20 prompts, batch 20, est. 14 min. Cost: $0. Results -> /private/tmp/claude-501/-Users-amrishkapoor-spillway/8a7a1f63-3e9e-4d09-80a8-0deb1a2ada73/scratchpad/golden-p16/home/jobs/20261002-164328-cae311/results.jsonl (tail with: spill tail)
+   why: batch 20: (36.0G working set - 5.4G margin(15%) - 4.8G ring(3x1.59G layer) - 3.9G resident(embed+norm+lm_head) - 0.1G activations) / 0.028G per-seq KV (actual prompt lens + 48 max_tokens); quant: bf16 (batch-tier default); est from measured engine rate
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+rows 0/20 · pass 1 (38.0 s) · 0.5 tok/s · ETA 30m 31s · bf16 · batch 20 · ~38.0 s per token per prompt · 8.7 GB peak[K
+  hamlet-author         1 tok │ The[K
+  continents            1 tok │ There[K
+  mona-lisa             1 tok │ The[K
+  capital-france        1 tok │ The[K
+  smallest-prime        1 tok │ The[K
+  red-planet            1 tok │ The[K
+  seven-times-eight     1 tok │ 7[K
+  largest-ocean         1 tok │ The[K
+[16:44:09] >>> first visible partial text; waiting 45s then ^C
+[9Frows 0/20 · pass 2 (32.0 s) · 0.6 tok/s · ETA 28m 04s · bf16 · batch 20 · ~32.0 s per token per prompt · 9.0 GB peak[K
+  hamlet-author         2 tok │ The play[K
+  continents            2 tok │ There are[K
+  mona-lisa             2 tok │ The Mona[K
+  capital-france        2 tok │ The capital[K
+  smallest-prime        2 tok │ The smallest[K
+  red-planet            2 tok │ The planet[K
+  seven-times-eight     2 tok │ 7 times[K
+  largest-ocean         2 tok │ The largest[K
+[9Frows 0/20 · pass 3 (32.4 s) · 0.6 tok/s · ETA 27m 22s · bf16 · batch 20 · ~32.4 s per token per prompt · 9.0 GB peak[K
+  hamlet-author         3 tok │ The play "[K
+  continents            3 tok │ There are [K
+  mona-lisa             3 tok │ The Mona Lisa[K
+  capital-france        3 tok │ The capital of[K
+  smallest-prime        3 tok │ The smallest prime[K
+  red-planet            3 tok │ The planet known[K
+  seven-times-eight     3 tok │ 7 times [K
+  largest-ocean         3 tok │ The largest ocean[K
+
+0/20 rows, 0 completion tokens, 0.0 tok/s aggregate
+
+next: spill resume 20261002-164328-cae311
+
+[16:45:13] $ spill resume
+resuming 20261002-164328-cae311: 0/20 done, 20 remaining
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+rows 0/20 · pass 1 (37.4 s) · 0.5 tok/s · ETA 30m 03s · bf16 · batch 20 · ~37.4 s per token per prompt · 8.7 GB peak[K
+  hamlet-author         1 tok │ The[K
+  continents            1 tok │ There[K
+  mona-lisa             1 tok │ The[K
+  capital-france        1 tok │ The[K
+  smallest-prime        1 tok │ The[K
+  red-planet            1 tok │ The[K
+  seven-times-eight     1 tok │ 7[K
+  largest-ocean         1 tok │ The[K
+[9Frows 0/20 · pass 2 (32.0 s) · 0.6 tok/s · ETA 27m 50s · bf16 · batch 20 · ~32.0 s per token per prompt · 9.0 GB peak[K
+  hamlet-author         2 tok │ The play[K
+  continents            2 tok │ There are[K
+  mona-lisa             2 tok │ The Mona[K
+  capital-france        2 tok │ The capital[K
+  smallest-prime        2 tok │ The smallest[K
+  red-planet            2 tok │ The planet[K
+  seven-times-eight     2 tok │ 7 times[K
+  largest-ocean         2 tok │ The largest[K
+[9Frows 0/20 · pass 3 (32.3 s) · 0.6 tok/s · ETA 27m 10s · bf16 · batch 20 · ~32.3 s per token per prompt · 9.0 GB peak[K
+  hamlet-author         3 tok │ The play "[K
+  continents            3 tok │ There are [K
+  mona-lisa             3 tok │ The Mona Lisa[K
+  capital-france        3 tok │ The capital of[K
+  smallest-prime        3 tok │ The smallest prime[K
+  red-planet            3 tok │ The planet known[K
+  seven-times-eight     3 tok │ 7 times [K
+  largest-ocean         3 tok │ The largest ocean[K
+[9Frows 0/20 · pass 4 (32.7 s) · 0.6 tok/s · ETA 26m 54s · bf16 · batch 20 · ~32.7 s per token per prompt · 9.0 GB peak[K
+  hamlet-author         4 tok │ The play "Ham[K
+  continents            4 tok │ There are 7[K
+  mona-lisa             4 tok │ The Mona Lisa was[K
+  capital-france        4 tok │ The capital of France[K
+  smallest-prime        4 tok │ The smallest prime number[K
+  red-planet            4 tok │ The planet known as[K
+  seven-times-eight     4 tok │ 7 times 8[K
+  largest-ocean         4 tok │ The largest ocean on[K
+[9Frows 0/20 · pass 5 (35.0 s) · 0.6 tok/s · ETA 27m 08s · bf16 · batch 20 · ~35.0 s per token per prompt · 9.0 GB peak[K
+  hamlet-author         5 tok │ The play "Hamlet[K
+  continents            5 tok │ There are 7 continents[K
+  mona-lisa             5 tok │ The Mona Lisa was painted[K
+  capital-france        5 tok │ The capital of France is[K
+  smallest-prime        5 tok │ The smallest prime number is[K
+  red-planet            5 tok │ The planet known as the[K
+  seven-times-eight     5 tok │ 7 times 8 is[K
+  largest-ocean         5 tok │ The largest ocean on Earth[K
+[9Frows 0/20 · pass 6 (33.2 s) · 0.6 tok/s · ETA 27m 02s · bf16 · batch 20 · ~33.2 s per token per prompt · 9.0 GB peak[K
+  hamlet-author         6 tok │ The play "Hamlet"[K
+  continents            6 tok │ There are 7 continents:  [K
+  mona-lisa             6 tok │ The Mona Lisa was painted by[K
+  capital-france        6 tok │ The capital of France is Paris[K
+  smallest-prime        6 tok │ The smallest prime number is [K
+  red-planet            6 tok │ The planet known as the "[K
+  seven-times-eight     6 tok │ 7 times 8 is [K
+  largest-ocean         6 tok │ The largest ocean on Earth is[K
+
+0/20 rows complete
+
+next: spill status
+[16:48:39] (resume demonstrated; ^C)
+
+[16:48:39] $ spill status
+job                          model          quant   progress        tok/s      eta status
+20261002-164324-27641e       qwen2.5:0.5b   bf16    20/20           211.7        - completed
+20261002-164328-cae311       llama3.3:70b   bf16    0/20              0.0        - interrupted
+
+next: spill tail
+[16:48:39] (exit 0)
+[16:48:39] golden path complete
