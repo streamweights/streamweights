@@ -362,6 +362,14 @@ class StreamKVCache:
             self.keys = self.keys[idx_arr]
             self.values = self.values[idx_arr]
 
+    def compact(self, n: int):
+        """Drop n dead left-pad columns. Rotary positions live in the stored
+        K values, so physical shifting is exact; offset stays absolute."""
+        if self.keys is not None and n > 0:
+            self.keys = self.keys[..., n:, :]
+            self.values = self.values[..., n:, :]
+            self._used -= n
+
 
 def _bind(block, plan: LayerPlan, buf: memoryview, prefix: str) -> float:
     """Wrap slot bytes as mx arrays with right dtype/shape, bind to the block.
@@ -625,7 +633,8 @@ class MlxStreamEngine:
                 if max_passes and pass_no >= max_passes:
                     return
 
-                K = caches[0].offset  # current cache length == next write slot
+                K = caches[0]._len    # physical cache length == next write slot
+                abs_off = caches[0].offset  # absolute rope position of next slot
                 # ---- admission ----
                 admits = []
                 cap = first_group if (not act_rows and completed == 0 and pass_no == 0) \
@@ -650,9 +659,8 @@ class MlxStreamEngine:
                     # fresh group: prompt ends align at slot Lpad-1; next write = Lpad
                     admits = [(p, Lpad - len(p[1])) for p in group]
                     caches = [StreamKVCache() for _ in range(n_layers)]
-                    for c in caches:
-                        c.offset = 0
-                    K = Lpad - 1  # so that s = K+1-L matches Lpad-L below
+                    K = Lpad - 1   # so that s = K+1-L matches Lpad-L below
+                    abs_off = Lpad - 1
                 else:
                     rem_max = max((act_rows[i][2] - len(act_gen[i])
                                    for i in range(len(act_rows))), default=0)
@@ -670,11 +678,12 @@ class MlxStreamEngine:
 
                 pass_t0 = time.monotonic()
                 admit_h = [embed_w[mx.array(t)][None] for (_, t, _), _ in admits]
-                admit_caches = [[StreamKVCache(offset=s) for _, s in admits]
-                                for _ in range(n_layers)]
+                # physical pad start s vs absolute rope start: differ after compaction
+                admit_caches = [[StreamKVCache(offset=abs_off + 1 - len(p[1]))
+                                 for p, _ in admits] for _ in range(n_layers)]
                 x = embed_w[tokens] if act_rows else None   # [b,1,D]
                 if act_rows:
-                    Kcur = K + 1
+                    Kcur = K + 1  # physical columns
                     pad_mask = (mx.arange(Kcur)[None, None, None, :]
                                 < mx.array(act_start)[:, None, None, None])
                     mask = mx.where(pad_mask, mx.array(-mx.inf, x.dtype),
@@ -696,7 +705,7 @@ class MlxStreamEngine:
 
                 # merge admits into the batch (prompt end aligned at slot K)
                 if admits:
-                    new_len = caches[0].offset if act_rows else (K + 1)
+                    new_len = caches[0]._len if act_rows else (K + 1)
                     for k in range(n_layers):
                         c = caches[k]
                         ks, vs = ([c.keys[..., :c._len, :]] if act_rows else []), \
@@ -715,7 +724,7 @@ class MlxStreamEngine:
                         c.keys = mx.concatenate(ks, axis=0)
                         c.values = mx.concatenate(vs, axis=0)
                         c._used = new_len
-                        c.offset = new_len
+                        c.offset = (abs_off + 1) if act_rows else new_len
                         mx.eval(c.keys, c.values)
                         for a in range(len(admits)):
                             admit_caches[k][a] = None
@@ -771,6 +780,13 @@ class MlxStreamEngine:
                     if not act_rows:
                         caches = [StreamKVCache() for _ in range(n_layers)]
                         mx.clear_cache()
+                    else:
+                        trim = min(act_start)
+                        if trim >= 256:  # dead left-pad columns: compact physically
+                            for c in caches:
+                                c.compact(trim)
+                            act_start = [st - trim for st in act_start]
+                            mx.clear_cache()
 
                 if self.pass_cb:
                     elapsed = time.monotonic() - t_job0
