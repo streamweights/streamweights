@@ -548,7 +548,6 @@ class MlxStreamEngine:
                            calibration=cal, quant=f"{spec.name}|{spec.quant}")
         self.note(bm.reason)
         auto_batch = bm.batch
-        first_group = min(spec.extra.get("first_group", 8), total_rows)
 
         provider = ResidentProvider(index) if self.resident else None
 
@@ -637,8 +636,7 @@ class MlxStreamEngine:
                 abs_off = caches[0].offset  # absolute rope position of next slot
                 # ---- admission ----
                 admits = []
-                cap = first_group if (not act_rows and completed == 0 and pass_no == 0) \
-                    else auto_batch
+                cap = auto_batch
                 if not act_rows and pending:
                     if committed is not None:
                         group = []

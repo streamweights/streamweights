@@ -27,7 +27,6 @@ def probe(quant: str, batch: int, rows: list[dict], max_tokens: int) -> float:
     spec = ModelSpec("llama3.3:70b", quant,
                      REPO / "models/llama3.3-70b" / QUANT_DIRS[quant], {}, 4096)
     budget = MemoryBudget(38654705664, batch_override=batch)
-    spec.extra["first_group"] = batch  # no ramp during probes
     done = 0
     for cr in eng.run_batch(rows, spec, budget):
         done += 1
