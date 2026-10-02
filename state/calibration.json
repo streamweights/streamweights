@@ -54,7 +54,7 @@
   "measured_pass_s": 33.9,
   "bind_ms_per_layer": 37.2,
   "mem_model": {
-    "8bit": {
+    "llama3.3:70b|8bit": {
       "base_bytes": 9299972360,
       "per_seq_token_bytes": 547617,
       "probe_batches": [
@@ -67,7 +67,7 @@
         42.48
       ]
     },
-    "bf16": {
+    "llama3.3:70b|bf16": {
       "base_bytes": 7617883852,
       "per_seq_token_bytes": 283524,
       "probe_batches": [

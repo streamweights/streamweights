@@ -428,7 +428,7 @@ def compute_batch(index: SafetensorsIndex, budget: MemoryBudget,
     probe runs at two batch sizes (state/calibration.json mem_model), solved for
     85% of the Metal working set. Fallback: the Phase 1 analytic formula."""
     ws = budget.working_set_bytes
-    mem = (calibration or {}).get("mem_model", {}).get(quant or "")
+    mem = (calibration or {}).get("mem_model", {}).get(quant or "")  # quant is "model|quant" composite when measured
     if mem:
         target = int(ws * 0.85)
         mean_cost_tokens = sum(seq_costs) / max(1, len(seq_costs)) / max(1, kv_per_token)
@@ -537,7 +537,7 @@ class MlxStreamEngine:
         max_tokens_job = max(p[2] for p in prompts)
         seq_costs = [(len(t) + mt) * kv_per_token for _, t, mt in prompts]
         bm = compute_batch(index, budget, seq_costs, max_tokens_job, kv_per_token,
-                           calibration=cal, quant=spec.quant)
+                           calibration=cal, quant=f"{spec.name}|{spec.quant}")
         self.note(bm.reason)
         auto_batch = bm.batch
         first_group = min(spec.extra.get("first_group", 8), total_rows)
@@ -561,7 +561,7 @@ class MlxStreamEngine:
         max_passes = spec.extra.get("max_passes")  # probe/timebox hook
 
         pending = list(prompts)          # sorted ascending by prompt length
-        mem = cal.get("mem_model", {}).get(spec.quant or "")
+        mem = cal.get("mem_model", {}).get(f"{spec.name}|{spec.quant}")
         admit_budget = committed = None
         per_tok_cost = None
         if mem and not budget.batch_override:

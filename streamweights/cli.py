@@ -57,7 +57,7 @@ def _rough_batch(st_bytes: int, arch: dict, rows: list[dict], max_tokens: int,
     lens = [sum(len(m.get("content", "")) for m in r["body"]["messages"]) // 4 + 16
             for r in rows]
     mean_tokens = sum(lens) / max(1, len(lens)) + max_tokens
-    mem = load_calibration().get("mem_model", {}).get(quant)
+    mem = load_calibration().get("mem_model", {}).get(f"llama3.3:70b|{quant}")
     if mem:
         batch = int((ws * 0.85 - mem["base_bytes"]) /
                     max(1, mem["per_seq_token_bytes"] * mean_tokens))
