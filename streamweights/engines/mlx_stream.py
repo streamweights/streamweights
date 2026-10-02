@@ -431,19 +431,20 @@ def compute_batch(index: SafetensorsIndex, budget: MemoryBudget,
     mem = (calibration or {}).get("mem_model", {}).get(quant or "")
     if mem:
         target = int(ws * 0.85)
-        worst_cost_tokens = max(seq_costs) / max(1, kv_per_token)  # Lmax + max_tokens
-        per_seq = mem["per_seq_token_bytes"] * worst_cost_tokens
-        batch = max(1, int((target - mem["base_bytes"]) / max(1, per_seq)))
+        mean_cost_tokens = sum(seq_costs) / max(1, len(seq_costs)) / max(1, kv_per_token)
+        per_seq_mean = mem["per_seq_token_bytes"] * mean_cost_tokens
+        batch = max(1, int((target - mem["base_bytes"]) / max(1, per_seq_mean)))
         batch = min(batch, max(1, len(seq_costs)), 512)
         if budget.batch_override:
             batch = budget.batch_override
-        reason = (f"batch {batch}: measured-memory mode — (0.85×{ws / GIB:.1f}G target "
-                  f"− {mem['base_bytes'] / GIB:.1f}G measured base) / "
-                  f"({mem['per_seq_token_bytes']:.0f} B/seq-token × {worst_cost_tokens:.0f} "
-                  f"worst-case tokens (actual longest prompt + {max_tokens} max_tokens)); "
-                  f"calibrated from probe runs at B={mem['probe_batches']}")
+        reason = (f"batch ~{batch} (admission by memory, not count): "
+                  f"(0.85×{ws / GIB:.1f}G target − {mem['base_bytes'] / GIB:.1f}G measured base) "
+                  f"÷ ({mem['per_seq_token_bytes'] / 1024:.0f} KB/seq-token × "
+                  f"{mean_cost_tokens:.0f} mean tokens (actual prompt lens + {max_tokens} "
+                  f"max_tokens)); rows admitted while calibrated cost fits; "
+                  f"probes at B={mem['probe_batches']}")
         return BudgetMath(ws, int(ws * 0.15), 0, 0, 0, target - mem["base_bytes"],
-                          int(per_seq), batch, reason)
+                          int(per_seq_mean), batch, reason)
     margin = int(ws * budget.margin)
     ring = n_ring * index.max_layer_bytes
     resident = index.embed.nbytes + index.final_norm.nbytes + (
@@ -560,6 +561,22 @@ class MlxStreamEngine:
         max_passes = spec.extra.get("max_passes")  # probe/timebox hook
 
         pending = list(prompts)          # sorted ascending by prompt length
+        mem = cal.get("mem_model", {}).get(spec.quant or "")
+        admit_budget = committed = None
+        per_tok_cost = None
+        if mem and not budget.batch_override:
+            admit_budget = int(budget.working_set_bytes * 0.85) - mem["base_bytes"]
+            per_tok_cost = mem["per_seq_token_bytes"]
+            committed = 0
+
+        def row_cost(p):
+            return per_tok_cost * (len(p[1]) + p[2]) if per_tok_cost else 0
+
+        def may_admit(p, n_active):
+            if committed is None:
+                return n_active < auto_batch
+            return n_active < 512 and (n_active == 0 or
+                                       committed + row_cost(p) <= admit_budget)
         # active-row state (parallel lists)
         act_rows: list = []              # (row, toks, max_tokens)
         act_start: list[int] = []        # first valid cache column per row
@@ -602,8 +619,16 @@ class MlxStreamEngine:
                 cap = first_group if (not act_rows and completed == 0 and pass_no == 0) \
                     else auto_batch
                 if not act_rows and pending:
-                    group = pending[:cap]
-                    pending = pending[cap:]
+                    if committed is not None:
+                        group = []
+                        for p in pending:
+                            if len(group) >= cap or not may_admit(p, len(group)):
+                                break
+                            group.append(p)
+                        group = group or pending[:1]
+                    else:
+                        group = pending[:cap]
+                    pending = pending[len(group):]
                     Lpad = max(len(t) for _, t, _ in group)
                     # fresh group: prompt ends align at slot Lpad-1; next write = Lpad
                     admits = [(p, Lpad - len(p[1])) for p in group]
@@ -612,7 +637,7 @@ class MlxStreamEngine:
                         c.offset = 0
                     K = Lpad - 1  # so that s = K+1-L matches Lpad-L below
                 else:
-                    while pending and len(act_rows) + len(admits) < auto_batch:
+                    while pending and may_admit(pending[0], len(act_rows) + len(admits)):
                         cand = pending[0]
                         if len(cand[1]) <= K + 1:
                             admits.append((cand, K + 1 - len(cand[1])))
@@ -675,6 +700,8 @@ class MlxStreamEngine:
                         act_rows.append(p)
                         act_start.append(s)
                         act_gen.append([])
+                        if committed is not None:
+                            committed += row_cost(p)
                     mx.clear_cache()
 
                 # logits for this pass: actives' decode step + admits' first token
@@ -703,6 +730,8 @@ class MlxStreamEngine:
                 if done_idx:
                     for i in done_idx:
                         yield emit(i)
+                        if committed is not None:
+                            committed -= row_cost(act_rows[i])
                     completed += len(done_idx)
                     keep = [i for i in range(len(act_rows)) if i not in set(done_idx)]
                     if keep:

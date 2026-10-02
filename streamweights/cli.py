@@ -50,12 +50,20 @@ def _gateway_up() -> bool:
 
 
 def _rough_batch(st_bytes: int, arch: dict, rows: list[dict], max_tokens: int,
-                 ws: int) -> int:
-    """Pre-download batch estimate (chars/4 token approximation)."""
-    kv_tok = 2 * arch["n_layers"] * arch["n_kv_heads"] * arch["head_dim"] * 2
+                 ws: int, quant: str = "bf16") -> int:
+    """Pre-download batch estimate (chars/4 token approximation). Uses the
+    measured memory calibration when one exists for this quant."""
+    from .engines.mlx_stream import load_calibration
     lens = [sum(len(m.get("content", "")) for m in r["body"]["messages"]) // 4 + 16
             for r in rows]
-    mean_cost = sum((l + max_tokens) * kv_tok for l in lens) / max(1, len(lens))
+    mean_tokens = sum(lens) / max(1, len(lens)) + max_tokens
+    mem = load_calibration().get("mem_model", {}).get(quant)
+    if mem:
+        batch = int((ws * 0.85 - mem["base_bytes"]) /
+                    max(1, mem["per_seq_token_bytes"] * mean_tokens))
+        return max(1, min(batch, 512))
+    kv_tok = 2 * arch["n_layers"] * arch["n_kv_heads"] * arch["head_dim"] * 2
+    mean_cost = mean_tokens * kv_tok
     ring = 3 * st_bytes // arch["n_layers"]
     avail = ws * 0.85 - ring - st_bytes * 0.03
     return max(1, int(avail / max(1, mean_cost)))
