@@ -594,6 +594,16 @@ class MlxStreamEngine:
         def row_cost(p):
             return per_tok_cost * (len(p[1]) + p[2]) if per_tok_cost else 0
 
+        if committed is not None and pending:
+            # blunt upfront clamp: the worst pending row's full-horizon physical
+            # tier must fit the whole batch (incremental top-ups cannot exceed it)
+            worst = max(len(p[1]) + p[2] for p in pending)
+            tier = ((worst + 255) // 256) * 256
+            phys_cap = max(1, int(admit_budget // (tier * kv_per_token)) - 1)
+            auto_batch = min(auto_batch, phys_cap)
+        self.note(f"admission: mode={'measured' if committed is not None else 'count'}, "
+                  f"auto_batch={auto_batch}")
+
         def may_admit(p, n_active, K_now, rem_max, pending_cost=0):
             if committed is None:
                 return n_active < auto_batch
