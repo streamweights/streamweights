@@ -29,6 +29,10 @@ from .base import CompletedRow, MemoryBudget, ModelSpec
 
 CALIBRATION_JSON = REPO_ROOT / "state" / "calibration.json"
 
+# prefill is processed alongside decode, at most this many prompt tokens per
+# pass, so a wave of newcomers never turns one pass into a 28-minute wall
+PREFILL_TOKENS_PER_PASS = 2048
+
 MB = 1024 * 1024
 
 ST_DTYPES = {
@@ -442,7 +446,7 @@ def compute_batch(index: SafetensorsIndex, budget: MemoryBudget,
     ws = budget.working_set_bytes
     mem = (calibration or {}).get("mem_model", {}).get(quant or "")  # quant is "model|quant" composite when measured
     if mem:
-        target = int(ws * 0.85)
+        target = int(ws * 0.75)
         mean_cost_tokens = sum(seq_costs) / max(1, len(seq_costs)) / max(1, kv_per_token)
         per_seq_mean = mem["per_seq_token_bytes"] * mean_cost_tokens
         batch = max(1, int((target - mem["base_bytes"]) / max(1, per_seq_mean)))
@@ -450,7 +454,7 @@ def compute_batch(index: SafetensorsIndex, budget: MemoryBudget,
         if budget.batch_override:
             batch = budget.batch_override
         reason = (f"batch ~{batch} (admission by memory, not count): "
-                  f"(0.85×{ws / GIB:.1f}G target − {mem['base_bytes'] / GIB:.1f}G measured base) "
+                  f"(0.75×{ws / GIB:.1f}G target − {mem['base_bytes'] / GIB:.1f}G measured base) "
                   f"÷ ({mem['per_seq_token_bytes'] / 1024:.0f} KB/seq-token × "
                   f"{mean_cost_tokens:.0f} mean tokens (actual prompt lens + {max_tokens} "
                   f"max_tokens)); rows admitted while calibrated cost fits; "
@@ -554,7 +558,9 @@ class MlxStreamEngine:
             toks = tokenizer.apply_chat_template(
                 r["body"]["messages"], add_generation_prompt=True)
             prompts.append((r, toks, r["body"].get("max_tokens", 128)))
-        prompts.sort(key=lambda p: len(p[1]))
+        prompts.sort(key=lambda p: -len(p[1]))  # longest first: the cache
+        # length is set by the head of the queue, every later row admits
+        # freely, and expensive rows are spread through the run, not walled
         total_rows = len(prompts)
         max_tokens_job = max([p[2] for p in prompts] or [0])
         seq_costs = [(len(t) + mt) * kv_per_token for _, t, mt in prompts]
@@ -617,7 +623,7 @@ class MlxStreamEngine:
         admit_budget = committed = None
         per_tok_cost = None
         if mem and not budget.batch_override:
-            admit_budget = int(budget.working_set_bytes * 0.85) - mem["base_bytes"]
+            admit_budget = int(budget.working_set_bytes * 0.75) - mem["base_bytes"]
             if K_lp or full_dir:
                 admit_budget -= lg.step_bytes(min(auto_batch, 512), int(
                     index.config.get("vocab_size", 0)))
@@ -807,10 +813,11 @@ class MlxStreamEngine:
 
                 K = caches[0]._len    # physical cache length == next write slot
                 abs_off = caches[0].offset  # absolute rope position of next slot
-                # direct backpressure: no admission while live Metal allocation
-                # exceeds 80% of the working set (catches any modeling error)
+                # direct backpressure guard: no admission while live Metal
+                # allocation exceeds 85% of the working set (the 75% steady-state
+                # budget is the primary control; this catches modeling errors)
                 mem_pressure = (mx.default_device() == mx.gpu and
-                                mx.get_active_memory() > 0.80 * budget.working_set_bytes)
+                                mx.get_active_memory() > 0.85 * budget.working_set_bytes)
                 # ---- admission ----
                 admits = []
                 cap = auto_batch
@@ -822,14 +829,18 @@ class MlxStreamEngine:
                         else:
                             group = []
                             gcost = 0
+                            ptoks = 0
                             Lp = 0
                             for p in pending:
                                 Lp = max(Lp, len(p[1]))
-                                if len(group) >= cap or not may_admit(
-                                        p, len(group), Lp, p[2], pending_cost=gcost):
+                                if (len(group) >= cap
+                                        or ptoks + len(p[1]) > PREFILL_TOKENS_PER_PASS
+                                        or not may_admit(p, len(group), Lp, p[2],
+                                                         pending_cost=gcost)):
                                     break
                                 group.append(p)
                                 gcost += row_cost(p)
+                                ptoks += len(p[1])
                             group = group or pending[:1]
                     else:
                         group = pending[:cap]
@@ -844,13 +855,17 @@ class MlxStreamEngine:
                     rem_max = max((act_rows[i][2] - len(act_gen[i])
                                    for i in range(len(act_rows))), default=0)
                     acost = 0
+                    ptoks = 0
                     while pending and not mem_pressure and may_admit(pending[0],
                                                 len(act_rows) + len(admits), K,
                                                 rem_max, pending_cost=acost):
                         cand = pending[0]
+                        if ptoks + len(cand[1]) > PREFILL_TOKENS_PER_PASS:
+                            break
                         if len(cand[1]) <= K + 1:
                             admits.append((cand, K + 1 - len(cand[1])))
                             acost += row_cost(cand)
+                            ptoks += len(cand[1])
                             pending = pending[1:]
                         else:
                             break
