@@ -11,3 +11,5 @@ __pycache__/
 nohup.out
 # Files over 10 MB are blocked by .githooks/pre-commit (gitignore cannot match by size).
 /state/files/
+/runs/
+/adapters/

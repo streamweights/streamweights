@@ -34,6 +34,8 @@ class CompletedRow:
     finish_reason: str = "stop"
     error: str | None = None
     batch_size: int = 1       # batch the row ran in (for metadata)
+    logprobs: list | None = None   # [{token_id, logprob, top: [[id, logprob], ...]}]
+    extra: dict | None = None      # extra top-level keys for the result row (score mode)
 
 
 class Engine(Protocol):

@@ -22,6 +22,8 @@ from typing import Iterator
 import mlx.core as mx
 import numpy as np
 
+from .. import logits as lg
+from ..errors import SpillError
 from ..registry import GIB, REPO_ROOT
 from .base import CompletedRow, MemoryBudget, ModelSpec
 
@@ -536,14 +538,25 @@ class MlxStreamEngine:
         H = cfg["num_key_value_heads"]
         eps = cfg.get("rms_norm_eps", 1e-5)
 
+        K_lp = lg.validate_k(spec.extra.get("logprobs"))
+        full_dir = spec.extra.get("full_logits_dir")
+        scoring = spec.extra.get("mode") == "score"
+        adapter = spec.extra.get("adapter")   # adapters.LoraAdapter or None
+        score_info: dict[str, tuple[int, list[int]]] = {}
         prompts = []
         for r in rows:
+            if scoring:
+                from ..formats import tokenize_scored
+                n_prompt, full_ids = tokenize_scored(tokenizer, r["body"]["messages"], eos_ids)
+                score_info[r["custom_id"]] = (n_prompt, full_ids)
+                prompts.append((r, full_ids, 0))
+                continue
             toks = tokenizer.apply_chat_template(
                 r["body"]["messages"], add_generation_prompt=True)
             prompts.append((r, toks, r["body"].get("max_tokens", 128)))
         prompts.sort(key=lambda p: len(p[1]))
         total_rows = len(prompts)
-        max_tokens_job = max(p[2] for p in prompts)
+        max_tokens_job = max([p[2] for p in prompts] or [0])
         seq_costs = [(len(t) + mt) * kv_per_token for _, t, mt in prompts]
         bm = compute_batch(index, budget, seq_costs, max_tokens_job, kv_per_token,
                            calibration=cal, quant=f"{spec.name}|{spec.quant}")
@@ -551,12 +564,19 @@ class MlxStreamEngine:
 
         provider = ResidentProvider(index) if self.resident else None
 
+        if adapter is not None:
+            adapter.prepare(block)   # one-time: LoRA-aware linears, passthrough until attached
+
         def bind_layer(k, ring, seqno):
             if provider is not None:
                 block.update(provider.trees[k])
-                return None
-            slot, buf = ring.get(seqno)
-            self._bind_costs.append(_bind(block, index.layers[k], buf, f"model.layers.{k}."))
+                slot = None
+            else:
+                slot, buf = ring.get(seqno)
+                self._bind_costs.append(
+                    _bind(block, index.layers[k], buf, f"model.layers.{k}."))
+            if adapter is not None:
+                adapter.attach(block, k)   # resident LoRA deltas, after the base is bound
             return slot
 
         self._bind_costs = []
@@ -579,6 +599,16 @@ class MlxStreamEngine:
                 logits = mx.tanh(logits / softcap) * softcap
             return logits
 
+        vocab = int(lm_w.shape[0])
+        if full_dir:
+            lg.check_full_logits(total_rows, max_tokens_job, vocab)
+            Path(full_dir).mkdir(parents=True, exist_ok=True)
+        lp_cap = None
+        if K_lp or full_dir:
+            # batch x vocab x 2 bytes per step (plus log-prob temporaries) must fit
+            # in 5% of the working set, on top of the weights/KV budget
+            lp_cap = lg.logits_batch_cap(vocab, int(0.05 * budget.working_set_bytes), K_lp)
+            auto_batch = min(auto_batch, lp_cap)
         stop_event = spec.extra.get("stop_event")
         max_passes = spec.extra.get("max_passes")  # probe/timebox hook
 
@@ -588,6 +618,9 @@ class MlxStreamEngine:
         per_tok_cost = None
         if mem and not budget.batch_override:
             admit_budget = int(budget.working_set_bytes * 0.85) - mem["base_bytes"]
+            if K_lp or full_dir:
+                admit_budget -= lg.step_bytes(min(auto_batch, 512), int(
+                    index.config.get("vocab_size", 0)))
             per_tok_cost = mem["per_seq_token_bytes"]
             committed = 0
 
@@ -609,7 +642,7 @@ class MlxStreamEngine:
                 return n_active < auto_batch
             if n_active == 0:
                 return True
-            if n_active >= 512:
+            if n_active >= 512 or (lp_cap and n_active >= lp_cap):
                 return False
             # (1) calibrated per-row cost must fit the budget
             if committed + pending_cost + row_cost(p) > admit_budget:
@@ -625,6 +658,9 @@ class MlxStreamEngine:
         act_rows: list = []              # (row, toks, max_tokens)
         act_start: list[int] = []        # first valid cache column per row
         act_gen: list[list[int]] = []    # generated ids per row
+        act_lp: list[list] = []          # per-token (id, logprob, top ids, top logprobs)
+        act_full: list[list] = []        # per-token float16 logits (--full-logits)
+        act_t0: list[float] = []         # when each row entered a pass
         caches = [StreamKVCache() for _ in range(n_layers)]
         tokens = None                    # [b, 1] next input ids
         completed = 0
@@ -643,14 +679,126 @@ class MlxStreamEngine:
             out = act_gen[i]
             stopped = bool(out) and out[-1] in eos_ids
             text_ids = out[:-1] if stopped else out
+            recs = None
+            if K_lp and act_lp[i]:
+                ids, tls, tis, tvs = zip(*act_lp[i])
+                recs = lg.records_from_arrays(ids, tls, tis, tvs)
+            if full_dir and act_full[i]:
+                np.save(Path(full_dir) / f"{lg.safe_name(r['custom_id'])}.npy",
+                        np.stack(act_full[i]))
             return CompletedRow(
                 custom_id=r["custom_id"], content=tokenizer.decode(text_ids),
                 prompt_tokens=len(toks), completion_tokens=len(out),
-                latency_s=round(time.monotonic() - t_job0, 3),
+                latency_s=round(time.monotonic() - act_t0[i], 3),
                 finish_reason="stop" if stopped else "length",
-                batch_size=len(act_rows))
+                batch_size=len(act_rows), logprobs=recs)
+
+        def score_groups():
+            """Teacher-forced scoring: prefill only, no sampling. Sequences are
+            grouped by token budget; one weight pass (one trip through every
+            layer) serves the whole group. For each row, the hidden states at
+            the target positions go through the final norm and lm_head, and the
+            teacher's top-k plus the target token's log-prob are recorded."""
+            nonlocal seqno
+            k_top = K_lp or 32
+            max_group_tokens = spec.extra.get("score_group_tokens", 16384)
+            max_group_rows = spec.extra.get("score_group_rows", 256)
+            todo = list(prompts)           # ascending by length
+            done_rows = scored = 0
+            t_start = time.monotonic()
+            pass_i = 0
+            while todo:
+                if stop_event and stop_event.is_set():
+                    return
+                group, tok_sum = [], 0
+                while todo and len(group) < max_group_rows and (
+                        not group or tok_sum + len(todo[0][1]) <= max_group_tokens):
+                    group.append(todo.pop(0))
+                    tok_sum += len(group[-1][1])
+                t0 = time.monotonic()
+                hs = [embed(mx.array(t))[None] for _, t, _ in group]
+                for k in range(n_layers):
+                    slot = bind_layer(k, ring, seqno)
+                    seqno += 1
+                    for a in range(len(group)):
+                        la = hs[a].shape[1]
+                        amask = "causal" if not fam.needs_array_mask else \
+                            mx.where(mx.arange(la)[:, None] >= mx.arange(la)[None, :],
+                                     mx.array(0, hs[a].dtype), mx.array(-mx.inf, hs[a].dtype))
+                        hs[a] = block(hs[a], mask=amask, cache=StreamKVCache())
+                        mx.eval(hs[a])   # one sequence's intermediates live at a time
+                    if slot is not None:
+                        ring.release(slot)
+                out_rows = []
+                for a, (r, toks, _) in enumerate(group):
+                    n_prompt, full_ids = score_info[r["custom_id"]]
+                    tgt = mx.array(full_ids[n_prompt:])
+                    h = hs[a][0, n_prompt - 1:len(full_ids) - 1, :]
+                    recs, lps, full_chunks = [], [], []
+                    for c0 in range(0, h.shape[0], 256):   # bound logits to 256 x vocab
+                        lg_c = lm_logits(h[c0:c0 + 256])
+                        tl, ti, tv = lg.topk_mlx(lg_c, tgt[c0:c0 + 256], k_top)
+                        recs += lg.records_from_arrays(
+                            full_ids[n_prompt + c0:n_prompt + c0 + len(tl)], tl, ti, tv)
+                        lps += [float(x) for x in tl]
+                        if full_dir:
+                            full_chunks.append(np.array(lg_c.astype(mx.float16)))
+                    if full_dir:
+                        np.save(Path(full_dir) / f"{lg.safe_name(r['custom_id'])}.npy",
+                                np.concatenate(full_chunks))
+                    tgt_ids = full_ids[n_prompt:]
+                    stopped = bool(tgt_ids) and tgt_ids[-1] in eos_ids
+                    out_rows.append(CompletedRow(
+                        custom_id=r["custom_id"],
+                        content=tokenizer.decode(tgt_ids[:-1] if stopped else tgt_ids),
+                        prompt_tokens=n_prompt, completion_tokens=len(tgt_ids),
+                        latency_s=0.0, finish_reason="scored", batch_size=len(group),
+                        logprobs=recs,
+                        extra={"score": {
+                            "mode": "teacher_forced", "n_target": len(tgt_ids),
+                            "logprob_sum": round(sum(lps), 6),
+                            "logprob_mean": round(sum(lps) / len(lps), 6),
+                            "perplexity": round(float(np.exp(-sum(lps) / len(lps))), 6)}}))
+                mx.clear_cache()
+                pass_s = time.monotonic() - t0
+                pass_i += 1
+                self.last_pass_times.append(pass_s)
+                scored += sum(len(score_info[r["custom_id"]][1]) for r, _, _ in group)
+                for cr in out_rows:
+                    cr.latency_s = round(pass_s, 3)
+                    yield cr
+                done_rows += len(group)
+                if self.pass_cb:
+                    el = time.monotonic() - t_start
+                    rate = scored / el if el else 0
+                    left = sum(len(t) for _, t, _ in todo)
+                    self.pass_cb({
+                        "rows_done": done_rows, "total": total_rows, "pass_no": pass_i,
+                        "pass_s": pass_s, "tok_s": rate,
+                        "eta_s": left / rate if rate else None,
+                        "quant": spec.quant, "batch": len(group),
+                        "peak_gb": (mx.get_peak_memory() / GIB)
+                        if mx.default_device() == mx.gpu else 0.0,
+                        "slots": [{"custom_id": r["custom_id"],
+                                   "tokens": len(score_info[r["custom_id"]][1])
+                                   - score_info[r["custom_id"]][0],
+                                   "tail": tokenizer.decode(
+                                       score_info[r["custom_id"]][1][-30:])[-80:]
+                                   .replace("\n", " ")} for r, _, _ in group[:8]]})
+            el = time.monotonic() - t_start
+            if scored and el > 0:     # measured prefill rate, the basis for --score estimates
+                cal2 = load_calibration()
+                cal2.setdefault("prefill_rates", {})[f"{spec.name}|{spec.quant}"] = {
+                    "tok_s": round(scored / el, 1), "tokens": scored,
+                    "rows": done_rows, "engine": "resident" if provider else "stream",
+                    "model_bytes": sum(p.nbytes for p in index.layers),
+                    "adapter": bool(adapter)}
+                save_calibration(cal2)
 
         try:
+            if scoring:
+                yield from score_groups()
+                return
             while act_rows or pending:
                 if stop_event and stop_event.is_set():
                     return
@@ -661,7 +809,8 @@ class MlxStreamEngine:
                 abs_off = caches[0].offset  # absolute rope position of next slot
                 # direct backpressure: no admission while live Metal allocation
                 # exceeds 80% of the working set (catches any modeling error)
-                mem_pressure = mx.get_active_memory() > 0.80 * budget.working_set_bytes
+                mem_pressure = (mx.default_device() == mx.gpu and
+                                mx.get_active_memory() > 0.80 * budget.working_set_bytes)
                 # ---- admission ----
                 admits = []
                 cap = auto_batch
@@ -770,6 +919,9 @@ class MlxStreamEngine:
                         act_rows.append(p)
                         act_start.append(s)
                         act_gen.append([])
+                        act_lp.append([])
+                        act_full.append([])
+                        act_t0.append(pass_t0)
                         if committed is not None:
                             committed += row_cost(p)
                     mx.clear_cache()
@@ -785,12 +937,22 @@ class MlxStreamEngine:
                 logits = lm_logits(h_all)
                 tokens = mx.argmax(logits, axis=-1)
                 mx.eval(tokens)
+                step_lp = step_full = None
+                if K_lp:
+                    step_lp = lg.topk_mlx(logits[:, 0, :], tokens[:, 0], K_lp)
+                if full_dir:
+                    step_full = np.array(logits[:, 0, :].astype(mx.float16))
                 pass_s = time.monotonic() - pass_t0
                 self.last_pass_times.append(pass_s)
                 pass_no += 1
 
                 for i in range(len(act_rows)):
                     act_gen[i].append(int(tokens[i, 0]))
+                    if step_lp is not None:
+                        tl, ti, tv = step_lp
+                        act_lp[i].append((int(tokens[i, 0]), tl[i], ti[i], tv[i]))
+                    if step_full is not None:
+                        act_full[i].append(step_full[i])
                 gen_tokens_total += len(act_rows)
 
                 # finish + compress
@@ -815,6 +977,9 @@ class MlxStreamEngine:
                     act_rows = [act_rows[i] for i in keep]
                     act_start = [act_start[i] for i in keep]
                     act_gen = [act_gen[i] for i in keep]
+                    act_lp = [act_lp[i] for i in keep]
+                    act_full = [act_full[i] for i in keep]
+                    act_t0 = [act_t0[i] for i in keep]
                     if not act_rows:
                         caches = [StreamKVCache() for _ in range(n_layers)]
                         mx.clear_cache()
@@ -844,7 +1009,7 @@ class MlxStreamEngine:
                         "tok_s": rate,
                         "eta_s": remaining / rate if rate else None,
                         "quant": spec.quant, "batch": len(act_rows),
-                        "peak_gb": mx.get_peak_memory() / GIB,
+                        "peak_gb": (mx.get_peak_memory() / GIB) if mx.default_device() == mx.gpu else 0.0,
                         "slots": slots,
                     })
         finally:

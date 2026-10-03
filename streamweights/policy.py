@@ -105,3 +105,47 @@ def choose_quant(model: Model, hardware: dict, explicit: str | None = None) -> Q
             f"dropped to Q8_0: probed NVMe rate ({nvme_rate / GIB:.1f} GB/s) implies "
             f"{bf16_bytes / nvme_rate:.0f} s per forward pass at bf16 (> {MAX_SECONDS_PER_PASS} s)")
     return QuantChoice("bf16", "bf16 (batch-tier default)")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: prefill-bound estimates for teacher-forced scoring.
+
+ASSUMED_TFLOPS = 6.0   # effective bf16 matmul rate used only when nothing is measured
+
+
+def estimate_score_seconds(total_tokens: int, model_bytes: int, quant: str,
+                           calibration: dict, key: str, streamed: bool,
+                           read_rate: float | None, group_tokens: int = 16384
+                           ) -> tuple[float, str]:
+    """Scoring is prefill-bound: time = tokens / measured prefill rate, with the
+    weight-read floor (one full read per group of up to `group_tokens`) when the
+    model streams. Source of the rate, best first:
+      measured   state/calibration.json prefill_rates[key] from an earlier --score run
+      scaled     another model's measured prefill rate, scaled by weight bytes
+      assumed    ASSUMED_TFLOPS over 2 x params (params ~ bytes / bytes-per-param)
+    Returns (seconds, source sentence)."""
+    pr = calibration.get("prefill_rates", {})
+    if key in pr:
+        rate, src = pr[key]["tok_s"], f"measured prefill rate {pr[key]['tok_s']:.0f} tok/s"
+    elif pr:
+        k2, v = max(pr.items(), key=lambda kv: kv[1]["tokens"])
+        ref_bytes = v.get("model_bytes")
+        # rate ~ 1/params; without the reference's bytes, fall back to the assumption
+        if ref_bytes:
+            rate = v["tok_s"] * ref_bytes / model_bytes
+            src = (f"scaled from {k2} measured {v['tok_s']:.0f} tok/s by weight bytes")
+        else:
+            rate = None
+    else:
+        rate = None
+    if rate is None:
+        bpp = {"bf16": 2.0, "8bit": 1.0, "4bit": 0.5}.get(quant, 2.0)
+        params = model_bytes / bpp
+        rate = ASSUMED_TFLOPS * 1e12 / (2 * params)
+        src = f"uncalibrated: {ASSUMED_TFLOPS:.0f} TFLOP/s assumed, {rate:.0f} tok/s"
+    compute_s = total_tokens / rate
+    if streamed and read_rate:
+        floor = math.ceil(total_tokens / group_tokens) * (model_bytes / read_rate)
+        if floor > compute_s:
+            return floor, src + "; weight-read bound"
+    return compute_s, src

@@ -104,8 +104,22 @@ def _run_job_thread(job: Job, model_name: str, quant: str):
     m = reg[model_name]
     paths = download(m, quant)
     ngl, _ = compute_offload(m, quant, job.ctx, hw["gpu"]["vram_bytes"], job.parallel)
+    from . import runs as runs_mod
+    from .engines.base import ModelSpec
+    runs_mod.start_run(job, command=f"gateway: POST /v1/batches model={model_name}",
+                       spec=ModelSpec(model_name, quant, paths[0], m.arch, job.ctx),
+                       input_path=job.input_path, hw=hw, engine_name="llamacpp")
     engine = BatchEngine(job, m, paths, ngl)
-    asyncio.run(engine.run())
+    try:
+        asyncio.run(engine.run())
+    except BaseException:
+        runs_mod.finish_run(job.id, status="failed", rows_done=len(job.done_ids()),
+                            results_path=job.results_path)
+        raise
+    meta = job.read_meta()
+    runs_mod.finish_run(job.id, status=meta.get("status", "completed"),
+                        rows_done=meta.get("done", len(job.done_ids())),
+                        results_path=job.results_path)
 
 
 @app.post("/v1/batches")

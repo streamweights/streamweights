@@ -32,3 +32,13 @@ GPU OOM from batch 32 up at 4k context; batch 16 ran but completed zero rows in 
 On macOS the engine is MLX with bf16 safetensors as the native artifact; llama.cpp is retained only as the non-Apple path. No GGUF conversion appears anywhere in the golden path.
 
 The seven DX rules in docs/plan.md remain binding - in particular "one command, zero config" must hold for `spill run <model> <file>` with no flags.
+
+## Workflow thesis (Phase 2)
+
+The product is the local half of building your own model: run, distill, tune, eval, against full-precision open models.
+The eval set is the central artifact.
+Every command is a run against it.
+
+## Long-prompt finding (proof run)
+
+Pass time is flat in batch size only while attention is cheap; at 1k-token prompts the engine becomes compute-bound and KV cost cuts batch by about 5x.

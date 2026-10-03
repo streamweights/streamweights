@@ -49,7 +49,12 @@ def test_gguf_header_reader():
 
 # ---------- policy ----------
 
-def test_policy_bf16_default():
+def test_policy_bf16_default(monkeypatch):
+    import shutil
+    from collections import namedtuple
+    du = namedtuple("du", "total used free")
+    # hermetic: the answer must not depend on how full this machine's disk is
+    monkeypatch.setattr(shutil, "disk_usage", lambda p: du(10**13, 0, 10**13))
     m = load_registry()["qwen2.5:0.5b"]
     c = choose_quant(m, HW)
     assert c.quant == "bf16" and "default" in c.reason

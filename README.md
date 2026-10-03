@@ -60,6 +60,45 @@ Any Hugging Face repo id with a supported architecture also works:
 spill run org/name your-evals.jsonl
 ```
 
+## The loop
+
+streamweights is the local half of building your own model: run, distill, tune, eval, against full-precision open models. The eval set is the central artifact, and every command is a run against it.
+
+| verb | what it does | example |
+|---|---|---|
+| run | the full-size model (optionally with a LoRA adapter) over your file | `spill run llama3.3:70b+./my-adapter evals.jsonl` |
+| distill | the teacher's completions with per-token top-k log-probs, or its log-probs over targets you supply (`--score`, prefill only, no sampling) | `spill distill llama3.3:70b prompts.jsonl --logprobs 32` |
+| tune | train an adapter on that data | next, not yet available |
+| eval | the same eval set through several models, one table | `spill eval evals.jsonl llama3.3:70b llama3.3:70b+./my-adapter --metric contains` |
+
+`spill eval` runs each model that has no finished run for this exact input file (matched by hash; `--rerun` forces), scores every row, prints one table (model, quant, adapter, rows, metric mean, p50 and p95 per-row latency, tokens) and writes `runs/eval-<id>/table.md` plus `diff.jsonl`, the rows where the models disagree. Metrics: `exact_match`, `contains`, `regex`, `json_field`, `judge` (a second model grades each row with a rubric, `--judge <model>`), and `script:<file.py>` (a Python file exposing `score(row) -> float`).
+
+An adapter is a local directory or Hugging Face repo in PEFT or mlx-lm layout. Both engines apply the LoRA deltas at the layer boundary, after each layer's base weights are bound, so the streamed bytes never change and adapter weights stay resident. `spill adapters` lists the ones under `adapters/`.
+
+`--logprobs K` (K up to 64) adds `logprobs: [{token_id, logprob, top: [[id, logprob], ...]}]` to each output row. `--full-logits` also writes one float16 `.npy` of logits per row, for sets under 200 rows (it refuses above that and tells you the size it would have written).
+
+### Formats
+
+One family of JSONL, the OpenAI shapes you already have. Training and distillation data are OpenAI fine-tuning chat lines (roles, optional `weight` of 0 or 1 on assistant messages); eval rows are the same plus an `expected` field of any JSON type. Batch lines (`custom_id` plus `body`) work everywhere chat lines do.
+
+Training or distillation target (`spill distill --score`):
+
+```json
+{"messages": [{"role": "user", "content": "What is the capital of France?"}, {"role": "assistant", "content": "The capital of France is Paris."}]}
+```
+
+Eval row (`spill eval`):
+
+```json
+{"messages": [{"role": "user", "content": "What is the capital of France?"}], "expected": "Paris", "max_tokens": 48}
+```
+
+`spill check <file>` validates a file and prints the first error with its line number.
+
+### Provenance
+
+Every run writes `runs/<id>/manifest.json` (command, model id and weight fingerprint, quant, adapter id and hash, input file hash, engine version, hardware probe, start and end) and stamps each result row with its run id and the same hashes, so any number in an eval table can be traced to the exact weights, adapter and input that produced it; `spill runs` lists them.
+
 ## Models and architectures
 
 | tag | params | family (state) | bf16 | 8-bit | on 48 GB | disk needed | 
@@ -93,7 +132,12 @@ the 1,000-token document-QA tier, stopped deliberately as a measured partial):
 
 ## Usage
 
-- `spill run <model> <input.jsonl|sample>` - flags: `--quant 8bit|4bit|Q8_0|Q4_K_M`, `--out path`, `--context N`, `--parallel N` (override, never required), `--quiet` (no live block), `--debug` (tracebacks).
+- `spill run <model>[+<adapter>] <input.jsonl|sample>` - flags: `--quant 8bit|4bit|Q8_0|Q4_K_M`, `--out path`, `--context N`, `--parallel N` (override, never required), `--logprobs K`, `--full-logits`, `--quiet` (no live block), `--debug` (tracebacks).
+- `spill distill <teacher> <file.jsonl> [--score] [--logprobs K]` - distillation JSONL from a full-size teacher.
+- `spill eval <evals.jsonl> <model>... [--metric M] [--judge model] [--rerun]` - one table across models.
+- `spill check <file.jsonl>` - validate a file; first error with its line number.
+- `spill runs` - every run with model, quant, adapter, input hash, rows, status.
+- `spill adapters` - local LoRA adapters.
 - `spill tail [job]` - follow a job's results; shows the live block while it runs.
 - `spill resume [job]` - continue the latest or named job from its checkpoint.
 - `spill status` - all jobs with progress, tokens/s, ETA.
@@ -111,7 +155,8 @@ The safetensors headers are parsed into a per-layer byte index without loading a
 - Phase 1 (done): streaming runner - 31.6 s per 70B bf16 pass at 79% of drive speed, identical-output gate 20/20.
 - Phase 1.5 (done): measured memory calibration; bf16 holds as the no-flags default.
 - Phase 1.6 (done): stranger-installable; six families verified; proof run measured as a partial: 1,400 of 2,000 rows in 15.6 h unattended (the short and summarize tiers, completely); the long-prompt tier runs ~100 s/pass under memory-pressure fault storms, full set projected ~50 h on the current engine; fix in progress (knee-targeting memory budget, batched prefill).
-- Next: outside-developer testing, the long-tier engine fixes, more verified families; then interactive tiers and adapters. Plan: [docs/plan.md](docs/plan.md).
+- Phase 2 (done): the loop - run store and manifests, per-token log-probs, `spill distill` (generation and teacher-forced), LoRA adapters at inference on both engines, metrics, `spill eval`, `spill check`. Verified on the 0.5b against an independent mlx-lm reference.
+- Next: `spill tune` (Phase 3), the long-tier engine fixes (batched prefill, knee-targeting memory budget), outside-developer testing; then the CPU path and MoE. Plan: [docs/plan.md](docs/plan.md).
 
 ## Feedback
 

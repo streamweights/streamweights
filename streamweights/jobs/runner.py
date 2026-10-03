@@ -9,11 +9,13 @@ import threading
 import time
 import uuid
 
+from .. import runs
 from ..engines.base import CompletedRow, MemoryBudget, ModelSpec
 from .engine import Job, Progress
 
 
-def result_row(cr: CompletedRow, job: Job, engine_name: str) -> dict:
+def result_row(cr: CompletedRow, job: Job, engine_name: str,
+               prov: dict | None = None) -> dict:
     ok = cr.error is None
     body = {
         "choices": [{"finish_reason": cr.finish_reason, "index": 0,
@@ -25,7 +27,7 @@ def result_row(cr: CompletedRow, job: Job, engine_name: str) -> dict:
                   "total_tokens": cr.prompt_tokens + cr.completion_tokens},
         "id": f"chatcmpl-{uuid.uuid4().hex[:24]}",
     }
-    return {
+    row = {
         "id": f"batch_req_{uuid.uuid4().hex[:12]}",
         "custom_id": cr.custom_id,
         "response": {"status_code": 200, "request_id": body["id"], "body": body} if ok else None,
@@ -35,8 +37,14 @@ def result_row(cr: CompletedRow, job: Job, engine_name: str) -> dict:
             "batch": cr.batch_size,
             "tokens": {"prompt": cr.prompt_tokens, "completion": cr.completion_tokens},
             "latency_s": cr.latency_s,
+            **({"provenance": prov} if prov else {}),
         },
     }
+    if cr.logprobs is not None:
+        row["logprobs"] = cr.logprobs
+    if cr.extra:
+        row.update(cr.extra)
+    return row
 
 
 def run_job(job: Job, engine, spec: ModelSpec, budget: MemoryBudget,
@@ -61,12 +69,16 @@ def run_job(job: Job, engine, spec: ModelSpec, budget: MemoryBudget,
         except ValueError:
             pass
 
+    meta0 = job.read_meta()
+    prov = meta0.get("provenance")
+    if meta0.get("run_id") and done:
+        runs.mark_resumed(meta0["run_id"])
     job.write_meta(status="running", engine=engine.name)
     ckpt = open(job.checkpoint_path, "a")
     results = open(job.results_path, "a")
     try:
         for cr in engine.run_batch(rows, spec, budget):
-            results.write(json.dumps(result_row(cr, job, engine.name)) + "\n")
+            results.write(json.dumps(result_row(cr, job, engine.name, prov)) + "\n")
             results.flush()
             ckpt.write(cr.custom_id + "\n")
             ckpt.flush()
@@ -82,6 +94,17 @@ def run_job(job: Job, engine, spec: ModelSpec, budget: MemoryBudget,
             status = "completed"
         job.write_meta(status=status, done=prog.done,
                        tokens_per_sec=round(prog.tokens_per_sec, 2))
+        if meta0.get("run_id"):
+            runs.finish_run(meta0["run_id"], status=status, rows_done=prog.done,
+                            tokens={"prompt": prog.prompt_tokens,
+                                    "completion": prog.completion_tokens},
+                            results_path=job.results_path)
+    except BaseException:
+        if meta0.get("run_id"):
+            runs.finish_run(meta0["run_id"], status="failed", rows_done=prog.done,
+                            results_path=job.results_path)
+        job.write_meta(status="failed")
+        raise
     finally:
         ckpt.close()
         results.close()

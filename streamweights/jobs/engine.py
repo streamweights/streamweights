@@ -101,15 +101,22 @@ class Job:
 
     @classmethod
     def create(cls, input_jsonl: Path, model: str, quant: str, ctx: int,
-               parallel: int, out: Path | None = None) -> "Job":
+               parallel: int, out: Path | None = None,
+               rows: list[dict] | None = None, options: dict | None = None) -> "Job":
+        """`rows`: already-validated rows in the batch shape (the normalized form of
+        a chat or eval file); otherwise the input file's lines are copied verbatim."""
         job_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
         d = JOBS_DIR / job_id
         d.mkdir(parents=True)
-        rows = [l for l in input_jsonl.read_text().splitlines() if l.strip()]
-        (d / "input.jsonl").write_text("\n".join(rows) + "\n")
-        job = cls(job_id, d, model, quant, ctx, parallel, len(rows))
+        if rows is not None:
+            lines = [json.dumps(r) for r in rows]
+        else:
+            lines = [l for l in input_jsonl.read_text().splitlines() if l.strip()]
+        (d / "input.jsonl").write_text("\n".join(lines) + "\n")
+        job = cls(job_id, d, model, quant, ctx, parallel, len(lines))
         job.write_meta(id=job_id, model=model, quant=quant, ctx=ctx, parallel=parallel,
-                       total=len(rows), status="created", out=str(out) if out else None,
+                       total=len(lines), status="created", out=str(out) if out else None,
+                       input_path=str(input_jsonl), options=options or {},
                        created_at=time.strftime("%Y-%m-%dT%H:%M:%S%z"))
         return job
 
