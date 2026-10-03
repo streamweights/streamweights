@@ -1,0 +1,1 @@
+1,334 of 2,000 rows completed (667 short-QA + 667 summarize-300w, all of both tiers); 666 rows remaining, all of them the 1,000-token document-QA tier; job 20261002-165546-e4a9b5 is checkpointed and resumable.

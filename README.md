@@ -80,11 +80,16 @@ Architecture families (`spill models --architectures` prints the live table):
 
 ## What to expect on a 48 GB M4 Pro
 
-| model | quant | placement | pass time | auto batch | per-token / prompt | first visible text | aggregate tok/s | 2,000-row set |
-|---|---|---|---|---|---|---|---|---|
-| qwen2.5:0.5b | bf16 | resident | ~0.1 s | up to 512 | ~0.1 s | < 10 s | 700+ | ~6 min (measured) |
-| llama3.3:70b | bf16 | streamed | ~34 s | ~158 | ~34 s | ~40 s (sample) | ~4.6 steady | 14.6–16.3 h (estimated) |
-| llama3.3:70b | 8-bit | streamed | ~19 s | ~76 | ~19 s | ~25 s (sample) | ~4.0 steady | ~17.6 h (estimated) |
+Measured on the 2,000-row eval set (1,334 rows completed; the remaining 666 are
+the 1,000-token document-QA tier, stopped deliberately as a measured partial):
+
+| model | quant | placement | tier (rows measured) | pass time | batch | first visible text | 2,000-row set |
+|---|---|---|---|---|---|---|---|
+| qwen2.5:0.5b | bf16 | resident | full set | ~0.1 s | up to 512 | < 10 s | ~6 min (measured) |
+| llama3.3:70b | bf16 | streamed | short-QA (667/667) | 33-38 s | 100-300 | 41 s (sample) | 1,400 of 2,000 measured in 15.6 h unattended; long-prompt tier ~100 s/pass, full set projected ~50 h on the current engine; fix in progress |
+| llama3.3:70b | bf16 | streamed | summarize-300w (667/667) | 33-40 s | 70-150 | | |
+| llama3.3:70b | bf16 | streamed | doc-QA-1k (0/666, measured 200+ passes) | 86-115 s | 74-75 | | |
+| llama3.3:70b | 8-bit | streamed | sample only | ~19 s | ~76 | ~25 s (sample) | ~17.6 h (estimated) |
 
 ## Usage
 
@@ -104,8 +109,9 @@ The safetensors headers are parsed into a per-layer byte index without loading a
 
 - Phase 0 (done): measured the mmap baseline - 11–13% of drive speed, 175 s per 70B pass.
 - Phase 1 (done): streaming runner - 31.6 s per 70B bf16 pass at 79% of drive speed, identical-output gate 20/20.
-- Phase 1.5 (done): measured memory calibration; bf16 holds as the no-flags default (~15 h for 2,000 rows).
-- Next: the 2,000-row proof run, outside-developer testing, more verified families; then interactive tiers and adapters. Plan: [docs/plan.md](docs/plan.md).
+- Phase 1.5 (done): measured memory calibration; bf16 holds as the no-flags default.
+- Phase 1.6 (done): stranger-installable; six families verified; proof run measured as a partial: 1,400 of 2,000 rows in 15.6 h unattended (the short and summarize tiers, completely); the long-prompt tier runs ~100 s/pass under memory-pressure fault storms, full set projected ~50 h on the current engine; fix in progress (knee-targeting memory budget, batched prefill).
+- Next: outside-developer testing, the long-tier engine fixes, more verified families; then interactive tiers and adapters. Plan: [docs/plan.md](docs/plan.md).
 
 ## Feedback
 
