@@ -16,7 +16,7 @@
 
 ## Architecture rule
 
-Inference backends are upstream llama.cpp unmodified. streamweights owns only CLI, gateway, jobs, registry, router (and, from Phase 1, the streaming runner — see docs/plan.md).
+Inference backends are upstream llama.cpp unmodified. streamweights owns only CLI, gateway, jobs, registry, router (and, from Phase 1, the streaming runner - see docs/plan.md).
 
 ## Stack
 
@@ -31,4 +31,4 @@ GPU OOM from batch 32 up at 4k context; batch 16 ran but completed zero rows in 
 
 On macOS the engine is MLX with bf16 safetensors as the native artifact; llama.cpp is retained only as the non-Apple path. No GGUF conversion appears anywhere in the golden path.
 
-The seven DX rules in docs/plan.md remain binding — in particular "one command, zero config" must hold for `spill run <model> <file>` with no flags.
+The seven DX rules in docs/plan.md remain binding - in particular "one command, zero config" must hold for `spill run <model> <file>` with no flags.

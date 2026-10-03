@@ -1,5 +1,5 @@
 > Names changed in 003: Spillway → streamweights, CLI → spill
-# Paste set 001 — Phase 0, the wedge on mmap
+# Paste set 001 - Phase 0, the wedge on mmap
 
 Received 2026-09-30. Saved verbatim.
 

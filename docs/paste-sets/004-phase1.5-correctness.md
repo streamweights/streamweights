@@ -1,4 +1,4 @@
-# Paste set 004 — Phase 1.5, correctness and headroom
+# Paste set 004 - Phase 1.5, correctness and headroom
 
 Received 2026-10-02. Saved verbatim.
 

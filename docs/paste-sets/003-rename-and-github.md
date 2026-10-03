@@ -1,4 +1,4 @@
-# Paste set 003 — rename and publish to GitHub
+# Paste set 003 - rename and publish to GitHub
 
 Received 2026-10-01. Saved verbatim.
 

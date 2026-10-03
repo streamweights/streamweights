@@ -1,12 +1,12 @@
-Phase 1.5 golden path transcript — fresh shell, clean clone, no flags, recorded
+Phase 1.5 golden path transcript - fresh shell, clean clone, no flags, recorded
 2026-10-02 13:46-15:29 PDT. Driver poll noise removed; output otherwise verbatim.
 Operator deviation: both model dirs symlinked from the existing checkout (a fresh
 machine would see the printed download lines instead).
 
 Timeline: pip install done 13:46:57. 0.5b: first completed rows ~22 s after the
 command (18 rows at ^C; the batched scheduler ramped 8 -> 512 on the tiny model
-within 4 passes at ~2,500 tok/s). 70B: pre-run line 13:47:23 — bf16 HELD as the
-no-flags default ("est. 16.3 h", memory-admission arithmetic printed) — first
+within 4 passes at ~2,500 tok/s). 70B: pre-run line 13:47:23 - bf16 HELD as the
+no-flags default ("est. 16.3 h", memory-admission arithmetic printed) - first
 completed rows 15:17:09 = 89 min 46 s after the pre-run line; by ^C+60 s the
 refill scheduler had banked 300 completed rows. spill resume picked up at
 300/2000 with 1,700 remaining.
@@ -47,8 +47,105 @@ Defects this golden path caught (the reason it exists), all fixed in-session:
 [13:46:57] $ spill run qwen2.5:0.5b examples/evals-2000.jsonl   # (^C after first rows streamed)
 spill: qwen2.5:0.5b bf16 (0.9 GB) fits in 48 GB RAM; resident. 2000 prompts, batch 1, est. 9 min. Cost: $0. Results -> /private/tmp/claude-501/-Users-amrishkapoor-spillway/8a7a1f63-3e9e-4d09-80a8-0deb1a2ada73/scratchpad/golden-p1/streamweights/jobs/20261002-134658-2c259b/results.jsonl (tail with: spill tail)
    why: bf16 (batch-tier default); est from measured engine rate; model fits working set -> mlx_resident
-rows 0/2000 · pass 1 (0.1 s) · 64.8 tok/s · ETA 1h 05m · bf16 · batch 8   rows 0/2000 · pass 2 (2.4 s) · 85.8 tok/s · ETA 49m 43s · bf16 · batch 211   rows 0/2000 · pass 3 (3.0 s) · 121.9 tok/s · ETA 34m 59s · bf16 · batch 459   rows 0/2000 · pass 4 (0.8 s) · 187.0 tok/s · ETA 22m 48s · bf16 · batch 512   rows 0/2000 · pass 5 (0.2 s) · 260.0 tok/s · ETA 16m 24s · bf16 · batch 512   rows 0/2000 · pass 6 (0.1 s) · 331.6 tok/s · ETA 12m 52s · bf16 · batch 512   rows 0/2000 · pass 7 (0.1 s) · 400.4 tok/s · ETA 10m 39s · bf16 · batch 512   rows 0/2000 · pass 8 (0.1 s) · 466.7 tok/s · ETA 9m 08s · bf16 · batch 512   rows 0/2000 · pass 9 (0.1 s) · 530.6 tok/s · ETA 8m 02s · bf16 · batch 512   rows 0/2000 · pass 10 (0.1 s) · 592.2 tok/s · ETA 7m 12s · bf16 · batch 512   rows 0/2000 · pass 11 (0.1 s) · 651.6 tok/s · ETA 6m 32s · bf16 · batch 512   rows 0/2000 · pass 12 (0.1 s) · 708.9 tok/s · ETA 6m 01s · bf16 · batch 512   rows 0/2000 · pass 13 (0.1 s) · 764.1 tok/s · ETA 5m 35s · bf16 · batch 512   rows 0/2000 · pass 14 (0.1 s) · 817.7 tok/s · ETA 5m 13s · bf16 · batch 512   rows 0/2000 · pass 15 (0.1 s) · 869.2 tok/s · ETA 4m 54s · bf16 · batch 512   rows 0/2000 · pass 16 (0.1 s) · 919.2 tok/s · ETA 4m 38s · bf16 · batch 512   rows 0/2000 · pass 17 (0.1 s) · 967.2 tok/s · ETA 4m 24s · bf16 · batch 512   rows 0/2000 · pass 18 (0.1 s) · 1013.8 tok/s · ETA 4m 12s · bf16 · batch 512   rows 0/2000 · pass 19 (0.1 s) · 1059.1 tok/s · ETA 4m 01s · bf16 · batch 512   rows 0/2000 · pass 20 (0.1 s) · 1103.0 tok/s · ETA 3m 52s · bf16 · batch 512   rows 0/2000 · pass 21 (0.1 s) · 1145.4 tok/s · ETA 3m 43s · bf16 · batch 512   rows 0/2000 · pass 22 (0.1 s) · 1187.1 tok/s · ETA 3m 35s · bf16 · batch 512   rows 0/2000 · pass 23 (0.1 s) · 1227.2 tok/s · ETA 3m 28s · bf16 · batch 512   rows 0/2000 · pass 24 (0.1 s) · 1266.0 tok/s · ETA 3m 22s · bf16 · batch 512   rows 0/2000 · pass 25 (0.1 s) · 1303.6 tok/s · ETA 3m 16s · bf16 · batch 512   rows 0/2000 · pass 26 (0.1 s) · 1340.2 tok/s · ETA 3m 11s · bf16 · batch 512   rows 0/2000 · pass 27 (0.1 s) · 1375.8 tok/s · ETA 3m 06s · bf16 · batch 512   rows 0/2000 · pass 28 (0.1 s) · 1410.2 tok/s · ETA 3m 01s · bf16 · batch 512   rows 0/2000 · pass 29 (0.1 s) · 1444.0 tok/s · ETA 2m 57s · bf16 · batch 512   rows 0/2000 · pass 30 (0.1 s) · 1476.9 tok/s · ETA 2m 53s · bf16 · batch 512   rows 0/2000 · pass 31 (0.1 s) · 1508.7 tok/s · ETA 2m 49s · bf16 · batch 512   rows 0/2000 · pass 32 (0.1 s) · 1539.8 tok/s · ETA 2m 46s · bf16 · batch 512   rows 0/2000 · pass 33 (0.1 s) · 1570.0 tok/s · ETA 2m 43s · bf16 · batch 512   rows 0/2000 · pass 34 (0.1 s) · 1599.4 tok/s · ETA 2m 40s · bf16 · batch 512   rows 0/2000 · pass 35 (0.1 s) · 1628.0 tok/s · ETA 2m 37s · bf16 · batch 512   rows 0/2000 · pass 36 (0.1 s) · 1655.9 tok/s · ETA 2m 34s · bf16 · batch 512   rows 0/2000 · pass 37 (0.1 s) · 1683.0 tok/s · ETA 2m 32s · bf16 · batch 512   rows 0/2000 · pass 38 (0.1 s) · 1709.5 tok/s · ETA 2m 29s · bf16 · batch 512   rows 0/2000 · pass 39 (0.1 s) · 1735.3 tok/s · ETA 2m 27s · bf16 · batch 512   rows 0/2000 · pass 40 (0.1 s) · 1760.6 tok/s · ETA 2m 25s · bf16 · batch 512   rows 0/2000 · pass 41 (0.1 s) · 1785.0 tok/s · ETA 2m 23s · bf16 · batch 512   rows 0/2000 · pass 42 (0.1 s) · 1808.9 tok/s · ETA 2m 21s · bf16 · batch 512   rows 0/2000 · pass 43 (0.1 s) · 1832.3 tok/s · ETA 2m 19s · bf16 · batch 512   rows 0/2000 · pass 44 (0.1 s) · 1855.4 tok/s · ETA 2m 17s · bf16 · batch 512   rows 0/2000 · pass 45 (0.1 s) · 1877.8 tok/s · ETA 2m 16s · bf16 · batch 512   rows 0/2000 · pass 46 (0.1 s) · 1899.6 tok/s · ETA 2m 14s · bf16 · batch 512   rows 0/2000 · pass 47 (0.1 s) · 1921.1 tok/s · ETA 2m 13s · bf16 · batch 512   rows 0/2000 · pass 48 (0.1 s) · 1941.8 tok/s · ETA 2m 11s · bf16 · batch 512   rows 0/2000 · pass 49 (0.1 s) · 1962.1 tok/s · ETA 2m 10s · bf16 · batch 512   rows 0/2000 · pass 50 (0.1 s) · 1982.2 tok/s · ETA 2m 09s · bf16 · batch 512   rows 0/2000 · pass 51 (0.1 s) · 2001.7 tok/s · ETA 2m 07s · bf16 · batch 512   rows 0/2000 · pass 52 (0.1 s) · 2020.9 tok/s · ETA 2m 06s · bf16 · batch 512   rows 0/2000 · pass 53 (0.1 s) · 2039.8 tok/s · ETA 2m 05s · bf16 · batch 512   rows 0/2000 · pass 54 (0.1 s) · 2058.2 tok/s · ETA 2m 04s · bf16 · batch 512   rows 0/2000 · pass 55 (0.1 s) · 2076.4 tok/s · ETA 2m 03s · bf16 · batch 512   rows 0/2000 · pass 56 (0.1 s) · 2094.0 tok/s · ETA 2m 02s · bf16 · batch 512   rows 0/2000 · pass 57 (0.1 s) · 2111.3 tok/s · ETA 2m 01s · bf16 · batch 512   rows 0/2000 · pass 58 (0.1 s) · 2128.2 tok/s · ETA 2m 00s · bf16 · batch 512   rows 0/2000 · pass 59 (0.1 s) · 2144.8 tok/s · ETA 1m 59s · bf16 · batch 512   rows 0/2000 · pass 60 (0.1 s) · 2161.0 tok/s · ETA 1m 58s · bf16 · batch 512   rows 0/2000 · pass 61 (0.1 s) · 2177.0 tok/s · ETA 1m 57s · bf16 · batch 512   rows 0/2000 · pass 62 (0.1 s) · 2192.6 tok/s · ETA 1m 56s · bf16 · batch 512   rows 0/2000 · pass 63 (0.1 s) · 2208.0 tok/s · ETA 1m 55s · bf16 · batch 512   rows 0/2000 · pass 64 (0.1 s) · 2223.0 tok/s · ETA 1m 55s · bf16 · batch 512   rows 0/2000 · pass 65 (0.1 s) · 2237.7 tok/s · ETA 1m 54s · bf16 · batch 512   rows 0/2000 · pass 66 (0.1 s) · 2252.3 tok/s · ETA 1m 53s · bf16 · batch 512   rows 0/2000 · pass 67 (0.1 s) · 2266.4 tok/s · ETA 1m 52s · bf16 · batch 512   rows 0/2000 · pass 68 (0.1 s) · 2280.2 tok/s · ETA 1m 52s · bf16 · batch 512   rows 0/2000 · pass 69 (0.1 s) · 2293.9 tok/s · ETA 1m 51s · bf16 · batch 512   rows 0/2000 · pass 70 (0.1 s) · 2307.2 tok/s · ETA 1m 50s · bf16 · batch 512   rows 0/2000 · pass 71 (0.1 s) · 2320.3 tok/s · ETA 1m 50s · bf16 · batch 512   rows 0/2000 · pass 72 (0.1 s) · 2333.1 tok/s · ETA 1m 49s · bf16 · batch 512   rows 0/2000 · pass 73 (0.1 s) · 2345.8 tok/s · ETA 1m 49s · bf16 · batch 512   rows 0/2000 · pass 74 (0.1 s) · 2358.1 tok/s · ETA 1m 48s · bf16 · batch 512   rows 6/2000 · pass 75 (0.1 s) · 2369.7 tok/s · ETA 1m 47s · bf16 · batch 506   rows 6/2000 · pass 76 (0.3 s) · 2360.7 tok/s · ETA 1m 48s · bf16 · batch 512   rows 6/2000 · pass 77 (0.2 s) · 2363.1 tok/s · ETA 1m 48s · bf16 · batch 512   rows 6/2000 · pass 78 (0.1 s) · 2374.9 tok/s · ETA 1m 47s · bf16 · batch 512   rows 6/2000 · pass 79 (0.1 s) · 2386.6 tok/s · ETA 1m 46s · bf16 · batch 512   rows 6/2000 · pass 80 (0.1 s) · 2398.0 tok/s · ETA 1m 46s · bf16 · batch 512   rows 6/2000 · pass 81 (0.1 s) · 2409.2 tok/s · ETA 1m 45s · bf16 · batch 512   rows 6/2000 · pass 82 (0.1 s) · 2420.1 tok/s · ETA 1m 45s · bf16 · batch 512   rows 7/2000 · pass 83 (0.1 s) · 2430.5 tok/s · ETA 1m 44s · bf16 · batch 511   rows 7/2000 · pass 84 (0.2 s) · 2426.8 tok/s · ETA 1m 45s · bf16 · batch 512   rows 7/2000 · pass 85 (0.2 s) · 2427.9 tok/s · ETA 1m 45s · bf16 · batch 512   rows 7/2000 · pass 86 (0.1 s) · 2438.3 tok/s · ETA 1m 44s · bf16 · batch 512   rows 7/2000 · pass 87 (0.1 s) · 2448.4 tok/s · ETA 1m 44s · bf16 · batch 512   rows 7/2000 · pass 88 (0.1 s) · 2458.4 tok/s · ETA 1m 43s · bf16 · batch 512   rows 7/2000 · pass 89 (0.1 s) · 2468.2 tok/s · ETA 1m 43s · bf16 · batch 512   rows 7/2000 · pass 90 (0.1 s) · 2478.0 tok/s · ETA 1m 42s · bf16 · batch 512   rows 7/2000 · pass 91 (0.1 s) · 2487.6 tok/s · ETA 1m 42s · bf16 · batch 512   rows 11/2000 · pass 92 (0.1 s) · 2496.7 tok/s · ETA 1m 41s · bf16 · batch 508   rows 11/2000 · pass 93 (0.3 s) · 2488.9 tok/s · ETA 1m 42s · bf16 · batch 512   rows 11/2000 · pass 94 (0.2 s) · 2491.1 tok/s · ETA 1m 42s · bf16 · batch 512   rows 11/2000 · pass 95 (0.1 s) · 2500.2 tok/s · ETA 1m 41s · bf16 · batch 512   rows 18/2000 · pass 96 (0.1 s) · 2508.7 tok/s · ETA 1m 41s · bf16 · batch 505   [13:47:20] >>> 18 rows in results.jsonl; ^C
-rows 18/2000 · pass 97 (0.3 s) · 2497.7 tok/s · ETA 1m 41s · bf16 · batch 512   
+
+rows 0/2000 · pass 1 (0.1 s) · 64.8 tok/s · ETA 1h 05m · bf16 · batch 8   
+rows 0/2000 · pass 2 (2.4 s) · 85.8 tok/s · ETA 49m 43s · bf16 · batch 211   
+rows 0/2000 · pass 3 (3.0 s) · 121.9 tok/s · ETA 34m 59s · bf16 · batch 459   
+rows 0/2000 · pass 4 (0.8 s) · 187.0 tok/s · ETA 22m 48s · bf16 · batch 512   
+rows 0/2000 · pass 5 (0.2 s) · 260.0 tok/s · ETA 16m 24s · bf16 · batch 512   
+rows 0/2000 · pass 6 (0.1 s) · 331.6 tok/s · ETA 12m 52s · bf16 · batch 512   
+rows 0/2000 · pass 7 (0.1 s) · 400.4 tok/s · ETA 10m 39s · bf16 · batch 512   
+rows 0/2000 · pass 8 (0.1 s) · 466.7 tok/s · ETA 9m 08s · bf16 · batch 512   
+rows 0/2000 · pass 9 (0.1 s) · 530.6 tok/s · ETA 8m 02s · bf16 · batch 512   
+rows 0/2000 · pass 10 (0.1 s) · 592.2 tok/s · ETA 7m 12s · bf16 · batch 512   
+rows 0/2000 · pass 11 (0.1 s) · 651.6 tok/s · ETA 6m 32s · bf16 · batch 512   
+rows 0/2000 · pass 12 (0.1 s) · 708.9 tok/s · ETA 6m 01s · bf16 · batch 512   
+rows 0/2000 · pass 13 (0.1 s) · 764.1 tok/s · ETA 5m 35s · bf16 · batch 512   
+rows 0/2000 · pass 14 (0.1 s) · 817.7 tok/s · ETA 5m 13s · bf16 · batch 512   
+rows 0/2000 · pass 15 (0.1 s) · 869.2 tok/s · ETA 4m 54s · bf16 · batch 512   
+rows 0/2000 · pass 16 (0.1 s) · 919.2 tok/s · ETA 4m 38s · bf16 · batch 512   
+rows 0/2000 · pass 17 (0.1 s) · 967.2 tok/s · ETA 4m 24s · bf16 · batch 512   
+rows 0/2000 · pass 18 (0.1 s) · 1013.8 tok/s · ETA 4m 12s · bf16 · batch 512   
+rows 0/2000 · pass 19 (0.1 s) · 1059.1 tok/s · ETA 4m 01s · bf16 · batch 512   
+rows 0/2000 · pass 20 (0.1 s) · 1103.0 tok/s · ETA 3m 52s · bf16 · batch 512   
+rows 0/2000 · pass 21 (0.1 s) · 1145.4 tok/s · ETA 3m 43s · bf16 · batch 512   
+rows 0/2000 · pass 22 (0.1 s) · 1187.1 tok/s · ETA 3m 35s · bf16 · batch 512   
+rows 0/2000 · pass 23 (0.1 s) · 1227.2 tok/s · ETA 3m 28s · bf16 · batch 512   
+rows 0/2000 · pass 24 (0.1 s) · 1266.0 tok/s · ETA 3m 22s · bf16 · batch 512   
+rows 0/2000 · pass 25 (0.1 s) · 1303.6 tok/s · ETA 3m 16s · bf16 · batch 512   
+rows 0/2000 · pass 26 (0.1 s) · 1340.2 tok/s · ETA 3m 11s · bf16 · batch 512   
+rows 0/2000 · pass 27 (0.1 s) · 1375.8 tok/s · ETA 3m 06s · bf16 · batch 512   
+rows 0/2000 · pass 28 (0.1 s) · 1410.2 tok/s · ETA 3m 01s · bf16 · batch 512   
+rows 0/2000 · pass 29 (0.1 s) · 1444.0 tok/s · ETA 2m 57s · bf16 · batch 512   
+rows 0/2000 · pass 30 (0.1 s) · 1476.9 tok/s · ETA 2m 53s · bf16 · batch 512   
+rows 0/2000 · pass 31 (0.1 s) · 1508.7 tok/s · ETA 2m 49s · bf16 · batch 512   
+rows 0/2000 · pass 32 (0.1 s) · 1539.8 tok/s · ETA 2m 46s · bf16 · batch 512   
+rows 0/2000 · pass 33 (0.1 s) · 1570.0 tok/s · ETA 2m 43s · bf16 · batch 512   
+rows 0/2000 · pass 34 (0.1 s) · 1599.4 tok/s · ETA 2m 40s · bf16 · batch 512   
+rows 0/2000 · pass 35 (0.1 s) · 1628.0 tok/s · ETA 2m 37s · bf16 · batch 512   
+rows 0/2000 · pass 36 (0.1 s) · 1655.9 tok/s · ETA 2m 34s · bf16 · batch 512   
+rows 0/2000 · pass 37 (0.1 s) · 1683.0 tok/s · ETA 2m 32s · bf16 · batch 512   
+rows 0/2000 · pass 38 (0.1 s) · 1709.5 tok/s · ETA 2m 29s · bf16 · batch 512   
+rows 0/2000 · pass 39 (0.1 s) · 1735.3 tok/s · ETA 2m 27s · bf16 · batch 512   
+rows 0/2000 · pass 40 (0.1 s) · 1760.6 tok/s · ETA 2m 25s · bf16 · batch 512   
+rows 0/2000 · pass 41 (0.1 s) · 1785.0 tok/s · ETA 2m 23s · bf16 · batch 512   
+rows 0/2000 · pass 42 (0.1 s) · 1808.9 tok/s · ETA 2m 21s · bf16 · batch 512   
+rows 0/2000 · pass 43 (0.1 s) · 1832.3 tok/s · ETA 2m 19s · bf16 · batch 512   
+rows 0/2000 · pass 44 (0.1 s) · 1855.4 tok/s · ETA 2m 17s · bf16 · batch 512   
+rows 0/2000 · pass 45 (0.1 s) · 1877.8 tok/s · ETA 2m 16s · bf16 · batch 512   
+rows 0/2000 · pass 46 (0.1 s) · 1899.6 tok/s · ETA 2m 14s · bf16 · batch 512   
+rows 0/2000 · pass 47 (0.1 s) · 1921.1 tok/s · ETA 2m 13s · bf16 · batch 512   
+rows 0/2000 · pass 48 (0.1 s) · 1941.8 tok/s · ETA 2m 11s · bf16 · batch 512   
+rows 0/2000 · pass 49 (0.1 s) · 1962.1 tok/s · ETA 2m 10s · bf16 · batch 512   
+rows 0/2000 · pass 50 (0.1 s) · 1982.2 tok/s · ETA 2m 09s · bf16 · batch 512   
+rows 0/2000 · pass 51 (0.1 s) · 2001.7 tok/s · ETA 2m 07s · bf16 · batch 512   
+rows 0/2000 · pass 52 (0.1 s) · 2020.9 tok/s · ETA 2m 06s · bf16 · batch 512   
+rows 0/2000 · pass 53 (0.1 s) · 2039.8 tok/s · ETA 2m 05s · bf16 · batch 512   
+rows 0/2000 · pass 54 (0.1 s) · 2058.2 tok/s · ETA 2m 04s · bf16 · batch 512   
+rows 0/2000 · pass 55 (0.1 s) · 2076.4 tok/s · ETA 2m 03s · bf16 · batch 512   
+rows 0/2000 · pass 56 (0.1 s) · 2094.0 tok/s · ETA 2m 02s · bf16 · batch 512   
+rows 0/2000 · pass 57 (0.1 s) · 2111.3 tok/s · ETA 2m 01s · bf16 · batch 512   
+rows 0/2000 · pass 58 (0.1 s) · 2128.2 tok/s · ETA 2m 00s · bf16 · batch 512   
+rows 0/2000 · pass 59 (0.1 s) · 2144.8 tok/s · ETA 1m 59s · bf16 · batch 512   
+rows 0/2000 · pass 60 (0.1 s) · 2161.0 tok/s · ETA 1m 58s · bf16 · batch 512   
+rows 0/2000 · pass 61 (0.1 s) · 2177.0 tok/s · ETA 1m 57s · bf16 · batch 512   
+rows 0/2000 · pass 62 (0.1 s) · 2192.6 tok/s · ETA 1m 56s · bf16 · batch 512   
+rows 0/2000 · pass 63 (0.1 s) · 2208.0 tok/s · ETA 1m 55s · bf16 · batch 512   
+rows 0/2000 · pass 64 (0.1 s) · 2223.0 tok/s · ETA 1m 55s · bf16 · batch 512   
+rows 0/2000 · pass 65 (0.1 s) · 2237.7 tok/s · ETA 1m 54s · bf16 · batch 512   
+rows 0/2000 · pass 66 (0.1 s) · 2252.3 tok/s · ETA 1m 53s · bf16 · batch 512   
+rows 0/2000 · pass 67 (0.1 s) · 2266.4 tok/s · ETA 1m 52s · bf16 · batch 512   
+rows 0/2000 · pass 68 (0.1 s) · 2280.2 tok/s · ETA 1m 52s · bf16 · batch 512   
+rows 0/2000 · pass 69 (0.1 s) · 2293.9 tok/s · ETA 1m 51s · bf16 · batch 512   
+rows 0/2000 · pass 70 (0.1 s) · 2307.2 tok/s · ETA 1m 50s · bf16 · batch 512   
+rows 0/2000 · pass 71 (0.1 s) · 2320.3 tok/s · ETA 1m 50s · bf16 · batch 512   
+rows 0/2000 · pass 72 (0.1 s) · 2333.1 tok/s · ETA 1m 49s · bf16 · batch 512   
+rows 0/2000 · pass 73 (0.1 s) · 2345.8 tok/s · ETA 1m 49s · bf16 · batch 512   
+rows 0/2000 · pass 74 (0.1 s) · 2358.1 tok/s · ETA 1m 48s · bf16 · batch 512   
+rows 6/2000 · pass 75 (0.1 s) · 2369.7 tok/s · ETA 1m 47s · bf16 · batch 506   
+rows 6/2000 · pass 76 (0.3 s) · 2360.7 tok/s · ETA 1m 48s · bf16 · batch 512   
+rows 6/2000 · pass 77 (0.2 s) · 2363.1 tok/s · ETA 1m 48s · bf16 · batch 512   
+rows 6/2000 · pass 78 (0.1 s) · 2374.9 tok/s · ETA 1m 47s · bf16 · batch 512   
+rows 6/2000 · pass 79 (0.1 s) · 2386.6 tok/s · ETA 1m 46s · bf16 · batch 512   
+rows 6/2000 · pass 80 (0.1 s) · 2398.0 tok/s · ETA 1m 46s · bf16 · batch 512   
+rows 6/2000 · pass 81 (0.1 s) · 2409.2 tok/s · ETA 1m 45s · bf16 · batch 512   
+rows 6/2000 · pass 82 (0.1 s) · 2420.1 tok/s · ETA 1m 45s · bf16 · batch 512   
+rows 7/2000 · pass 83 (0.1 s) · 2430.5 tok/s · ETA 1m 44s · bf16 · batch 511   
+rows 7/2000 · pass 84 (0.2 s) · 2426.8 tok/s · ETA 1m 45s · bf16 · batch 512   
+rows 7/2000 · pass 85 (0.2 s) · 2427.9 tok/s · ETA 1m 45s · bf16 · batch 512   
+rows 7/2000 · pass 86 (0.1 s) · 2438.3 tok/s · ETA 1m 44s · bf16 · batch 512   
+rows 7/2000 · pass 87 (0.1 s) · 2448.4 tok/s · ETA 1m 44s · bf16 · batch 512   
+rows 7/2000 · pass 88 (0.1 s) · 2458.4 tok/s · ETA 1m 43s · bf16 · batch 512   
+rows 7/2000 · pass 89 (0.1 s) · 2468.2 tok/s · ETA 1m 43s · bf16 · batch 512   
+rows 7/2000 · pass 90 (0.1 s) · 2478.0 tok/s · ETA 1m 42s · bf16 · batch 512   
+rows 7/2000 · pass 91 (0.1 s) · 2487.6 tok/s · ETA 1m 42s · bf16 · batch 512   
+rows 11/2000 · pass 92 (0.1 s) · 2496.7 tok/s · ETA 1m 41s · bf16 · batch 508   
+rows 11/2000 · pass 93 (0.3 s) · 2488.9 tok/s · ETA 1m 42s · bf16 · batch 512   
+rows 11/2000 · pass 94 (0.2 s) · 2491.1 tok/s · ETA 1m 42s · bf16 · batch 512   
+rows 11/2000 · pass 95 (0.1 s) · 2500.2 tok/s · ETA 1m 41s · bf16 · batch 512   
+rows 18/2000 · pass 96 (0.1 s) · 2508.7 tok/s · ETA 1m 41s · bf16 · batch 505   [13:47:20] >>> 18 rows in results.jsonl; ^C
+
+rows 18/2000 · pass 97 (0.3 s) · 2497.7 tok/s · ETA 1m 41s · bf16 · batch 512   
 18/2000 rows, 1553 completion tokens, 69.8 tok/s aggregate
 
 next: spill resume 20261002-134658-2c259b
@@ -57,9 +154,139 @@ next: spill resume 20261002-134658-2c259b
 spill: llama3.3:70b bf16 (131.4 GB) does not fit in 48 GB RAM; streaming from NVMe at ~3.8 GB/s (measured engine rate). 2000 prompts, batch 158, est. 16.3 h. Cost: $0. Results -> /private/tmp/claude-501/-Users-amrishkapoor-spillway/8a7a1f63-3e9e-4d09-80a8-0deb1a2ada73/scratchpad/golden-p1/streamweights/jobs/20261002-134723-5d1605/results.jsonl (tail with: spill tail)
    why: batch ~158 (admission by memory, not count): (0.85×36.0G target − 7.1G measured base) ÷ (277 KB/seq-token × 563 mean tokens (actual prompt lens + 128 max_tokens)); rows admitted while calibrated cost fits; probes at B=[16, 48]; quant: bf16 (batch-tier default); est from measured engine rate
    batch ~158 (admission by memory, not count): (0.85×36.0G target − 7.1G measured base) ÷ (277 KB/seq-token × 563 mean tokens (actual prompt lens + 128 max_tokens)); rows admitted while calibrated cost fits; probes at B=[16, 48]
-rows 0/2000 · pass 1 (32.0 s) · 0.2 tok/s · ETA 285h 56m · bf16 · batch 8   rows 0/2000 · pass 2 (393.8 s) · 0.5 tok/s · ETA 138h 18m · bf16 · batch 211   rows 0/2000 · pass 3 (187.2 s) · 0.8 tok/s · ETA 84h 00m · bf16 · batch 300   rows 0/2000 · pass 4 (33.4 s) · 1.3 tok/s · ETA 56h 08m · bf16 · batch 300   rows 0/2000 · pass 5 (36.9 s) · 1.6 tok/s · ETA 43h 26m · bf16 · batch 300   rows 0/2000 · pass 6 (36.7 s) · 2.0 tok/s · ETA 36h 05m · bf16 · batch 300   rows 0/2000 · pass 7 (36.8 s) · 2.3 tok/s · ETA 31h 18m · bf16 · batch 300   rows 0/2000 · pass 8 (37.4 s) · 2.5 tok/s · ETA 27h 58m · bf16 · batch 300   rows 0/2000 · pass 9 (37.1 s) · 2.8 tok/s · ETA 25h 29m · bf16 · batch 300   rows 0/2000 · pass 10 (37.1 s) · 3.0 tok/s · ETA 23h 35m · bf16 · batch 300   rows 0/2000 · pass 11 (37.5 s) · 3.2 tok/s · ETA 22h 04m · bf16 · batch 300   rows 0/2000 · pass 12 (37.1 s) · 3.4 tok/s · ETA 20h 50m · bf16 · batch 300   rows 0/2000 · pass 13 (37.2 s) · 3.6 tok/s · ETA 19h 48m · bf16 · batch 300   rows 0/2000 · pass 14 (37.5 s) · 3.8 tok/s · ETA 18h 57m · bf16 · batch 300   rows 0/2000 · pass 15 (37.1 s) · 3.9 tok/s · ETA 18h 13m · bf16 · batch 300   rows 0/2000 · pass 16 (37.6 s) · 4.0 tok/s · ETA 17h 35m · bf16 · batch 300   rows 0/2000 · pass 17 (37.5 s) · 4.2 tok/s · ETA 17h 02m · bf16 · batch 300   rows 0/2000 · pass 18 (37.4 s) · 4.3 tok/s · ETA 16h 32m · bf16 · batch 300   rows 0/2000 · pass 19 (37.5 s) · 4.4 tok/s · ETA 16h 06m · bf16 · batch 300   rows 0/2000 · pass 20 (36.9 s) · 4.5 tok/s · ETA 15h 43m · bf16 · batch 300   rows 0/2000 · pass 21 (37.5 s) · 4.6 tok/s · ETA 15h 22m · bf16 · batch 300   rows 0/2000 · pass 22 (37.0 s) · 4.7 tok/s · ETA 15h 03m · bf16 · batch 300   rows 0/2000 · pass 23 (37.3 s) · 4.8 tok/s · ETA 14h 46m · bf16 · batch 300   rows 0/2000 · pass 24 (37.2 s) · 4.9 tok/s · ETA 14h 30m · bf16 · batch 300   rows 0/2000 · pass 25 (37.0 s) · 5.0 tok/s · ETA 14h 16m · bf16 · batch 300   rows 0/2000 · pass 26 (37.4 s) · 5.1 tok/s · ETA 14h 02m · bf16 · batch 300   rows 0/2000 · pass 27 (37.1 s) · 5.1 tok/s · ETA 13h 50m · bf16 · batch 300   rows 0/2000 · pass 28 (37.2 s) · 5.2 tok/s · ETA 13h 39m · bf16 · batch 300   rows 0/2000 · pass 29 (38.0 s) · 5.3 tok/s · ETA 13h 29m · bf16 · batch 300   rows 0/2000 · pass 30 (38.2 s) · 5.3 tok/s · ETA 13h 20m · bf16 · batch 300   rows 0/2000 · pass 31 (38.2 s) · 5.4 tok/s · ETA 13h 11m · bf16 · batch 300   rows 0/2000 · pass 32 (38.5 s) · 5.4 tok/s · ETA 13h 03m · bf16 · batch 300   rows 0/2000 · pass 33 (38.1 s) · 5.5 tok/s · ETA 12h 55m · bf16 · batch 300   rows 0/2000 · pass 34 (38.4 s) · 5.5 tok/s · ETA 12h 48m · bf16 · batch 300   rows 0/2000 · pass 35 (38.4 s) · 5.6 tok/s · ETA 12h 42m · bf16 · batch 300   rows 0/2000 · pass 36 (38.0 s) · 5.6 tok/s · ETA 12h 35m · bf16 · batch 300   rows 0/2000 · pass 37 (37.7 s) · 5.7 tok/s · ETA 12h 29m · bf16 · batch 300   rows 0/2000 · pass 38 (37.9 s) · 5.7 tok/s · ETA 12h 24m · bf16 · batch 300   rows 0/2000 · pass 39 (37.4 s) · 5.8 tok/s · ETA 12h 18m · bf16 · batch 300   rows 0/2000 · pass 40 (38.0 s) · 5.8 tok/s · ETA 12h 13m · bf16 · batch 300   rows 0/2000 · pass 41 (38.2 s) · 5.9 tok/s · ETA 12h 08m · bf16 · batch 300   rows 0/2000 · pass 42 (37.9 s) · 5.9 tok/s · ETA 12h 03m · bf16 · batch 300   rows 0/2000 · pass 43 (38.2 s) · 5.9 tok/s · ETA 11h 59m · bf16 · batch 300   rows 0/2000 · pass 44 (37.7 s) · 6.0 tok/s · ETA 11h 55m · bf16 · batch 300   rows 0/2000 · pass 45 (37.8 s) · 6.0 tok/s · ETA 11h 51m · bf16 · batch 300   rows 0/2000 · pass 46 (37.9 s) · 6.0 tok/s · ETA 11h 47m · bf16 · batch 300   rows 0/2000 · pass 47 (38.5 s) · 6.1 tok/s · ETA 11h 43m · bf16 · batch 300   rows 0/2000 · pass 48 (38.5 s) · 6.1 tok/s · ETA 11h 40m · bf16 · batch 300   rows 0/2000 · pass 49 (38.7 s) · 6.1 tok/s · ETA 11h 37m · bf16 · batch 300   rows 0/2000 · pass 50 (38.1 s) · 6.1 tok/s · ETA 11h 34m · bf16 · batch 300   rows 0/2000 · pass 51 (38.3 s) · 6.2 tok/s · ETA 11h 31m · bf16 · batch 300   rows 0/2000 · pass 52 (38.3 s) · 6.2 tok/s · ETA 11h 28m · bf16 · batch 300   rows 0/2000 · pass 53 (38.3 s) · 6.2 tok/s · ETA 11h 25m · bf16 · batch 300   rows 0/2000 · pass 54 (38.4 s) · 6.2 tok/s · ETA 11h 22m · bf16 · batch 300   rows 0/2000 · pass 55 (38.0 s) · 6.3 tok/s · ETA 11h 20m · bf16 · batch 300   rows 0/2000 · pass 56 (38.0 s) · 6.3 tok/s · ETA 11h 17m · bf16 · batch 300   rows 0/2000 · pass 57 (38.3 s) · 6.3 tok/s · ETA 11h 15m · bf16 · batch 300   rows 0/2000 · pass 58 (38.3 s) · 6.3 tok/s · ETA 11h 13m · bf16 · batch 300   rows 0/2000 · pass 59 (38.5 s) · 6.4 tok/s · ETA 11h 10m · bf16 · batch 300   rows 0/2000 · pass 60 (39.2 s) · 6.4 tok/s · ETA 11h 08m · bf16 · batch 300   rows 0/2000 · pass 61 (39.8 s) · 6.4 tok/s · ETA 11h 07m · bf16 · batch 300   rows 0/2000 · pass 62 (38.8 s) · 6.4 tok/s · ETA 11h 05m · bf16 · batch 300   rows 0/2000 · pass 63 (38.2 s) · 6.4 tok/s · ETA 11h 03m · bf16 · batch 300   rows 0/2000 · pass 64 (38.2 s) · 6.5 tok/s · ETA 11h 01m · bf16 · batch 300   rows 0/2000 · pass 65 (38.8 s) · 6.5 tok/s · ETA 10h 59m · bf16 · batch 300   rows 0/2000 · pass 66 (39.0 s) · 6.5 tok/s · ETA 10h 58m · bf16 · batch 300   rows 0/2000 · pass 67 (38.5 s) · 6.5 tok/s · ETA 10h 56m · bf16 · batch 300   rows 0/2000 · pass 68 (38.8 s) · 6.5 tok/s · ETA 10h 54m · bf16 · batch 300   rows 0/2000 · pass 69 (38.5 s) · 6.5 tok/s · ETA 10h 53m · bf16 · batch 300   rows 0/2000 · pass 70 (38.9 s) · 6.5 tok/s · ETA 10h 51m · bf16 · batch 300   rows 0/2000 · pass 71 (39.0 s) · 6.6 tok/s · ETA 10h 50m · bf16 · batch 300   rows 0/2000 · pass 72 (38.8 s) · 6.6 tok/s · ETA 10h 49m · bf16 · batch 300   rows 0/2000 · pass 73 (38.1 s) · 6.6 tok/s · ETA 10h 47m · bf16 · batch 300   rows 0/2000 · pass 74 (38.1 s) · 6.6 tok/s · ETA 10h 46m · bf16 · batch 300   rows 0/2000 · pass 75 (38.5 s) · 6.6 tok/s · ETA 10h 44m · bf16 · batch 300   rows 0/2000 · pass 76 (38.5 s) · 6.6 tok/s · ETA 10h 43m · bf16 · batch 300   rows 0/2000 · pass 77 (38.5 s) · 6.6 tok/s · ETA 10h 42m · bf16 · batch 300   rows 0/2000 · pass 78 (38.3 s) · 6.7 tok/s · ETA 10h 41m · bf16 · batch 300   rows 0/2000 · pass 79 (38.4 s) · 6.7 tok/s · ETA 10h 39m · bf16 · batch 300   rows 0/2000 · pass 80 (38.1 s) · 6.7 tok/s · ETA 10h 38m · bf16 · batch 300   rows 0/2000 · pass 81 (38.5 s) · 6.7 tok/s · ETA 10h 37m · bf16 · batch 300   rows 0/2000 · pass 82 (38.4 s) · 6.7 tok/s · ETA 10h 36m · bf16 · batch 300   rows 0/2000 · pass 83 (37.8 s) · 6.7 tok/s · ETA 10h 35m · bf16 · batch 300   rows 0/2000 · pass 84 (38.4 s) · 6.7 tok/s · ETA 10h 34m · bf16 · batch 300   rows 0/2000 · pass 85 (38.1 s) · 6.7 tok/s · ETA 10h 32m · bf16 · batch 300   rows 0/2000 · pass 86 (37.9 s) · 6.8 tok/s · ETA 10h 31m · bf16 · batch 300   rows 0/2000 · pass 87 (37.8 s) · 6.8 tok/s · ETA 10h 30m · bf16 · batch 300   rows 0/2000 · pass 88 (37.5 s) · 6.8 tok/s · ETA 10h 29m · bf16 · batch 300   rows 0/2000 · pass 89 (37.8 s) · 6.8 tok/s · ETA 10h 28m · bf16 · batch 300   rows 0/2000 · pass 90 (37.8 s) · 6.8 tok/s · ETA 10h 27m · bf16 · batch 300   rows 0/2000 · pass 91 (37.7 s) · 6.8 tok/s · ETA 10h 26m · bf16 · batch 300   rows 0/2000 · pass 92 (37.5 s) · 6.8 tok/s · ETA 10h 25m · bf16 · batch 300   rows 0/2000 · pass 93 (37.9 s) · 6.8 tok/s · ETA 10h 24m · bf16 · batch 300   rows 0/2000 · pass 94 (38.2 s) · 6.8 tok/s · ETA 10h 23m · bf16 · batch 300   rows 0/2000 · pass 95 (38.6 s) · 6.8 tok/s · ETA 10h 22m · bf16 · batch 300   rows 0/2000 · pass 96 (38.4 s) · 6.9 tok/s · ETA 10h 22m · bf16 · batch 300   rows 0/2000 · pass 97 (39.0 s) · 6.9 tok/s · ETA 10h 21m · bf16 · batch 300   rows 0/2000 · pass 98 (38.8 s) · 6.9 tok/s · ETA 10h 20m · bf16 · batch 300   rows 0/2000 · pass 99 (38.2 s) · 6.9 tok/s · ETA 10h 19m · bf16 · batch 300   rows 0/2000 · pass 100 (38.5 s) · 6.9 tok/s · ETA 10h 19m · bf16 · batch 300   rows 0/2000 · pass 101 (38.5 s) · 6.9 tok/s · ETA 10h 18m · bf16 · batch 300   rows 0/2000 · pass 102 (38.5 s) · 6.9 tok/s · ETA 10h 17m · bf16 · batch 300   rows 0/2000 · pass 103 (38.4 s) · 6.9 tok/s · ETA 10h 17m · bf16 · batch 300   rows 0/2000 · pass 104 (38.6 s) · 6.9 tok/s · ETA 10h 16m · bf16 · batch 300   rows 0/2000 · pass 105 (38.7 s) · 6.9 tok/s · ETA 10h 15m · bf16 · batch 300   rows 0/2000 · pass 106 (38.7 s) · 6.9 tok/s · ETA 10h 15m · bf16 · batch 300   rows 0/2000 · pass 107 (38.9 s) · 6.9 tok/s · ETA 10h 14m · bf16 · batch 300   rows 0/2000 · pass 108 (38.6 s) · 6.9 tok/s · ETA 10h 13m · bf16 · batch 300   rows 0/2000 · pass 109 (39.1 s) · 7.0 tok/s · ETA 10h 13m · bf16 · batch 300   rows 0/2000 · pass 110 (38.4 s) · 7.0 tok/s · ETA 10h 12m · bf16 · batch 300   rows 0/2000 · pass 111 (39.0 s) · 7.0 tok/s · ETA 10h 12m · bf16 · batch 300   rows 0/2000 · pass 112 (38.6 s) · 7.0 tok/s · ETA 10h 11m · bf16 · batch 300   rows 0/2000 · pass 113 (38.2 s) · 7.0 tok/s · ETA 10h 11m · bf16 · batch 300   rows 0/2000 · pass 114 (38.7 s) · 7.0 tok/s · ETA 10h 10m · bf16 · batch 300   rows 0/2000 · pass 115 (38.7 s) · 7.0 tok/s · ETA 10h 10m · bf16 · batch 300   rows 0/2000 · pass 116 (38.7 s) · 7.0 tok/s · ETA 10h 09m · bf16 · batch 300   rows 0/2000 · pass 117 (38.4 s) · 7.0 tok/s · ETA 10h 08m · bf16 · batch 300   rows 0/2000 · pass 118 (38.7 s) · 7.0 tok/s · ETA 10h 08m · bf16 · batch 300   rows 0/2000 · pass 119 (38.2 s) · 7.0 tok/s · ETA 10h 07m · bf16 · batch 300   rows 0/2000 · pass 120 (38.0 s) · 7.0 tok/s · ETA 10h 07m · bf16 · batch 300   rows 0/2000 · pass 121 (38.7 s) · 7.0 tok/s · ETA 10h 06m · bf16 · batch 300   rows 0/2000 · pass 122 (38.3 s) · 7.0 tok/s · ETA 10h 06m · bf16 · batch 300   rows 0/2000 · pass 123 (38.4 s) · 7.0 tok/s · ETA 10h 05m · bf16 · batch 300   rows 0/2000 · pass 124 (39.1 s) · 7.0 tok/s · ETA 10h 05m · bf16 · batch 300   rows 0/2000 · pass 125 (39.1 s) · 7.1 tok/s · ETA 10h 05m · bf16 · batch 300   rows 0/2000 · pass 126 (38.4 s) · 7.1 tok/s · ETA 10h 04m · bf16 · batch 300   rows 0/2000 · pass 127 (39.0 s) · 7.1 tok/s · ETA 10h 04m · bf16 · batch 300   [transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
-rows 8/2000 · pass 128 (40.1 s) · 7.1 tok/s · ETA 10h 01m · bf16 · batch 292   [15:17:09] >>> first 70B rows streamed; waiting 60s then ^C
-rows 211/2000 · pass 129 (38.6 s) · 7.1 tok/s · ETA 9h 00m · bf16 · batch 89   rows 300/2000 · pass 130 (127.3 s) · 6.9 tok/s · ETA 8h 43m · bf16 · batch 61   
+
+rows 0/2000 · pass 1 (32.0 s) · 0.2 tok/s · ETA 285h 56m · bf16 · batch 8   
+rows 0/2000 · pass 2 (393.8 s) · 0.5 tok/s · ETA 138h 18m · bf16 · batch 211   
+rows 0/2000 · pass 3 (187.2 s) · 0.8 tok/s · ETA 84h 00m · bf16 · batch 300   
+rows 0/2000 · pass 4 (33.4 s) · 1.3 tok/s · ETA 56h 08m · bf16 · batch 300   
+rows 0/2000 · pass 5 (36.9 s) · 1.6 tok/s · ETA 43h 26m · bf16 · batch 300   
+rows 0/2000 · pass 6 (36.7 s) · 2.0 tok/s · ETA 36h 05m · bf16 · batch 300   
+rows 0/2000 · pass 7 (36.8 s) · 2.3 tok/s · ETA 31h 18m · bf16 · batch 300   
+rows 0/2000 · pass 8 (37.4 s) · 2.5 tok/s · ETA 27h 58m · bf16 · batch 300   
+rows 0/2000 · pass 9 (37.1 s) · 2.8 tok/s · ETA 25h 29m · bf16 · batch 300   
+rows 0/2000 · pass 10 (37.1 s) · 3.0 tok/s · ETA 23h 35m · bf16 · batch 300   
+rows 0/2000 · pass 11 (37.5 s) · 3.2 tok/s · ETA 22h 04m · bf16 · batch 300   
+rows 0/2000 · pass 12 (37.1 s) · 3.4 tok/s · ETA 20h 50m · bf16 · batch 300   
+rows 0/2000 · pass 13 (37.2 s) · 3.6 tok/s · ETA 19h 48m · bf16 · batch 300   
+rows 0/2000 · pass 14 (37.5 s) · 3.8 tok/s · ETA 18h 57m · bf16 · batch 300   
+rows 0/2000 · pass 15 (37.1 s) · 3.9 tok/s · ETA 18h 13m · bf16 · batch 300   
+rows 0/2000 · pass 16 (37.6 s) · 4.0 tok/s · ETA 17h 35m · bf16 · batch 300   
+rows 0/2000 · pass 17 (37.5 s) · 4.2 tok/s · ETA 17h 02m · bf16 · batch 300   
+rows 0/2000 · pass 18 (37.4 s) · 4.3 tok/s · ETA 16h 32m · bf16 · batch 300   
+rows 0/2000 · pass 19 (37.5 s) · 4.4 tok/s · ETA 16h 06m · bf16 · batch 300   
+rows 0/2000 · pass 20 (36.9 s) · 4.5 tok/s · ETA 15h 43m · bf16 · batch 300   
+rows 0/2000 · pass 21 (37.5 s) · 4.6 tok/s · ETA 15h 22m · bf16 · batch 300   
+rows 0/2000 · pass 22 (37.0 s) · 4.7 tok/s · ETA 15h 03m · bf16 · batch 300   
+rows 0/2000 · pass 23 (37.3 s) · 4.8 tok/s · ETA 14h 46m · bf16 · batch 300   
+rows 0/2000 · pass 24 (37.2 s) · 4.9 tok/s · ETA 14h 30m · bf16 · batch 300   
+rows 0/2000 · pass 25 (37.0 s) · 5.0 tok/s · ETA 14h 16m · bf16 · batch 300   
+rows 0/2000 · pass 26 (37.4 s) · 5.1 tok/s · ETA 14h 02m · bf16 · batch 300   
+rows 0/2000 · pass 27 (37.1 s) · 5.1 tok/s · ETA 13h 50m · bf16 · batch 300   
+rows 0/2000 · pass 28 (37.2 s) · 5.2 tok/s · ETA 13h 39m · bf16 · batch 300   
+rows 0/2000 · pass 29 (38.0 s) · 5.3 tok/s · ETA 13h 29m · bf16 · batch 300   
+rows 0/2000 · pass 30 (38.2 s) · 5.3 tok/s · ETA 13h 20m · bf16 · batch 300   
+rows 0/2000 · pass 31 (38.2 s) · 5.4 tok/s · ETA 13h 11m · bf16 · batch 300   
+rows 0/2000 · pass 32 (38.5 s) · 5.4 tok/s · ETA 13h 03m · bf16 · batch 300   
+rows 0/2000 · pass 33 (38.1 s) · 5.5 tok/s · ETA 12h 55m · bf16 · batch 300   
+rows 0/2000 · pass 34 (38.4 s) · 5.5 tok/s · ETA 12h 48m · bf16 · batch 300   
+rows 0/2000 · pass 35 (38.4 s) · 5.6 tok/s · ETA 12h 42m · bf16 · batch 300   
+rows 0/2000 · pass 36 (38.0 s) · 5.6 tok/s · ETA 12h 35m · bf16 · batch 300   
+rows 0/2000 · pass 37 (37.7 s) · 5.7 tok/s · ETA 12h 29m · bf16 · batch 300   
+rows 0/2000 · pass 38 (37.9 s) · 5.7 tok/s · ETA 12h 24m · bf16 · batch 300   
+rows 0/2000 · pass 39 (37.4 s) · 5.8 tok/s · ETA 12h 18m · bf16 · batch 300   
+rows 0/2000 · pass 40 (38.0 s) · 5.8 tok/s · ETA 12h 13m · bf16 · batch 300   
+rows 0/2000 · pass 41 (38.2 s) · 5.9 tok/s · ETA 12h 08m · bf16 · batch 300   
+rows 0/2000 · pass 42 (37.9 s) · 5.9 tok/s · ETA 12h 03m · bf16 · batch 300   
+rows 0/2000 · pass 43 (38.2 s) · 5.9 tok/s · ETA 11h 59m · bf16 · batch 300   
+rows 0/2000 · pass 44 (37.7 s) · 6.0 tok/s · ETA 11h 55m · bf16 · batch 300   
+rows 0/2000 · pass 45 (37.8 s) · 6.0 tok/s · ETA 11h 51m · bf16 · batch 300   
+rows 0/2000 · pass 46 (37.9 s) · 6.0 tok/s · ETA 11h 47m · bf16 · batch 300   
+rows 0/2000 · pass 47 (38.5 s) · 6.1 tok/s · ETA 11h 43m · bf16 · batch 300   
+rows 0/2000 · pass 48 (38.5 s) · 6.1 tok/s · ETA 11h 40m · bf16 · batch 300   
+rows 0/2000 · pass 49 (38.7 s) · 6.1 tok/s · ETA 11h 37m · bf16 · batch 300   
+rows 0/2000 · pass 50 (38.1 s) · 6.1 tok/s · ETA 11h 34m · bf16 · batch 300   
+rows 0/2000 · pass 51 (38.3 s) · 6.2 tok/s · ETA 11h 31m · bf16 · batch 300   
+rows 0/2000 · pass 52 (38.3 s) · 6.2 tok/s · ETA 11h 28m · bf16 · batch 300   
+rows 0/2000 · pass 53 (38.3 s) · 6.2 tok/s · ETA 11h 25m · bf16 · batch 300   
+rows 0/2000 · pass 54 (38.4 s) · 6.2 tok/s · ETA 11h 22m · bf16 · batch 300   
+rows 0/2000 · pass 55 (38.0 s) · 6.3 tok/s · ETA 11h 20m · bf16 · batch 300   
+rows 0/2000 · pass 56 (38.0 s) · 6.3 tok/s · ETA 11h 17m · bf16 · batch 300   
+rows 0/2000 · pass 57 (38.3 s) · 6.3 tok/s · ETA 11h 15m · bf16 · batch 300   
+rows 0/2000 · pass 58 (38.3 s) · 6.3 tok/s · ETA 11h 13m · bf16 · batch 300   
+rows 0/2000 · pass 59 (38.5 s) · 6.4 tok/s · ETA 11h 10m · bf16 · batch 300   
+rows 0/2000 · pass 60 (39.2 s) · 6.4 tok/s · ETA 11h 08m · bf16 · batch 300   
+rows 0/2000 · pass 61 (39.8 s) · 6.4 tok/s · ETA 11h 07m · bf16 · batch 300   
+rows 0/2000 · pass 62 (38.8 s) · 6.4 tok/s · ETA 11h 05m · bf16 · batch 300   
+rows 0/2000 · pass 63 (38.2 s) · 6.4 tok/s · ETA 11h 03m · bf16 · batch 300   
+rows 0/2000 · pass 64 (38.2 s) · 6.5 tok/s · ETA 11h 01m · bf16 · batch 300   
+rows 0/2000 · pass 65 (38.8 s) · 6.5 tok/s · ETA 10h 59m · bf16 · batch 300   
+rows 0/2000 · pass 66 (39.0 s) · 6.5 tok/s · ETA 10h 58m · bf16 · batch 300   
+rows 0/2000 · pass 67 (38.5 s) · 6.5 tok/s · ETA 10h 56m · bf16 · batch 300   
+rows 0/2000 · pass 68 (38.8 s) · 6.5 tok/s · ETA 10h 54m · bf16 · batch 300   
+rows 0/2000 · pass 69 (38.5 s) · 6.5 tok/s · ETA 10h 53m · bf16 · batch 300   
+rows 0/2000 · pass 70 (38.9 s) · 6.5 tok/s · ETA 10h 51m · bf16 · batch 300   
+rows 0/2000 · pass 71 (39.0 s) · 6.6 tok/s · ETA 10h 50m · bf16 · batch 300   
+rows 0/2000 · pass 72 (38.8 s) · 6.6 tok/s · ETA 10h 49m · bf16 · batch 300   
+rows 0/2000 · pass 73 (38.1 s) · 6.6 tok/s · ETA 10h 47m · bf16 · batch 300   
+rows 0/2000 · pass 74 (38.1 s) · 6.6 tok/s · ETA 10h 46m · bf16 · batch 300   
+rows 0/2000 · pass 75 (38.5 s) · 6.6 tok/s · ETA 10h 44m · bf16 · batch 300   
+rows 0/2000 · pass 76 (38.5 s) · 6.6 tok/s · ETA 10h 43m · bf16 · batch 300   
+rows 0/2000 · pass 77 (38.5 s) · 6.6 tok/s · ETA 10h 42m · bf16 · batch 300   
+rows 0/2000 · pass 78 (38.3 s) · 6.7 tok/s · ETA 10h 41m · bf16 · batch 300   
+rows 0/2000 · pass 79 (38.4 s) · 6.7 tok/s · ETA 10h 39m · bf16 · batch 300   
+rows 0/2000 · pass 80 (38.1 s) · 6.7 tok/s · ETA 10h 38m · bf16 · batch 300   
+rows 0/2000 · pass 81 (38.5 s) · 6.7 tok/s · ETA 10h 37m · bf16 · batch 300   
+rows 0/2000 · pass 82 (38.4 s) · 6.7 tok/s · ETA 10h 36m · bf16 · batch 300   
+rows 0/2000 · pass 83 (37.8 s) · 6.7 tok/s · ETA 10h 35m · bf16 · batch 300   
+rows 0/2000 · pass 84 (38.4 s) · 6.7 tok/s · ETA 10h 34m · bf16 · batch 300   
+rows 0/2000 · pass 85 (38.1 s) · 6.7 tok/s · ETA 10h 32m · bf16 · batch 300   
+rows 0/2000 · pass 86 (37.9 s) · 6.8 tok/s · ETA 10h 31m · bf16 · batch 300   
+rows 0/2000 · pass 87 (37.8 s) · 6.8 tok/s · ETA 10h 30m · bf16 · batch 300   
+rows 0/2000 · pass 88 (37.5 s) · 6.8 tok/s · ETA 10h 29m · bf16 · batch 300   
+rows 0/2000 · pass 89 (37.8 s) · 6.8 tok/s · ETA 10h 28m · bf16 · batch 300   
+rows 0/2000 · pass 90 (37.8 s) · 6.8 tok/s · ETA 10h 27m · bf16 · batch 300   
+rows 0/2000 · pass 91 (37.7 s) · 6.8 tok/s · ETA 10h 26m · bf16 · batch 300   
+rows 0/2000 · pass 92 (37.5 s) · 6.8 tok/s · ETA 10h 25m · bf16 · batch 300   
+rows 0/2000 · pass 93 (37.9 s) · 6.8 tok/s · ETA 10h 24m · bf16 · batch 300   
+rows 0/2000 · pass 94 (38.2 s) · 6.8 tok/s · ETA 10h 23m · bf16 · batch 300   
+rows 0/2000 · pass 95 (38.6 s) · 6.8 tok/s · ETA 10h 22m · bf16 · batch 300   
+rows 0/2000 · pass 96 (38.4 s) · 6.9 tok/s · ETA 10h 22m · bf16 · batch 300   
+rows 0/2000 · pass 97 (39.0 s) · 6.9 tok/s · ETA 10h 21m · bf16 · batch 300   
+rows 0/2000 · pass 98 (38.8 s) · 6.9 tok/s · ETA 10h 20m · bf16 · batch 300   
+rows 0/2000 · pass 99 (38.2 s) · 6.9 tok/s · ETA 10h 19m · bf16 · batch 300   
+rows 0/2000 · pass 100 (38.5 s) · 6.9 tok/s · ETA 10h 19m · bf16 · batch 300   
+rows 0/2000 · pass 101 (38.5 s) · 6.9 tok/s · ETA 10h 18m · bf16 · batch 300   
+rows 0/2000 · pass 102 (38.5 s) · 6.9 tok/s · ETA 10h 17m · bf16 · batch 300   
+rows 0/2000 · pass 103 (38.4 s) · 6.9 tok/s · ETA 10h 17m · bf16 · batch 300   
+rows 0/2000 · pass 104 (38.6 s) · 6.9 tok/s · ETA 10h 16m · bf16 · batch 300   
+rows 0/2000 · pass 105 (38.7 s) · 6.9 tok/s · ETA 10h 15m · bf16 · batch 300   
+rows 0/2000 · pass 106 (38.7 s) · 6.9 tok/s · ETA 10h 15m · bf16 · batch 300   
+rows 0/2000 · pass 107 (38.9 s) · 6.9 tok/s · ETA 10h 14m · bf16 · batch 300   
+rows 0/2000 · pass 108 (38.6 s) · 6.9 tok/s · ETA 10h 13m · bf16 · batch 300   
+rows 0/2000 · pass 109 (39.1 s) · 7.0 tok/s · ETA 10h 13m · bf16 · batch 300   
+rows 0/2000 · pass 110 (38.4 s) · 7.0 tok/s · ETA 10h 12m · bf16 · batch 300   
+rows 0/2000 · pass 111 (39.0 s) · 7.0 tok/s · ETA 10h 12m · bf16 · batch 300   
+rows 0/2000 · pass 112 (38.6 s) · 7.0 tok/s · ETA 10h 11m · bf16 · batch 300   
+rows 0/2000 · pass 113 (38.2 s) · 7.0 tok/s · ETA 10h 11m · bf16 · batch 300   
+rows 0/2000 · pass 114 (38.7 s) · 7.0 tok/s · ETA 10h 10m · bf16 · batch 300   
+rows 0/2000 · pass 115 (38.7 s) · 7.0 tok/s · ETA 10h 10m · bf16 · batch 300   
+rows 0/2000 · pass 116 (38.7 s) · 7.0 tok/s · ETA 10h 09m · bf16 · batch 300   
+rows 0/2000 · pass 117 (38.4 s) · 7.0 tok/s · ETA 10h 08m · bf16 · batch 300   
+rows 0/2000 · pass 118 (38.7 s) · 7.0 tok/s · ETA 10h 08m · bf16 · batch 300   
+rows 0/2000 · pass 119 (38.2 s) · 7.0 tok/s · ETA 10h 07m · bf16 · batch 300   
+rows 0/2000 · pass 120 (38.0 s) · 7.0 tok/s · ETA 10h 07m · bf16 · batch 300   
+rows 0/2000 · pass 121 (38.7 s) · 7.0 tok/s · ETA 10h 06m · bf16 · batch 300   
+rows 0/2000 · pass 122 (38.3 s) · 7.0 tok/s · ETA 10h 06m · bf16 · batch 300   
+rows 0/2000 · pass 123 (38.4 s) · 7.0 tok/s · ETA 10h 05m · bf16 · batch 300   
+rows 0/2000 · pass 124 (39.1 s) · 7.0 tok/s · ETA 10h 05m · bf16 · batch 300   
+rows 0/2000 · pass 125 (39.1 s) · 7.1 tok/s · ETA 10h 05m · bf16 · batch 300   
+rows 0/2000 · pass 126 (38.4 s) · 7.1 tok/s · ETA 10h 04m · bf16 · batch 300   
+rows 0/2000 · pass 127 (39.0 s) · 7.1 tok/s · ETA 10h 04m · bf16 · batch 300   [transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+
+rows 8/2000 · pass 128 (40.1 s) · 7.1 tok/s · ETA 10h 01m · bf16 · batch 292   [15:17:09] >>> first 70B rows streamed; waiting 60s then ^C
+
+rows 211/2000 · pass 129 (38.6 s) · 7.1 tok/s · ETA 9h 00m · bf16 · batch 89   
+rows 300/2000 · pass 130 (127.3 s) · 6.9 tok/s · ETA 8h 43m · bf16 · batch 61   
 300/2000 rows, 38400 completion tokens, 6.9 tok/s aggregate
 
 next: spill resume 20261002-134723-5d1605
@@ -67,7 +294,9 @@ next: spill resume 20261002-134723-5d1605
 [15:19:55] $ spill resume   # prove resume picks up the checkpoint
 resuming 20261002-134723-5d1605: 300/2000 done, 1700 remaining
    batch ~140 (admission by memory, not count): (0.85×36.0G target − 7.1G measured base) ÷ (277 KB/seq-token × 632 mean tokens (actual prompt lens + 128 max_tokens)); rows admitted while calibrated cost fits; probes at B=[16, 48]
-rows 0/1700 · pass 1 (32.2 s) · 0.2 tok/s · ETA 245h 00m · bf16 · batch 8   rows 0/1700 · pass 2 (535.4 s) · 0.5 tok/s · ETA 111h 26m · bf16 · batch 300   
+
+rows 0/1700 · pass 1 (32.2 s) · 0.2 tok/s · ETA 245h 00m · bf16 · batch 8   
+rows 0/1700 · pass 2 (535.4 s) · 0.5 tok/s · ETA 111h 26m · bf16 · batch 300   
 300/2000 rows complete
 
 next: spill status

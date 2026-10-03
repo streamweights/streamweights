@@ -1,4 +1,4 @@
-Phase 1.6 golden path — fresh dir, the public install one-liner, no flags.
+Phase 1.6 golden path - fresh dir, the public install one-liner, no flags.
 Recorded 2026-10-02 16:43 PDT. Operator deviation: model artifacts symlinked into
 the fresh SPILL_HOME (a fresh machine sees the printed download lines instead).
 
@@ -567,8 +567,8 @@ next: spill status
 
 [16:48:39] $ spill status
 job                          model          quant   progress        tok/s      eta status
-20261002-164324-27641e       qwen2.5:0.5b   bf16    20/20           211.7        - completed
-20261002-164328-cae311       llama3.3:70b   bf16    0/20              0.0        - interrupted
+20261002-164324-27641e       qwen2.5:0.5b   bf16    20/20           211.7       - completed
+20261002-164328-cae311       llama3.3:70b   bf16    0/20              0.0       - interrupted
 
 next: spill tail
 [16:48:39] (exit 0)

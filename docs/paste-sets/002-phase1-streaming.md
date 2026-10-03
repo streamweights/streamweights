@@ -1,4 +1,4 @@
-# Paste set 002 — Phase 1, streaming runner on MLX
+# Paste set 002 - Phase 1, streaming runner on MLX
 
 Received 2026-10-01. Saved verbatim. (The number is out of order on purpose: it is the
 Phase 1 directive, issued before 003.)

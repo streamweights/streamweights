@@ -1,4 +1,4 @@
-# Paste set 005 — Phase 1.6, share-ready then proof run
+# Paste set 005 - Phase 1.6, share-ready then proof run
 
 Received 2026-10-02. Saved verbatim.
 
