@@ -649,22 +649,29 @@ class MlxStreamEngine:
 
                 K = caches[0]._len    # physical cache length == next write slot
                 abs_off = caches[0].offset  # absolute rope position of next slot
+                # direct backpressure: no admission while live Metal allocation
+                # exceeds 80% of the working set (catches any modeling error)
+                mem_pressure = mx.get_active_memory() > 0.80 * budget.working_set_bytes
                 # ---- admission ----
                 admits = []
                 cap = auto_batch
                 if not act_rows and pending:
                     if committed is not None:
-                        group = []
-                        gcost = 0
-                        Lp = 0
-                        for p in pending:
-                            Lp = max(Lp, len(p[1]))
-                            if len(group) >= cap or not may_admit(
-                                    p, len(group), Lp, p[2], pending_cost=gcost):
-                                break
-                            group.append(p)
-                            gcost += row_cost(p)
-                        group = group or pending[:1]
+                        if mem_pressure:
+                            mx.clear_cache()  # return pooled memory before refilling
+                            group = pending[:1]
+                        else:
+                            group = []
+                            gcost = 0
+                            Lp = 0
+                            for p in pending:
+                                Lp = max(Lp, len(p[1]))
+                                if len(group) >= cap or not may_admit(
+                                        p, len(group), Lp, p[2], pending_cost=gcost):
+                                    break
+                                group.append(p)
+                                gcost += row_cost(p)
+                            group = group or pending[:1]
                     else:
                         group = pending[:cap]
                     pending = pending[len(group):]
@@ -678,7 +685,7 @@ class MlxStreamEngine:
                     rem_max = max((act_rows[i][2] - len(act_gen[i])
                                    for i in range(len(act_rows))), default=0)
                     acost = 0
-                    while pending and may_admit(pending[0],
+                    while pending and not mem_pressure and may_admit(pending[0],
                                                 len(act_rows) + len(admits), K,
                                                 rem_max, pending_cost=acost):
                         cand = pending[0]
