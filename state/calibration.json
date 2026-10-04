@@ -50,7 +50,7 @@
     }
   ],
   "calibrated_at": "2026-10-01T16:05:59-0700",
-  "bind_ms_per_layer": 7.0,
+  "bind_ms_per_layer": 37.6,
   "mem_model": {
     "llama3.3:70b|8bit": {
       "base_bytes": 9299972360,
@@ -80,7 +80,8 @@
     }
   },
   "engine_rates": {
-    "llama3.3:70b|bf16": 4100.0,
+    "llama3.3:70b|bf16": 3722.2,
     "llama3.3:70b|8bit": 4386.0
-  }
+  },
+  "measured_pass_s": 35.08
 }

@@ -66,7 +66,9 @@ Phase 0 (complete): the wedge on mmap. Result: the pipeline works end to end; mm
 
 Phase 1 (complete): streaming runner (MLX on macOS). Gate met: 70%+ of NVMe sequential rate sustained at the auto batch size, identical greedy output to the resident engine, no DX regression.
 
-Phases 1.5 and 1.6 (complete): measured memory calibration, correctness fixes, install path, and the 2,000-row proof run on 70B bf16 (see docs/reports/).
+Phases 1.5 and 1.6 (complete): measured memory calibration, correctness fixes, install path, and the proof run's first 1,334 rows (see docs/reports/).
+
+Phase 2.5 (complete): long-tail engine fixes. 75% steady-state memory budget with live-allocation guard, prefill capped at 2,048 tokens per pass and overlapped with decode, longest-first scheduling with per-bucket estimates, KV cache compaction. Result: the full 2,000-row set is complete on 70B bf16; the 666 long-document rows ran in 23 h 51 m with zero interventions at 28.9 GB peak (clean long-tier passes 33-37 s, matching the short tier). The fresh single-command full run moves to the Phase 3.5 loop proof.
 
 Phase 2 (this release): the loop. Run store, logits output, spill distill (generation and teacher-forced), adapters at inference, metrics, spill eval, file formats and spill check. Gate: spill distill --score log-probs match an independent mlx-lm reference within bf16 tolerance; base+adapter produces identical greedy output on the streamed and resident engines (20 prompts); spill eval prints one table for two models from one command with cached reuse by input hash; every run has a manifest; spill run <model> <file> with no flags is unchanged.
 

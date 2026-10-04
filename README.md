@@ -119,15 +119,14 @@ Architecture families (`spill models --architectures` prints the live table):
 
 ## What to expect on a 48 GB M4 Pro
 
-Measured on the 2,000-row eval set (1,334 rows completed; the remaining 666 are
-the 1,000-token document-QA tier, stopped deliberately as a measured partial):
+Measured on the full 2,000-row eval set (all rows completed):
 
-| model | quant | placement | tier (rows measured) | pass time | batch | first visible text | 2,000-row set |
+| model | quant | placement | tier (rows) | pass time | batch | first visible text | measured time |
 |---|---|---|---|---|---|---|---|
-| qwen2.5:0.5b | bf16 | resident | full set | ~0.1 s | up to 512 | < 10 s | ~6 min (measured) |
-| llama3.3:70b | bf16 | streamed | short-QA (667/667) | 33-38 s | 100-300 | 41 s (sample) | 1,400 of 2,000 measured in 15.6 h unattended; long-prompt tier ~100 s/pass, full set projected ~50 h on the current engine; fix in progress |
-| llama3.3:70b | bf16 | streamed | summarize-300w (667/667) | 33-40 s | 70-150 | | |
-| llama3.3:70b | bf16 | streamed | doc-QA-1k (0/666, measured 200+ passes) | 86-115 s | 74-75 | | |
+| qwen2.5:0.5b | bf16 | resident | full set | ~0.1 s | up to 512 | < 10 s | ~6 min |
+| llama3.3:70b | bf16 | streamed | short-QA (667) | 33-38 s | 100-300 | 41 s (sample) | 1,334 rows in 15 h 35 m unattended (Phase 1.6 engine) |
+| llama3.3:70b | bf16 | streamed | summarize-300w (667) | 33-40 s | 70-150 | | (same unattended leg) |
+| llama3.3:70b | bf16 | streamed | doc-QA-1k (666) | 33-37 s clean; 45-90 s with refill prefill | 39-50 | | 666 rows in 23 h 51 m, zero interventions (Phase 2.5 engine) |
 | llama3.3:70b | 8-bit | streamed | sample only | ~19 s | ~76 | ~25 s (sample) | ~17.6 h (estimated) |
 
 ## Usage
