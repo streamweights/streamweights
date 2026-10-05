@@ -143,7 +143,10 @@ def detect_layout(d: Path) -> str | None:
 
 
 def load_adapter_dir(d: Path, adapter_id: str | None = None) -> LoraAdapter:
-    import mlx.core as mx
+    from .platforms import mlx_available
+    mx = None
+    if mlx_available():
+        import mlx.core as mx
     d = Path(d)
     layout = detect_layout(d)
     if layout is None:
@@ -176,7 +179,11 @@ def load_adapter_dir(d: Path, adapter_id: str | None = None) -> LoraAdapter:
         base = cfg.get("base_model_name_or_path")
         pat = _PEFT_KEY
 
-    raw = mx.load(str(wfile))
+    if mx is not None:
+        raw = mx.load(str(wfile))
+    else:                              # export on a platform without MLX: numpy float32
+        from .safetensors_np import load_f32
+        raw = load_f32(wfile)
     pairs: dict = {}
     for name, arr in raw.items():
         m = pat.search(name)
@@ -200,7 +207,8 @@ def load_adapter_dir(d: Path, adapter_id: str | None = None) -> LoraAdapter:
                              f"{tuple(a.shape)} vs {tuple(b.shape)}")
         layers.setdefault(layer, {})[path] = (a, b, scale)
         targets.add(path)
-    mx.eval([t for mods in layers.values() for m in mods.values() for t in m[:2]])
+    if mx is not None:
+        mx.eval([t for mods in layers.values() for m in mods.values() for t in m[:2]])
     return LoraAdapter(adapter_id or d.name, d, layout, rank, _sha([wfile, cfg_path]),
                        base, layers, targets)
 

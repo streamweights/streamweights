@@ -14,7 +14,7 @@ import typer.core
 
 from . import build as build_mod
 from . import estimate as est
-from . import overnight
+from . import overnight, platforms
 from . import probe as probe_mod
 from .cli import (JOBS_DIR, GIB, Job, RunOpts, _fail, _finalize_distill, _next_hint,
                   _run_impl, _run_mlx_resume, app)
@@ -74,7 +74,7 @@ class RealBackend(build_mod.Backend):
 
 
 def _make_plan(f, student, teacher, base, compare, weight_own, epochs):
-    from .engines.mlx_stream import load_calibration
+    from .calibration import load_calibration
     hw = probe_mod.load(probe_if_missing=True)
     from .resolve import arch_from_config, resolve_model
     for m in {student, teacher, base, *compare} - {None}:
@@ -138,10 +138,12 @@ def do_build(folder, student, teacher, base, compare, weight_own, epochs, notify
     typer.echo(f"\nbuild wall time {est.fmt_dur(res.wall_s)} this session")
     for line in build_mod.final_lines(res):
         typer.echo(line)
+    _next_hint(f"spill export {res.tuned_label}")
     return res
 
 
 def resume_build(folder: Path):
+    platforms.require_mlx("build")
     f = build_mod.read_folder(folder)
     st = build_mod.load_state(f)
     if not st:
@@ -156,7 +158,8 @@ def resume_build(folder: Path):
         _fail(e)
 
 
-@app.command()
+@app.command(short_help="Build your model from a folder: distill, tune, eval",
+             epilog="Example: spill build banking77-quick")
 def build(
     folder: str = typer.Argument(..., help="a folder with evals.jsonl and train.jsonl and/or "
                                            "prompts.jsonl"),
@@ -178,12 +181,13 @@ def build(
     notify: str = typer.Option(None, "--notify", help="also POST a small JSON to this URL when "
                                                       "done or stopped"),
     quiet: bool = typer.Option(False, "--quiet"),
-    debug: bool = typer.Option(False, "--debug"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Build your own model from a folder: distill, tune, eval, one table."""
     import streamweights.cli as cli
     cli._DEBUG = debug
     try:
+        platforms.require_mlx("build")
         do_build(folder, student, teacher, base, list(compare or []), weight_own, epochs,
                  notify, quiet)
     except typer.Exit:
@@ -211,7 +215,8 @@ class _ExportCommand(typer.core.TyperCommand):
         return super().parse_args(ctx, args)
 
 
-@app.command(cls=_ExportCommand)
+@app.command(cls=_ExportCommand, short_help="Merge an adapter into its base; GGUF and Ollama",
+             epilog="Example: spill export qwen2.5:0.5b+banking --gguf")
 def export(
     model: str = typer.Argument(..., help="<base>+<adapter>, e.g. qwen2.5:7b+banking77"),
     out: Path = typer.Option(None, "--out", help="directory for the merged model (default: "
@@ -221,7 +226,7 @@ def export(
     ollama: bool = typer.Option(False, "--ollama", help="run `ollama create` if ollama is "
                                                         "installed (implies --gguf)"),
     name: str = typer.Option(None, "--name", help="Ollama model name"),
-    debug: bool = typer.Option(False, "--debug"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Merge the adapter into the base: merged safetensors, optionally GGUF and Ollama."""
     import streamweights.cli as cli
@@ -250,10 +255,12 @@ def _export_impl(model, out, gguf, ollama, name):
                          f"{' plus the GGUF' if gguf or ollama else ''} and {free / GIB:.0f} GB "
                          f"is free (20 GB floor kept)")
     kind = (gguf or ("q8_0" if ollama else None))
-    typer.echo(f"spill: export {base}+{adapter.id}: merge rank-{adapter.rank} LoRA "
-               f"({len(adapter.layers)} layers) into {base} bf16 ({size / GIB:.1f} GB) -> {dest}"
-               + (f"; then GGUF {kind} via llama.cpp's converter" if kind else "")
-               + ". Cost: $0.")
+    rate = probe_mod.load()["nvme_seq_read"]["bytes_per_sec"]
+    typer.echo(f"spill export {base}+{adapter.id}: merge rank-{adapter.rank} LoRA "
+               f"({len(adapter.layers)} layers) into {base} bf16 ({size / GIB:.1f} GB)"
+               + (f", then GGUF {kind} via llama.cpp's converter" if kind else "")
+               + f". Est. {est.fmt_dur(2 * size / rate)} for the merge (disk-bound)"
+               + (", plus the conversion" if kind else "") + f". Cost: $0. Merged model -> {dest}")
     info = ex.merge_adapter(mdir, adapter, dest, say=lambda s: typer.echo(f"   {s}"))
     typer.echo(f"merged {info['modules']} modules into {info['shards']} shard(s), "
                f"{info['dtype']}: {dest}")
@@ -286,8 +293,9 @@ def _model_dir(base: str) -> Path:
     return download_hf(res) if res.kind == "hf" else Path(download_safetensors(res.name))
 
 
-@app.command()
-def doctor(debug: bool = typer.Option(False, "--debug")):
+@app.command(short_help="Check this machine and what it can run overnight",
+             epilog="Example: spill doctor")
+def doctor(debug: bool = typer.Option(False, "--debug", hidden=True)):
     """One screen: chip, memory, disk, models, interrupted jobs, what runs overnight."""
     import streamweights.cli as cli
     cli._DEBUG = debug
@@ -300,13 +308,14 @@ def doctor(debug: bool = typer.Option(False, "--debug")):
 def _doctor_impl():
     from . import doctor as doc
     from .adapters import list_local_adapters
-    from .engines.mlx_stream import load_calibration
+    from .calibration import load_calibration
     from .registry import MODELS_DIR, load_registry
     from importlib.metadata import version as _v
     try:
         __version__ = _v("streamweights")
     except Exception:
         __version__ = "dev"
+    from .platforms import mlx_available
     hw = probe_mod.load(probe_if_missing=True)
     interrupted = []
     for b in overnight.interrupted_builds():
@@ -317,22 +326,25 @@ def _doctor_impl():
                            f"(spill resume {j['id']})")
     typer.echo(doc.report(hw, load_calibration(), registry_tags=list(load_registry()),
                           models_dir=MODELS_DIR, interrupted_lines=interrupted,
-                          version=__version__, adapters=len(list_local_adapters())))
+                          version=__version__, adapters=len(list_local_adapters()),
+                          mlx=mlx_available()))
     have = any(True for _ in MODELS_DIR.glob("*/bf16-st")) if MODELS_DIR.exists() else False
     first = (overnight.interrupted_builds() or [None])[-1]
     jobs = overnight.interrupted_jobs(JOBS_DIR)
     _next_hint((f"spill resume {first['folder']}" if first else
                 f"spill resume {jobs[-1]['id']}") if interrupted else
+               "spill run qwen2.5:0.5b sample" if not mlx_available() else
                ("spill build <folder>" if have else "spill example banking77 --quick"))
 
 
-@app.command()
+@app.command(short_help="Create a ready-to-run example folder",
+             epilog="Example: spill example banking77 --quick")
 def example(
     name: str = typer.Argument("banking77", help="which example (banking77)"),
     quick: bool = typer.Option(False, "--quick", help="the under-an-hour variant: 100 evals, "
                                                       "500 train rows, student qwen2.5:0.5b"),
     force: bool = typer.Option(False, "--force", help="write into a folder that already exists"),
-    debug: bool = typer.Option(False, "--debug"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Create ./<name>/ with ready files (an exam, homework, and the prompt for untrained models)."""
     import streamweights.cli as cli
@@ -342,6 +354,7 @@ def example(
         folder = ex.create(name, quick, Path("."), force)
         files = sorted(p.name for p in folder.iterdir())
         typer.echo(f"created {folder}/ with {', '.join(files)}")
-        _next_hint(f"spill build {folder}")
+        _next_hint(f"spill build {folder}" if platforms.mlx_available()
+                   else f"spill check {folder}/evals.jsonl")
     except Exception as e:
         _fail(e)

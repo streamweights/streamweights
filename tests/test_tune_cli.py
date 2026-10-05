@@ -38,8 +38,8 @@ def data(tmp_path):
 
 def tune(model_dir, data, name, *extra):
     r = R.invoke(app, ["tune", str(model_dir), str(data), "--name", name, "--rank", "4",
-                       "--alpha", "8", "--lr", "3e-2", "--batch", "4", "--steps", "40",
-                       "--ckpt-every", "10", "--quiet", *extra])
+                       "--lr", "3e-2", "--batch", "4", "--steps", "40",
+                       "--quiet", *extra])
     return r
 
 
@@ -47,7 +47,7 @@ def test_tune_prints_pre_run_line_and_next_hint(model_dir, data):
     r = tune(model_dir, data, "cli-res", "--path", "resident")
     assert r.exit_code == 0, r.output
     out = r.output
-    assert "spill: tune tiny-llama bf16" in out and "resident (mlx-lm LoRA tuner)" in out
+    assert "spill tune tiny-llama: bf16" in out and "resident (mlx-lm LoRA tuner)" in out
     assert "rank 4 alpha 8" in out and "24 examples" in out and "40 steps of micro-batch 4" in out
     assert "Cost: $0" in out and "Est." in out
     assert "next: spill eval evals.jsonl tiny-llama tiny-llama+cli-res" in out

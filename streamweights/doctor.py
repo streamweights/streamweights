@@ -14,6 +14,7 @@ import shutil
 import sys
 
 from . import estimate as est
+from .platforms import platform_line
 
 GIB = 1024**3
 OVERNIGHT_H = 12
@@ -79,7 +80,8 @@ def downloaded_models(registry_tags, models_dir) -> list[str]:
 
 
 def report(hw: dict, cal: dict, *, registry_tags, models_dir, interrupted_lines: list[str],
-           version: str, free_disk: int | None = None, adapters: int = 0) -> str:
+           version: str, free_disk: int | None = None, adapters: int = 0,
+           mlx: bool = True) -> str:
     ws = hw.get("gpu", {}).get("vram_bytes", 0)
     ram = hw.get("ram_total_bytes", 0)
     free = free_disk if free_disk is not None else shutil.disk_usage(_existing(models_dir)).free
@@ -91,10 +93,12 @@ def report(hw: dict, cal: dict, *, registry_tags, models_dir, interrupted_lines:
     rate_src = "measured streaming rate" if rates else "estimated from the disk probe"
     big, limit = largest_overnight(rate, ws, free, tf)
     have = downloaded_models(registry_tags, models_dir)
+    chip = hw.get("cpu") or platform.processor() or platform.machine() or "unknown"
+    mem = (f"{ram / GIB:.0f} GB RAM, Metal working set {ws / GIB:.0f} GB" if mlx
+           else f"{ram / GIB:.0f} GB RAM, no Metal")
     lines = [
-        f"chip         {hw.get('cpu', platform.processor() or 'unknown')}, "
-        f"{hw.get('cpu_cores', '?')} cores",
-        f"memory       {ram / GIB:.0f} GB RAM, Metal working set {ws / GIB:.0f} GB",
+        f"chip         {chip}, {hw.get('cpu_cores', '?')} cores",
+        f"memory       {mem}",
         f"disk         {free / GIB:.0f} GB free",
         f"software     Python {sys.version.split()[0]}, streamweights {version}",
         f"models       " + (", ".join(have) if have else "none downloaded yet"),
@@ -106,4 +110,7 @@ def report(hw: dict, cal: dict, *, registry_tags, models_dir, interrupted_lines:
         f"training     {tf:g} TFLOP/s used for prefill and training estimates ({tf_src}); "
         f"training and prefill scale with GPU cores, evals with the disk",
     ]
+    if not mlx:
+        lines = [l for l in lines if not l.startswith(("overnight", "training"))]
+        lines.append(f"platform     {platform.system()} {platform.machine()}: {platform_line()}")
     return "\n".join(lines)

@@ -468,7 +468,7 @@ def _record_compute_rate(prep: Prepared, result: dict) -> None:
     not an assumption. Streamed: compute time = micro-batch wall time minus time blocked
     on the ring, at 6 flops/param/token (forward + recompute + input gradients).
     Resident: step wall time at 4 flops/param/token."""
-    from ..engines.mlx_stream import load_calibration, save_calibration
+    from ..calibration import load_calibration, save_calibration
     spec, ss = prep.spec, prep.stream_stats
     L = prep.n_layers
     try:

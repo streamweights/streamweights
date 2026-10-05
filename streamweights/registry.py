@@ -10,6 +10,8 @@ from pathlib import Path
 
 import yaml
 
+from .errors import SpillError
+
 def _home() -> Path:
     """Data root: the git checkout when running from one, else ~/.streamweights
     (installed packages must not write into site-packages). SPILL_HOME overrides."""
@@ -145,10 +147,9 @@ def download(model: Model, quant_name: str, progress: bool = True) -> list[Path]
         return q.local_paths(model.name)
     free = shutil.disk_usage(REPO_ROOT).free
     if free - q.bytes < MIN_FREE_AFTER_DOWNLOAD:
-        raise RuntimeError(
+        raise SpillError(
             f"refusing download: {q.bytes / GIB:.1f} GB to {dest} would leave "
-            f"{(free - q.bytes) / GIB:.1f} GB free (< 20 GB floor)"
-        )
+            f"{(free - q.bytes) / GIB:.1f} GB free (20 GB floor)", "spill doctor")
     print(f"downloading {model.name} {quant_name}: {q.bytes / GIB:.1f} GB -> {dest}", file=sys.stderr)
     dest.mkdir(parents=True, exist_ok=True)
     if q.repo:
@@ -161,11 +162,10 @@ def download(model: Model, quant_name: str, progress: bool = True) -> list[Path]
                 target.hardlink_to(p)
             paths.append(target)
         return paths
-    raise RuntimeError(
-        f"{model.name} has no published bf16 GGUF; convert from {q.convert_from} with "
-        f"llama.cpp's convert_hf_to_gguf.py --outtype bf16 into {dest}, or opt into a "
-        f"quant explicitly with --quant Q8_0"
-    )
+    raise SpillError(
+        f"{model.name} has no published bf16 GGUF (convert from {q.convert_from} with "
+        f"llama.cpp's convert_hf_to_gguf.py --outtype bf16 into {dest})",
+        f"spill run {model.name} sample --quant Q8_0")
 
 
 if __name__ == "__main__":

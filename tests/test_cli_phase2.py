@@ -40,7 +40,7 @@ def test_distill_generation_and_score(tmp_path):
     r = runner.invoke(app, ["distill", "qwen2.5:0.5b", str(prompts), "--logprobs", "5",
                             "--quiet", "--out", str(tmp_path / "gen.jsonl")])
     assert r.exit_code == 0, r.output
-    assert "mode: generate" in r.output and "next:" in r.output
+    assert "spill distill qwen2.5:0.5b:" in r.output and "next:" in r.output
     recs = [json.loads(l) for l in (tmp_path / "gen.jsonl").read_text().splitlines()]
     assert len(recs) == 2
     for rec in recs:
@@ -54,7 +54,7 @@ def test_distill_generation_and_score(tmp_path):
     r = runner.invoke(app, ["distill", "qwen2.5:0.5b", str(targets), "--score", "--quiet",
                             "--out", str(tmp_path / "sc.jsonl")])
     assert r.exit_code == 0, r.output
-    assert "teacher-forced score" in r.output and "tokens to prefill" in r.output
+    assert "Teacher-forced score" in r.output and "tokens to prefill" in r.output
     rec = json.loads((tmp_path / "sc.jsonl").read_text())
     assert rec["target"] == "Paris." and rec["positions"][0]["top"]
     assert rec["score"]["n_target"] == len(rec["positions"])

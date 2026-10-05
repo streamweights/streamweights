@@ -1,11 +1,11 @@
 """Architecture support table, keyed by config.json model_type / architectures.
 
 States:
-  verified — streamed output tested identical to resident execution on a model of
+  verified: streamed output tested identical to resident execution on a model of
              the family (plus first-token agreement with mlx_lm.generate).
-  expected — dense decoder family with an mlx-lm class the streamer binds
+  expected: dense decoder family with an mlx-lm class the streamer binds
              generically; not yet through the identity gate.
-  not_yet  — the streamer cannot run it; one-line reason per class.
+  not_yet : the streamer cannot run it; one-line reason per class.
 
 The resident engine's support follows mlx-lm's own model list.
 """

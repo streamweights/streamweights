@@ -10,6 +10,7 @@ import tarfile
 import urllib.request
 from pathlib import Path
 
+from .errors import SpillError
 from .registry import REPO_ROOT
 
 BIN_DIR = REPO_ROOT / "bin"
@@ -29,8 +30,8 @@ def ensure_llama_server() -> Path:
     key = (platform.system(), platform.machine())
     asset = ASSETS.get(key)
     if not asset:
-        raise RuntimeError(f"no prebuilt llama.cpp asset known for {key}; "
-                           f"place a llama-server binary at {LLAMA_SERVER}")
+        raise SpillError(f"no prebuilt llama.cpp for {key[0]} {key[1]}; place a llama-server "
+                         f"binary at {LLAMA_SERVER}", "spill doctor")
     url = f"https://github.com/ggml-org/llama.cpp/releases/download/{RELEASE}/{asset}"
     print(f"fetching llama.cpp {RELEASE} prebuilt -> {BIN_DIR}", file=sys.stderr)
     BIN_DIR.mkdir(exist_ok=True)

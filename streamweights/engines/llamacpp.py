@@ -11,6 +11,7 @@ from typing import Iterator
 
 import httpx
 
+from ..errors import SpillError
 from ..jobs.engine import LLAMA_SERVER, _free_port
 from .base import CompletedRow, MemoryBudget, ModelSpec
 
@@ -35,7 +36,7 @@ class LlamaCppEngine:
                 t0 = time.monotonic()
                 while time.monotonic() - t0 < 1800:
                     if proc.poll() is not None:
-                        raise RuntimeError("llama-server failed to start")
+                        raise SpillError("llama-server failed to start", "spill doctor")
                     try:
                         if c.get(f"http://127.0.0.1:{port}/health", timeout=2).status_code == 200:
                             break

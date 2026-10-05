@@ -221,11 +221,11 @@ def banner(jobs_dir: Path, skip_resume_of: str | None = None) -> str | None:
         b = builds[-1]
         extra = f" (+{len(builds) - 1} more)" if len(builds) > 1 else ""
         return (f"spill: build {b['name']} is interrupted at stage {b['done'] + 1}/"
-                f"{b['total']}{extra}; continue with: spill resume {b['folder']}")
+                f"{b['total']}{extra}. Try: spill resume {b['folder']}")
     jobs = interrupted_jobs(jobs_dir)
     if jobs:
         j = jobs[-1]
         extra = f" (+{len(jobs) - 1} more)" if len(jobs) > 1 else ""
         return (f"spill: {j['kind']} job {j['id']} is interrupted at {j['done']}/{j['total']} "
-                f"rows{extra}; continue with: spill resume {j['id']}")
+                f"rows{extra}. Try: spill resume {j['id']}")
     return None

@@ -21,6 +21,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
+
+from . import safetensors_np as snp
 from .errors import SpillError
 from .registry import REPO_ROOT
 
@@ -43,9 +46,17 @@ def export_name(base: str, adapter_id: str) -> str:
 
 # ------------------------------------------------------------ merge
 
+def _adapter_f32(x):
+    """An adapter tensor (MLX array or numpy) as float32 numpy."""
+    if hasattr(x, "astype") and type(x).__module__.startswith("mlx"):
+        import mlx.core as mx
+        return np.array(x.astype(mx.float32))
+    return np.asarray(x, dtype=np.float32)
+
+
 def merge_adapter(model_dir: Path, adapter, out_dir: Path, say=lambda s: None) -> dict:
-    """Write the merged model to out_dir. Returns {"modules": n, "shards": n, "dtype": str}."""
-    import mlx.core as mx
+    """Write the merged model to out_dir (numpy, so it runs without MLX). Returns
+    {"modules": n, "shards": n, "dtype": str}."""
     model_dir, out_dir = Path(model_dir), Path(out_dir)
     cfg = json.loads((model_dir / "config.json").read_text())
     if cfg.get("quantization"):
@@ -59,31 +70,33 @@ def merge_adapter(model_dir: Path, adapter, out_dir: Path, say=lambda s: None) -
     expected = sum(len(m) for m in adapter.layers.values())
     merged = 0
     dtype = None
+
     for i, shard in enumerate(shards):
-        tensors = mx.load(str(shard))
-        out = {}
-        for name, w in tensors.items():
+        entries = []
+        for name, dt, shape, raw in snp.tensors(shard):
+            def make(name=name, dt=dt, shape=shape, raw=raw):
+                m = _WEIGHT.match(name)
+                ab = adapter.layers.get(int(m.group(1)), {}).get(m.group(2)) if m else None
+                if ab is None:
+                    return raw
+                a, b, scale = ab
+                delta = (_adapter_f32(a) @ _adapter_f32(b)) * np.float32(scale)   # [in, out]
+                return snp.from_f32(snp.to_f32(raw, dt) + delta.T, dt)
             m = _WEIGHT.match(name)
-            if m:
-                layer, path = int(m.group(1)), m.group(2)
-                ab = adapter.layers.get(layer, {}).get(path)
-                if ab is not None:
-                    a, b, scale = ab
-                    delta = (a.astype(mx.float32) @ b.astype(mx.float32)) * scale   # [in, out]
-                    if delta.T.shape != w.shape:
-                        raise SpillError(
-                            f"adapter {adapter.id} layer {layer} {path} makes a {tuple(delta.T.shape)} "
-                            f"update for a {tuple(w.shape)} weight; it was trained on a "
-                            f"different base")
-                    dtype = w.dtype
-                    w = (w.astype(mx.float32) + delta.T).astype(w.dtype)
-                    merged += 1
-            out[name] = w
-        mx.eval(list(out.values()))
-        mx.save_safetensors(str(out_dir / shard.name), out, metadata={"format": "pt"})
+            ab = adapter.layers.get(int(m.group(1)), {}).get(m.group(2)) if m else None
+            if ab is not None:
+                a, b, _ = ab
+                upd = (tuple(a.shape)[0], tuple(b.shape)[1])
+                if upd[::-1] != tuple(shape):
+                    raise SpillError(
+                        f"adapter {adapter.id} layer {m.group(1)} {m.group(2)} makes a "
+                        f"{upd[::-1]} update for a {tuple(shape)} weight; it was trained on a "
+                        f"different base")
+                dtype = dt
+                merged += 1
+            entries.append((name, dt, shape, make))
+        snp.write(out_dir / shard.name, entries, metadata={"format": "pt"})
         say(f"merged shard {i + 1}/{len(shards)}: {shard.name}")
-        del tensors, out
-        mx.clear_cache()
     if merged != expected:
         raise SpillError(f"adapter {adapter.id} has {expected} modules but only {merged} matched "
                          f"a weight in the base; it was trained on a different base or "
@@ -93,8 +106,8 @@ def merge_adapter(model_dir: Path, adapter, out_dir: Path, say=lambda s: None) -
             shutil.copyfile(f, out_dir / f.name)
     (out_dir / "merge.json").write_text(json.dumps({
         "adapter": adapter.id, "adapter_hash": adapter.hash, "rank": adapter.rank,
-        "modules": merged, "base_dir": str(model_dir), "dtype": str(dtype)}, indent=2))
-    return {"modules": merged, "shards": len(shards), "dtype": str(dtype)}
+        "modules": merged, "base_dir": str(model_dir), "dtype": dtype}, indent=2))
+    return {"modules": merged, "shards": len(shards), "dtype": dtype}
 
 
 # ------------------------------------------------------------ gguf

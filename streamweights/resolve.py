@@ -1,5 +1,5 @@
 """Model argument resolution: curated tag, or any Hugging Face repo id
-(org/name[@revision]) — fetched, classified, sized, and run through the same
+(org/name[@revision]): fetched, classified, sized, and run through the same
 policy and budget as a tag."""
 
 from __future__ import annotations

@@ -109,7 +109,7 @@ def test_classification_gets_max_tokens_16_and_says_so(folder):
     assert p.classification and p.max_tokens == 16
     line = B.pre_run_line(p)
     assert "max_tokens 16" in line and "path both" in line
-    assert "llama3.3:70b (teacher)" in line and "Total ~" in line and "5 TFLOP/s assumed" in line
+    assert "llama3.3:70b (teacher)" in line and "Est. " in line and "5 TFLOP/s, assumed" in line
     assert "On battery" not in line and "On battery" in B.pre_run_line(p, on_battery=True)
 
 
@@ -144,7 +144,7 @@ def test_run_both_path_roles_and_files(folder):
     assert all(m["role"] != "system" for r in tr for m in r["messages"])
     assert [r["role"] for r in res.table] == ["your model", "base (untrained)", "teacher"]
     assert res.table[0]["score"] == 0.9
-    assert B.final_lines(res)[0] == "your model: qwen2.5:7b+bank · spill export qwen2.5:7b+bank"
+    assert B.final_lines(res)[0] == "your model: qwen2.5:7b+bank"
     # intermediates in the folder
     assert (folder / "prompts.distill.jsonl").exists()
     assert (folder / "qwen2.5-7b_plus_bank.out.jsonl").exists() or True
@@ -203,7 +203,8 @@ def test_cli_build_end_to_end_with_fake_backend(folder, monkeypatch):
     r = CliRunner().invoke(app, ["build", str(folder)])
     assert r.exit_code == 0, r.output
     assert "path both" in r.output and "stage 1/5" in r.output
-    assert "your model: qwen2.5:7b+bank · spill export qwen2.5:7b+bank" in r.output
+    assert "your model: qwen2.5:7b+bank" in r.output
+    assert r.output.rstrip().endswith("next: spill export qwen2.5:7b+bank")
     assert "model" in r.output and "role" in r.output and "score" in r.output
     # running again is a no-op that reprints the table
     fake2 = Fake()

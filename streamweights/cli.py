@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import json
 import math
-import platform
+import os
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import typer
+import typer.core
 
-from . import overnight
+from . import overnight, platforms
+from .errors import SpillError
 from . import probe as probe_mod
 from .engines.base import MemoryBudget, ModelSpec
 from .jobs.engine import Job, JOBS_DIR, compute_offload
@@ -23,17 +25,33 @@ from .registry import (GIB, download, load_registry, mlx_quant_repo,
 
 if sys.version_info < (3, 10):  # pragma: no cover
     sys.stderr.write("spill needs Python 3.10 or newer; this is "
-                     f"{sys.version.split()[0]} — try: uv tool install "
+                     f"{sys.version.split()[0]}. Try: uv tool install "
                      "git+https://github.com/streamweights/streamweights\n")
     raise SystemExit(1)
 
-app = typer.Typer(add_completion=False, no_args_is_help=True)
+COMMAND_ORDER = ["build", "example", "run", "distill", "tune", "eval", "export",
+                 "models", "adapters", "runs", "status", "tail", "resume", "doctor", "check"]
+
+
+class _LoopOrder(typer.core.TyperGroup):
+    """`spill --help` lists the commands in the order you use them."""
+
+    def list_commands(self, ctx):
+        known = [c for c in COMMAND_ORDER if c in self.commands]
+        return known + [c for c in self.commands if c not in COMMAND_ORDER]
+
+
+app = typer.Typer(cls=_LoopOrder, add_completion=False, no_args_is_help=True,
+                  pretty_exceptions_enable=False, rich_markup_mode=None,
+                  epilog="Example: spill example banking77 --quick && "
+                         "spill build banking77-quick")
 _DEBUG = False
 
 
 @app.callback()
 def _main(ctx: typer.Context):
-    """On launch, any command reports an interrupted job or build in one line."""
+    """Build your own model on your Mac. Errors are one line; add --debug to any command
+    for the traceback."""
     if ctx.invoked_subcommand in ("resume", "doctor", None) or "--help" in sys.argv:
         return
     try:
@@ -48,15 +66,47 @@ SAMPLE_PATH = Path(__file__).parent / "data" / "sample-20.jsonl"
 
 
 def _fail(e):
+    """One line ending in the command that gets you unstuck; the traceback only with --debug."""
     from .errors import SpillError
     if _DEBUG:
         raise e
     if isinstance(e, SpillError):
-        typer.echo(f"spill: {e.line()}", err=True)
+        typer.echo(f"spill: {e.line(default='spill doctor')}", err=True)
     else:
-        typer.echo(f"spill: {type(e).__name__}: {e} — rerun with --debug for the traceback",
-                   err=True)
+        again = "spill " + " ".join(sys.argv[1:] + ["--debug"])
+        typer.echo(f"spill: {type(e).__name__}: {e}. Try: {again}", err=True)
     raise typer.Exit(1)
+
+
+def main():
+    """Console entry point: `--debug` anywhere on the line turns tracebacks on; anything
+    that escapes a command still prints one line."""
+    global _DEBUG
+    if "--debug" in sys.argv:
+        sys.argv.remove("--debug")
+        _DEBUG = True
+    try:                              # Typer 0.27+ bundles its own click
+        from typer import _click as click
+    except ImportError:
+        import click
+    try:
+        app(standalone_mode=False)
+    except typer.Exit as e:
+        raise SystemExit(e.exit_code)
+    except typer.Abort:
+        raise SystemExit(130)
+    except click.ClickException as e:
+        cmd = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else None
+        typer.echo(f"spill: {e.format_message()}. Try: spill {cmd + ' ' if cmd else ''}--help",
+                   err=True)
+        raise SystemExit(2)
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    except Exception as e:
+        try:
+            _fail(e)
+        except typer.Exit as x:
+            raise SystemExit(x.exit_code)
 
 
 def _resolve_input(input_arg: str) -> Path:
@@ -76,7 +126,8 @@ MB = 1024 * 1024
 
 
 def _is_mac() -> bool:
-    return platform.system() == "Darwin" and platform.machine() == "arm64"
+    from .platforms import mlx_available
+    return mlx_available()
 
 
 def _fmt_dur(s: float) -> str:
@@ -107,7 +158,7 @@ def _rough_batch(st_bytes: int, arch: dict, rows: list[dict], max_tokens: int,
                  ws: int, quant: str = "bf16") -> int:
     """Pre-download batch estimate (chars/4 token approximation). Uses the
     measured memory calibration when one exists for this quant."""
-    from .engines.mlx_stream import load_calibration
+    from .calibration import load_calibration
     lens = [sum(len(m.get("content", "")) for m in r["body"]["messages"]) // 4 + 16
             for r in rows]
     mean_tokens = sum(lens) / max(1, len(lens)) + max_tokens
@@ -190,7 +241,8 @@ class RunOpts:
     full_logits: bool = False
     adapter: str | None = None    # spec string of the adapter, if any
     kind: str = "run"             # run | distill | judge
-    prefix_reuse: bool = True     # shared-prefix KV reuse (--no-prefix-reuse to A/B it)
+    cmd: str | None = None        # the command named in the pre-run line (default: kind)
+    prefix_reuse: bool = True     # shared-prefix KV reuse (SPILL_NO_PREFIX_REUSE=1 to A/B it)
 
 
 VOCAB_BY_TAG = {"qwen2.5:0.5b": 151936, "qwen2.5:7b": 152064, "qwen2.5:32b": 152064, "llama3.3:70b": 128256}
@@ -341,27 +393,26 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
     engine.pass_cb = _LiveRenderer(job.dir, quiet)
     out_path = out or (runs_mod.run_dir(job.id) / "distill.jsonl"
                        if opts.kind == "distill" else job.results_path)
+    cmd = opts.cmd or ("eval" if opts.kind == "judge" else opts.kind)
     if scoring:
-        what = (f"mode: teacher-forced score (prefill only, no sampling). {n_prompts} rows, "
+        what = (f"Teacher-forced score (prefill only, no sampling): {n_prompts} rows, "
                 f"{sum(lens)} tokens to prefill ({n_target} target tokens scored, top-"
-                f"{spec.extra['logprobs']} log-probs each), est. {_fmt_dur(est)} "
-                f"({rate_note}).")
+                f"{spec.extra['logprobs']} log-probs each). Est. {_fmt_dur(est)} ({rate_note}).")
     else:
-        extra = (f" Top-{opts.logprobs} log-probs on"
-                 f"{' + full logits' if opts.full_logits else ''}." if opts.logprobs else "")
-        what = f"{n_prompts} prompts, batch {batch}, est. {_fmt_dur(est)}.{cost_note}{extra}"
+        extra = f" Top-{opts.logprobs} log-probs on." if opts.logprobs else ""
+        what = f"{n_prompts} prompts, batch {batch}. Est. {_fmt_dur(est)}.{cost_note}{extra}"
         if opts.kind == "distill":
             n_prompt_tok = sum(lens) - sum(r["body"].get("max_tokens", 128) for r in rows)
-            what = (f"mode: generate, teacher top-{opts.logprobs} log-probs per token. "
-                    f"{n_prompts} prompts, {n_prompt_tok} prompt tokens plus up to "
+            what = (f"{n_prompts} prompts, {n_prompt_tok} prompt tokens plus up to "
                     f"{sum(r['body'].get('max_tokens', 128) for r in rows)} generated tokens "
-                    f"to score, batch {batch}, est. {_fmt_dur(est)} (decode from the "
-                    f"measured pass time plus prefill).{cost_note}")
+                    f"scored with the teacher's top-{opts.logprobs} log-probs, batch {batch}. "
+                    f"Est. {_fmt_dur(est)} (decode from the measured pass time plus "
+                    f"prefill).{cost_note}")
     typer.echo(
-        f"spill: {label} {quant} ({size / GIB:.1f} GB, {fam.label}: {fam.state}) "
-        f"{'fits' if size <= ram else 'does not fit'} in {ram / GIB:.0f} GB RAM; {placement}. "
+        f"spill {cmd} {label}: {quant} ({size / GIB:.1f} GB, {fam.label}: {fam.state}) "
+        f"{'fits' if size <= ram else 'does not fit'} in {ram / GIB:.0f} GB RAM, {placement}. "
         f"{what} Cost: $0.{overnight.battery_note()} "
-        f"Results -> {out_path} (tail with: spill tail)")
+        f"Results -> {out_path}")
     typer.echo(f"   why: {why}")
 
     from .jobs.runner import run_job
@@ -391,24 +442,21 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
     return job, prog
 
 
-@app.command()
+@app.command(short_help="Run a JSONL of prompts through a model",
+             epilog="Example: spill run qwen2.5:0.5b sample")
 def run(
     model: str = typer.Argument(..., help="curated tag (llama3.3:70b), HF repo id (org/name[@rev]), "
                                           "optionally +<adapter> (local dir or HF repo)"),
     input_jsonl: str = typer.Argument(..., help="OpenAI batch or chat JSONL path, or `sample`"),
     quant: str = typer.Option(None, "--quant",
                               help="8bit|4bit (mlx) or Q8_0|Q4_K_M (gguf); bf16 is the default"),
-    out: Path = typer.Option(None, "--out"),
-    context: int = typer.Option(4096, "--context"),
-    parallel: int = typer.Option(None, "--parallel", help="override computed batch (never required)"),
-    quiet: bool = typer.Option(False, "--quiet", help="suppress the live tail block"),
-    notify: str = typer.Option(None, "--notify", help="also POST a small JSON to this URL when done"),
-    no_prefix_reuse: bool = typer.Option(False, "--no-prefix-reuse",
-                                         help="compute every row's whole prompt (for A/B checks)"),
+    out: Path = typer.Option(None, "--out", help="also copy results.jsonl here"),
+    context: int = typer.Option(4096, "--context", help="context window in tokens"),
+    parallel: int = typer.Option(None, "--parallel", hidden=True),
+    quiet: bool = typer.Option(False, "--quiet", help="one progress line, no live slot block"),
+    notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when done"),
     logprobs: int = typer.Option(None, "--logprobs", help="per-token top-K log-probs, K up to 64"),
-    full_logits: bool = typer.Option(False, "--full-logits",
-                                     help="also write a float16 .npy of logits per row (sets under 200 rows)"),
-    debug: bool = typer.Option(False, "--debug", help="show tracebacks"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Run an OpenAI batch JSONL (or `sample`) against a tag or any HF repo id."""
     global _DEBUG
@@ -416,8 +464,8 @@ def run(
     try:
         with overnight.long_job("spill run " + model, notify):
             _run_impl(model, input_jsonl, quant, out, context, parallel, quiet,
-                      RunOpts(logprobs=logprobs, full_logits=full_logits,
-                              prefix_reuse=not no_prefix_reuse))
+                      RunOpts(logprobs=logprobs,
+                              prefix_reuse=not os.environ.get("SPILL_NO_PREFIX_REUSE")))
     except Exception as e:
         _fail(e)
 
@@ -453,7 +501,7 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
     adapter = resolve_adapter(adapter_spec) if adapter_spec else None
 
     if mlx_ok:
-        from .engines.mlx_stream import load_calibration
+        from .calibration import load_calibration
         arch = reg[model].arch if res.kind == "tag" else arch_from_config(res.config)
         downloaded = safetensors_downloaded(model) if res.kind == "tag" else (
             res.local_dir.exists() and any(res.local_dir.glob("*.safetensors")))
@@ -476,8 +524,8 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
                         adapter=adapter)
     model = res.name
     if not _is_mac():
-        typer.echo("spill: not Apple silicon / no Metal — using the llama.cpp GGUF path, "
-                   "which works but is slow; the streaming runner needs Metal")
+        typer.echo(f"spill: no Apple silicon here, so run uses llama.cpp (works, slower); "
+                   f"{platforms.platform_line()}")
     if res.kind == "hf":
         from .errors import SpillError
         raise SpillError("arbitrary HF repos run on the Metal streaming path only; "
@@ -494,8 +542,7 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
     try:
         paths = download(m, choice.quant)
     except RuntimeError as e:
-        typer.echo(str(e), err=True)
-        raise typer.Exit(1)
+        raise SpillError(str(e), "spill models")
     ram = hw["ram_total_bytes"]
     size = m.quants[choice.quant].bytes
     ngl, n = compute_offload(m, choice.quant, context, hw["gpu"]["vram_bytes"], parallel)
@@ -507,11 +554,11 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
                      options={"mode": "generate", "kind": "run"})
     out_path = out or job.results_path
     typer.echo(
-        f"spill: {model} {choice.quant} ({size / GIB:.1f} GB) "
-        f"{'fits' if fits else 'does not fit'} in {ram / GIB:.0f} GB RAM; "
-        f"{'resident' if fits else f'streaming from NVMe at ~{nvme / GIB:.1f} GB/s'}. "
-        f"{len(rows)} prompts, batch {n}, est. {_fmt_dur(est)}. Cost: $0. "
-        f"Results -> {out_path} (tail with: spill tail)")
+        f"spill run {model}: {choice.quant} ({size / GIB:.1f} GB) "
+        f"{'fits' if fits else 'does not fit'} in {ram / GIB:.0f} GB RAM, "
+        f"{'resident' if fits else f'streaming from NVMe at ~{nvme / GIB:.1f} GB/s'}, via "
+        f"llama.cpp. {len(rows)} prompts, batch {n}. Est. {_fmt_dur(est)}. Cost: $0. "
+        f"Results -> {out_path}")
     from .engines.llamacpp import LlamaCppEngine
     from .jobs.runner import run_job
     spec = ModelSpec(model, choice.quant, paths[0], m.arch, context,
@@ -528,7 +575,8 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
     return job, prog
 
 
-@app.command()
+@app.command(short_help="List past runs",
+             epilog="Example: spill runs")
 def runs(limit: int = typer.Option(20, "--limit", help="most recent N runs")):
     """List runs with model, quant, adapter, input hash, rows and status."""
     from . import runs as runs_mod
@@ -547,7 +595,8 @@ def runs(limit: int = typer.Option(20, "--limit", help="most recent N runs")):
     _next_hint(f"cat {runs_mod.manifest_path(ms[-1]['id'])}")
 
 
-@app.command()
+@app.command(short_help="Collect a big model's answers to learn from",
+             epilog="Example: spill distill qwen2.5:0.5b sample")
 def distill(
     teacher: str = typer.Argument(..., help="teacher model: tag or HF repo id (optionally +adapter)"),
     input_jsonl: str = typer.Argument(..., help="prompts (batch/chat JSONL), or with --score "
@@ -556,23 +605,23 @@ def distill(
                                help="teacher-forced: score the given assistant targets, "
                                     "prefill only, no sampling"),
     logprobs: int = typer.Option(32, "--logprobs", help="top-K per token, K up to 64"),
-    quant: str = typer.Option(None, "--quant"),
+    quant: str = typer.Option(None, "--quant", help="8bit | 4bit; bf16 is the default"),
     out: Path = typer.Option(None, "--out", help="distillation JSONL (default runs/<id>/distill.jsonl)"),
-    context: int = typer.Option(4096, "--context"),
-    parallel: int = typer.Option(None, "--parallel"),
-    quiet: bool = typer.Option(False, "--quiet"),
-    notify: str = typer.Option(None, "--notify", help="also POST a small JSON to this URL when done"),
-    debug: bool = typer.Option(False, "--debug"),
+    context: int = typer.Option(4096, "--context", help="context window in tokens"),
+    quiet: bool = typer.Option(False, "--quiet", help="one progress line, no live slot block"),
+    notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when done"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Distillation data from a full-size teacher: its completions plus per-token top-k
     log-probs (generation), or its log-probs over targets you supply (--score)."""
     global _DEBUG
     _DEBUG = debug
     try:
+        platforms.require_mlx("distill")
         opts = RunOpts(mode="score" if score else "generate", logprobs=logprobs,
                        kind="distill")
         with overnight.long_job("spill distill " + teacher, notify):
-            job, prog = _run_impl(teacher, input_jsonl, quant, out, context, parallel,
+            job, prog = _run_impl(teacher, input_jsonl, quant, out, context, None,
                                   quiet, opts)
         if prog.done >= prog.total:
             dest = _finalize_distill(job)
@@ -584,7 +633,8 @@ def distill(
         _fail(e)
 
 
-@app.command("eval")
+@app.command("eval", short_help="Score models on your eval set, one table",
+             epilog="Example: spill eval banking77-quick/evals.jsonl qwen2.5:0.5b qwen2.5:0.5b+banking")
 def eval_cmd(
     input_jsonl: str = typer.Argument(..., help="eval JSONL: prompts plus an `expected` field per row"),
     models: list[str] = typer.Argument(None, help="one or more models, each optionally +adapter; "
@@ -594,18 +644,19 @@ def eval_cmd(
                                help="exact_match | contains | regex | json_field | judge | script:<file.py>"),
     judge: str = typer.Option(None, "--judge", help="judge model (implies --metric judge)"),
     rerun: bool = typer.Option(False, "--rerun", help="ignore cached runs for this input hash"),
-    quant: str = typer.Option(None, "--quant"),
-    context: int = typer.Option(4096, "--context"),
-    parallel: int = typer.Option(None, "--parallel"),
-    quiet: bool = typer.Option(False, "--quiet"),
-    debug: bool = typer.Option(False, "--debug"),
+    quant: str = typer.Option(None, "--quant", help="8bit | 4bit; bf16 is the default"),
+    context: int = typer.Option(4096, "--context", help="context window in tokens"),
+    quiet: bool = typer.Option(False, "--quiet", help="one progress line, no live slot block"),
+    notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when done"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Run the eval set against each model (reusing finished runs for this exact input),
     score it, and print one table plus the rows where the models disagree."""
     global _DEBUG
     _DEBUG = debug
     try:
-        _eval_impl(input_jsonl, models, metric, judge, rerun, quant, context, parallel, quiet)
+        with overnight.long_job("spill eval " + Path(input_jsonl).name, notify):
+            _eval_impl(input_jsonl, models, metric, judge, rerun, quant, context, None, quiet)
     except Exception as e:
         _fail(e)
 
@@ -669,7 +720,7 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
                 prog = type("P", (), {"done": len(j.done_ids()), "total": j.total})()
             else:
                 job, prog = _run_impl(label, str(path), quant, None, context, parallel, quiet,
-                                      RunOpts())
+                                      RunOpts(cmd="eval"))
             if prog.done < prog.total:
                 from .errors import StageInterrupted
                 raise StageInterrupted(job.id, prog.done, prog.total, f"{label}:")
@@ -686,7 +737,7 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
             jpath.write_text("".join(json.dumps(r) + "\n" for r in jrows))
             typer.echo(f"judging {label} with {judge}")
             jjob, jprog = _run_impl(judge, str(jpath), None, None, context, parallel, quiet,
-                                    RunOpts(kind="judge"))
+                                    RunOpts(kind="judge", cmd="eval"))
             if jprog.done < jprog.total:
                 raise SpillError(f"judge run stopped at {jprog.done}/{jprog.total}",
                                  f"spill resume {jjob.id}")
@@ -725,44 +776,37 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
     return scored
 
 
-@app.command()
+@app.command(short_help="Train a LoRA adapter on your data",
+             epilog="Example: spill tune qwen2.5:0.5b banking77-quick/train.jsonl --name banking")
 def tune(
     model: str = typer.Argument(..., help="base model: tag, Hugging Face repo id, or a local "
                                           "safetensors directory"),
-    train_jsonl: Path = typer.Argument(..., help="OpenAI fine-tuning chat JSONL "
-                                                 "(messages, optional per-message weight)"),
-    name: str = typer.Option(..., "--name", help="adapter name, saved under <data>/adapters/<name>"),
-    rank: int = typer.Option(16, "--rank"),
-    alpha: float = typer.Option(32.0, "--alpha"),
-    dropout: float = typer.Option(0.0, "--dropout"),
-    targets: str = typer.Option(None, "--targets",
-                                help="comma list of block modules (default: every linear "
-                                     "projection, e.g. self_attn.q_proj,mlp.down_proj)"),
-    lr: float = typer.Option(1e-4, "--lr"),
-    schedule: str = typer.Option("cosine", "--schedule", help="cosine | constant"),
-    weight_decay: float = typer.Option(0.01, "--weight-decay"),
-    steps: int = typer.Option(None, "--steps", help="optimizer steps (default: --epochs of data)"),
-    epochs: float = typer.Option(1.0, "--epochs"),
-    batch: int = typer.Option(None, "--batch",
-                              help="micro-batch (default: 4 resident, sized from the memory "
-                                   "budget when streamed)"),
+    train_jsonl: Path = typer.Argument(..., help="training JSONL: {prompt, answer} rows, or "
+                                                 "OpenAI chat rows (messages)"),
+    name: str = typer.Option(..., "--name", help="adapter name (see: spill adapters)"),
+    rank: int = typer.Option(16, "--rank", help="LoRA rank"),
+    lr: float = typer.Option(1e-4, "--lr", help="learning rate"),
+    steps: int = typer.Option(None, "--steps", help="optimizer steps (default: --epochs of the data)"),
+    epochs: float = typer.Option(1.0, "--epochs", help="passes over the data"),
+    batch: int = typer.Option(None, "--batch", help="micro-batch (default: 4 resident, sized "
+                                                    "from the memory budget when streamed)"),
     grad_accum: int = typer.Option(1, "--grad-accum", help="micro-batches per optimizer step"),
     max_seq: int = typer.Option(2048, "--max-seq", help="token cap per example; whole "
-                                "exchanges are dropped from the left, never mid-assistant-turn"),
-    seed: int = typer.Option(0, "--seed"),
+                                "exchanges are dropped from the left"),
     path: str = typer.Option("auto", "--path", help="auto | resident | streamed"),
-    ckpt_every: int = typer.Option(50, "--ckpt-every"),
     overwrite: bool = typer.Option(False, "--overwrite", help="replace an existing adapter"),
-    quiet: bool = typer.Option(False, "--quiet"),
-    debug: bool = typer.Option(False, "--debug"),
+    quiet: bool = typer.Option(False, "--quiet", help="a progress line every 10 steps"),
+    notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when done"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Train a LoRA adapter on your data against the full-precision base."""
     global _DEBUG
     _DEBUG = debug
     try:
-        _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, schedule,
-                   weight_decay, steps, epochs, batch, grad_accum, max_seq, seed, path,
-                   ckpt_every, overwrite, quiet)
+        platforms.require_mlx("tune")
+        with overnight.long_job("spill tune " + name, notify):
+            _tune_impl(model, train_jsonl, name, rank, 2 * rank, 0.0, None, lr, "cosine", 0.01,
+                       steps, epochs, batch, grad_accum, max_seq, 0, path, 50, overwrite, quiet)
     except Exception as e:
         _fail(e)
 
@@ -793,7 +837,7 @@ def _tune_pre_line(prep, size_gb: float, ws: int, ram: int, dest: Path) -> None:
     trunc = (f", {st.truncated} truncated" if st.truncated else "") + \
             (f", {len(st.skipped)} skipped" if st.skipped else "")
     typer.echo(
-        f"spill: tune {s.model} bf16 ({size_gb:.1f} GB, {fam.label}: {fam.state}) {placement}. "
+        f"spill tune {s.model}: bf16 ({size_gb:.1f} GB, {fam.label}: {fam.state}), {placement}. "
         f"Adapter {s.name}: rank {s.rank} alpha {s.alpha:g} dropout {s.dropout:g} on {tg} in "
         f"{prep.n_layers} layers ({prep.lora_params / 1e6:.1f}M parameters), lr {s.lr:g} "
         f"{s.schedule}, AdamW. {st.examples} examples, {st.tokens:,} tokens "
@@ -905,7 +949,7 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
                ckpt_every, overwrite, quiet):
     from . import adapters as adapters_mod
     from . import runs as runs_mod
-    from .engines.mlx_stream import load_calibration
+    from .calibration import load_calibration
     from .errors import SpillError
     from .tune import job as tj
     if not train_jsonl.exists():
@@ -975,7 +1019,7 @@ def _tune_build(model, train, name, resume_job, epochs=1.0, quiet=True):
 
 
 def _tune_resume(j: Job, meta: dict) -> None:
-    from .engines.mlx_stream import load_calibration
+    from .calibration import load_calibration
     from .tune import job as tj
     hw = probe_mod.load()
     spec = tj.TuneSpec(**meta["options"]["tune"])
@@ -989,7 +1033,8 @@ def _tune_resume(j: Job, meta: dict) -> None:
 
 
 
-@app.command()
+@app.command(short_help="List your trained adapters",
+             epilog="Example: spill adapters")
 def adapters():
     """List local LoRA adapters (PEFT or mlx-lm layout) under the data root."""
     from .adapters import ADAPTERS_DIR, list_local_adapters
@@ -1008,7 +1053,8 @@ def adapters():
     _next_hint(f"spill run <base>+{found[0]['id']} sample")
 
 
-@app.command()
+@app.command(short_help="Validate a JSONL file, with line-numbered errors",
+             epilog="Example: spill check banking77-quick/evals.jsonl")
 def check(path: Path = typer.Argument(..., help="a batch, chat, eval or distillation-target JSONL")):
     """Validate a JSONL file; prints the first error with its line number."""
     from .errors import SpillError
@@ -1016,7 +1062,7 @@ def check(path: Path = typer.Argument(..., help="a batch, chat, eval or distilla
     try:
         info = check_file(path)
     except SpillError as e:
-        typer.echo(f"spill: {path}: {e.line()}", err=True)
+        typer.echo(f"spill: {path}: {e.line(default=f'spill check {path}')}", err=True)
         raise typer.Exit(1)
     typer.echo(f"{path}: ok, {info['rows']} rows, {info['shape']} lines, use: {info['use']}")
     nxt = {"eval": f"spill eval {path} <model-a> <model-b>",
@@ -1026,14 +1072,13 @@ def check(path: Path = typer.Argument(..., help="a batch, chat, eval or distilla
     _next_hint(nxt)
 
 
-@app.command()
+@app.command(short_help="Follow the results of the latest job",
+             epilog="Example: spill tail")
 def tail(job: str = typer.Argument(None)):
     """Follow results.jsonl of the latest (or named) job."""
     j = Job.load(job) if job else Job.latest()
     if not j:
-        typer.echo("no jobs yet")
-        _next_hint("spill run qwen2.5:0.5b examples/evals-2000.jsonl")
-        raise typer.Exit(1)
+        _fail(SpillError("no jobs yet", "spill run qwen2.5:0.5b sample"))
     typer.echo(f"tailing {j.results_path}  (^C to stop)")
     pos = 0
     live = _LiveRenderer()
@@ -1062,7 +1107,8 @@ def tail(job: str = typer.Argument(None)):
     _next_hint("spill status")
 
 
-@app.command()
+@app.command(short_help="Continue an interrupted job or build",
+             epilog="Example: spill resume banking77-quick")
 def resume(job: str = typer.Argument(None)):
     """Continue the latest or named job from its checkpoint; a folder continues its build."""
     if job and (Path(job) / ".build" / "state.json").exists():
@@ -1071,9 +1117,7 @@ def resume(job: str = typer.Argument(None)):
         return
     j = Job.load(job) if job else Job.latest()
     if not j:
-        typer.echo("no jobs to resume")
-        _next_hint("spill run qwen2.5:0.5b examples/evals-2000.jsonl")
-        raise typer.Exit(1)
+        _fail(SpillError("no job to resume", "spill run qwen2.5:0.5b sample"))
     meta0 = j.read_meta()
     if meta0.get("options", {}).get("kind") == "tune":
         if meta0.get("status") == "completed":
@@ -1168,12 +1212,13 @@ def _run_mlx_resume(j: Job, quant: str, hw: dict) -> None:
         _finalize_distill(j)
 
 
-@app.command()
+@app.command(short_help="Show jobs: progress, tokens/s, ETA",
+             epilog="Example: spill status")
 def status():
     """List jobs with progress, tokens/s, ETA."""
     if not JOBS_DIR.exists() or not any(JOBS_DIR.iterdir()):
         typer.echo("no jobs")
-        _next_hint("spill run qwen2.5:0.5b examples/evals-2000.jsonl")
+        _next_hint("spill run qwen2.5:0.5b sample")
         return
     typer.echo(f"{'job':28s} {'model':14s} {'quant':7s} {'progress':12s} {'tok/s':>8s} {'eta':>8s} status")
     for d in sorted(JOBS_DIR.iterdir()):
@@ -1199,7 +1244,8 @@ MLX8_BYTES = {"qwen2.5:0.5b": 700_000_000, "qwen2.5:7b": 8_091_987_725, "qwen2.5
               "llama3.3:70b": 75_000_000_000}
 
 
-@app.command()
+@app.command(short_help="List the models spill knows and what they need",
+             epilog="Example: spill models")
 def models(architectures: bool = typer.Option(False, "--architectures",
                                               help="print the architecture support table")):
     """Curated tags: size, family, placement on this machine, disk needed, downloaded."""
@@ -1231,11 +1277,11 @@ def models(architectures: bool = typer.Option(False, "--architectures",
                    f"{str(dl):>10s}")
     typer.echo('\nAny Hugging Face repo id with a supported architecture also works: '
                'spill run org/name sample.')
-    _next_hint("spill run llama3.3:70b sample")
+    _next_hint("spill run qwen2.5:0.5b sample")
 
 
 from . import cli_build  # noqa: E402,F401  (registers build, example, export, doctor)
 
 if __name__ == "__main__":      # `python -m streamweights.cli`: use the module that has every command
-    from streamweights.cli import app as _app
-    _app()
+    from streamweights.cli import main as _main_entry
+    _main_entry()

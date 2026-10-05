@@ -11,8 +11,11 @@ class SpillError(Exception):
         self.recovery = recovery
         super().__init__(message)
 
-    def line(self) -> str:
-        return f"{self.message}" + (f" — try: {self.recovery}" if self.recovery else "")
+    def line(self, default: str | None = None) -> str:
+        """One line: the message, then the command that gets you unstuck."""
+        rec = self.recovery or default
+        msg = self.message.rstrip(". ")
+        return f"{msg}. Try: {rec}" if rec else msg
 
 
 class StageInterrupted(SpillError):

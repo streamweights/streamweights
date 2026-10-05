@@ -44,3 +44,10 @@ def mlx_adapter():
     return _ADAPTER
 
 
+
+
+@pytest.fixture(autouse=True)
+def _isolated_build_registry(tmp_path, monkeypatch):
+    """A fake build in one test must not show up as an interrupted build in the next."""
+    from streamweights import overnight
+    monkeypatch.setattr(overnight, "BUILDS_FILE", tmp_path / "builds.json")

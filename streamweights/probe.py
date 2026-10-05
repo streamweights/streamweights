@@ -66,6 +66,43 @@ def _probe_gpu() -> dict:
     return {"vendor": "none", "model": None, "vram_bytes": 0, "bf16_compute": False}
 
 
+def _cpu_name() -> str:
+    name = _sysctl("machdep.cpu.brand_string")
+    if name:
+        return name
+    try:
+        for line in open("/proc/cpuinfo"):
+            if line.startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    except OSError:
+        pass
+    return platform.processor() or platform.machine() or "unknown"
+
+
+def _ram_total() -> int:
+    n = int(_sysctl("hw.memsize") or 0)
+    if n:
+        return n
+    try:
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (AttributeError, ValueError, OSError):     # Windows
+        try:
+            import ctypes
+
+            class _Mem(ctypes.Structure):
+                _fields_ = [("l", ctypes.c_ulong), ("p", ctypes.c_ulong),
+                            ("total", ctypes.c_ulonglong), ("a", ctypes.c_ulonglong),
+                            ("tp", ctypes.c_ulonglong), ("ap", ctypes.c_ulonglong),
+                            ("tv", ctypes.c_ulonglong), ("av", ctypes.c_ulonglong),
+                            ("e", ctypes.c_ulonglong)]
+            m = _Mem()
+            m.l = ctypes.sizeof(_Mem)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+            return int(m.total)
+        except Exception:
+            return 0
+
+
 def _free_ram_bytes() -> int:
     if platform.system() == "Darwin":
         out = _run(["vm_stat"])
@@ -105,11 +142,14 @@ def _measure_seq_read(path: Path, size_bytes: int = 4 * GIB) -> dict:
         size_bytes = max(1 * GIB, free // 4)
     cache_dropped = False
     try:
-        import fcntl
+        try:
+            import fcntl
+        except ImportError:                      # Windows
+            fcntl = None
         with open(test, "wb") as f:
             # F_NOCACHE on the write fd keeps these pages out of the unified
             # buffer cache, so the read below hits the device, not RAM.
-            if hasattr(fcntl, "F_NOCACHE"):
+            if fcntl is not None and hasattr(fcntl, "F_NOCACHE"):
                 fcntl.fcntl(f.fileno(), fcntl.F_NOCACHE, 1)
             chunk = os.urandom(64 * 1024**2)
             written = 0
@@ -132,8 +172,7 @@ def _measure_seq_read(path: Path, size_bytes: int = 4 * GIB) -> dict:
         fd = os.open(test, os.O_RDONLY)
         try:
             if not cache_dropped:
-                import fcntl
-                if hasattr(fcntl, "F_NOCACHE"):
+                if fcntl is not None and hasattr(fcntl, "F_NOCACHE"):
                     fcntl.fcntl(fd, fcntl.F_NOCACHE, 1)
                     cache_dropped = True  # per-fd cache bypass on macOS
             buf_size = 32 * 1024**2
@@ -174,9 +213,9 @@ def probe(fast: bool = False) -> dict:
     hw = {
         "probed_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "os": f"{platform.system()} {platform.release()} ({platform.mac_ver()[0] or platform.version()})",
-        "cpu": _sysctl("machdep.cpu.brand_string") or platform.processor(),
+        "cpu": _cpu_name(),
         "cpu_cores": os.cpu_count(),
-        "ram_total_bytes": int(_sysctl("hw.memsize") or 0) or os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES"),
+        "ram_total_bytes": _ram_total(),
         "ram_free_bytes": _free_ram_bytes(),
         "gpu": _probe_gpu(),
         "disk": disk,

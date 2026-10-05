@@ -16,6 +16,7 @@ from pathlib import Path
 
 import httpx
 
+from ..errors import SpillError
 from ..registry import GIB, REPO_ROOT, Model
 
 JOBS_DIR = REPO_ROOT / "jobs"
@@ -228,8 +229,8 @@ class BatchEngine:
             self._stop_server()
             if parallel <= 1:
                 job.write_meta(status="failed", error="server failed to start at parallel=1")
-                raise RuntimeError("llama-server failed to start even at parallel=1 "
-                                   f"(see {job.dir}/llama-server.log)")
+                raise SpillError("llama-server failed to start even at parallel=1",
+                                 f"tail {job.dir}/llama-server.log")
             parallel //= 2  # halve on OOM
             job.write_meta(note=f"server OOM/failed; halved parallel to {parallel}")
         job.parallel = parallel

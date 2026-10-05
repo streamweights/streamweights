@@ -23,11 +23,11 @@ import mlx.core as mx
 import numpy as np
 
 from .. import logits as lg
+from ..calibration import CALIBRATION_JSON, load_calibration, save_calibration  # noqa: F401
 from ..errors import SpillError
 from ..registry import GIB, REPO_ROOT
 from .base import CompletedRow, MemoryBudget, ModelSpec
 
-CALIBRATION_JSON = REPO_ROOT / "state" / "calibration.json"
 
 # prefill is processed alongside decode, at most this many prompt tokens per
 # pass, so a wave of newcomers never turns one pass into a 28-minute wall
@@ -271,20 +271,6 @@ def calibrate(index: SafetensorsIndex, n_layers: int = 4,
     return cal
 
 
-def load_calibration() -> dict:
-    if CALIBRATION_JSON.exists():
-        try:
-            return json.loads(CALIBRATION_JSON.read_text())
-        except json.JSONDecodeError:
-            pass
-    return {}
-
-
-def save_calibration(cal: dict):
-    CALIBRATION_JSON.parent.mkdir(exist_ok=True)
-    CALIBRATION_JSON.write_text(json.dumps(cal, indent=2) + "\n")
-
-
 # ---------------------------------------------------------------- compute
 
 def collect_eos_ids(model_dir: Path, tokenizer) -> set[int]:
@@ -322,9 +308,9 @@ def _model_modules(config: dict):
     from .supported import NOT_YET, classify
     fam = classify(config)
     if fam.state == NOT_YET or not fam.module:
-        raise ValueError(
-            f"unsupported architecture: {fam.label} is '{fam.state}' "
-            f"({fam.note}) — see: spill models --architectures")
+        raise SpillError(
+            f"unsupported architecture: {fam.label} is '{fam.state}' ({fam.note})",
+            "spill models --architectures")
     mod = importlib.import_module(f"mlx_lm.models.{fam.module}")
     args = mod.ModelArgs.from_dict(config)
     block = mod.TransformerBlock(args)
@@ -486,7 +472,7 @@ def compute_batch(index: SafetensorsIndex, budget: MemoryBudget,
                   seq_costs: list[int], max_tokens: int, kv_per_token: int,
                   n_ring: int = 3, calibration: dict | None = None,
                   quant: str | None = None) -> BudgetMath:
-    """Batch sizing. Preferred: measured-memory mode — peak(B) calibrated from
+    """Batch sizing. Preferred: measured-memory mode: peak(B) calibrated from
     probe runs at two batch sizes (state/calibration.json mem_model), solved for
     85% of the Metal working set. Fallback: the Phase 1 analytic formula."""
     ws = budget.working_set_bytes
@@ -736,7 +722,7 @@ class MlxStreamEngine:
             if committed + pending_cost + row_cost(p) > admit_budget:
                 return False
             # (2) physical allocation: every row's cache occupies the batch's
-            # padded length, allocated in 256-token steps — the term the
+            # padded length, allocated in 256-token steps: the term the
             # per-row model misses (this is what let 512 short rows in)
             horizon = K_now + max(rem_max, p[2])
             phys_len = ((horizon + 255) // 256) * 256
