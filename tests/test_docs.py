@@ -12,6 +12,7 @@ README = (ROOT / "README.md").read_text()
 DOCS = [ROOT / "README.md", ROOT / "CLAUDE.md", *sorted((ROOT / "docs").glob("*.md")),
         *sorted((ROOT / "streamweights/data/examples").rglob("README.md"))]
 REPORTS = sorted((ROOT / "docs/reports").glob("*.md"))
+TRANSCRIPTS = sorted((ROOT / "docs/reports").glob("*.txt"))
 PLACEHOLDERS = ("@@", "<!--TABLE-->", "TBD", "TODO", "FIXME", "XXX", "lorem", "placeholder")
 
 
@@ -60,7 +61,7 @@ def _normalized(text: str) -> str:
 
 
 def test_every_number_in_the_readme_was_measured():
-    corpus = _normalized("\n".join(p.read_text() for p in REPORTS)
+    corpus = _normalized("\n".join(p.read_text() for p in [*REPORTS, *TRANSCRIPTS])
                          + (ROOT / "docs/reports/data/calibration-m4pro.json").read_text())
     for m in MEASURED.finditer(README):
         num, unit = m.group(1), m.group(2)

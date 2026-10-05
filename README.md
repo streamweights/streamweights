@@ -18,6 +18,8 @@ That builds a small model that classifies banking questions into 77 intents, fro
 | qwen2.5:0.5b+banking77-quick | your model | 0.640 | 100 |
 | qwen2.5:0.5b | base (untrained) | 0.200 | 100 |
 
+A fresh install, with the `pip install` and the 0.9 GB model download, took 79.5 s from install to the end of build ([transcript](docs/reports/010-fresh-install.txt)) and scored 0.640 and 0.210: bf16 output shifts slightly with batch shape.
+
 ## How it works in one picture
 
 ![your files go into spill build, which makes your model; a big model optionally helps](docs/img/flow.svg)

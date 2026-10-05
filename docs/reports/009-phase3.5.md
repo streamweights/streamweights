@@ -67,8 +67,17 @@ qwen2.5:0.5b, 100 held-out rows, 500 training rows, 250 steps (2 epochs).
 | eval tuned | 1 s | 4 s |
 | total | 29 s | 44 s |
 
-The fresh-install run in `docs/reports/010-fresh-install.txt` shows the same build with
-nothing cached.
+The fresh-install run in `docs/reports/010-fresh-install.txt` is the same build with nothing
+cached and the model downloaded on the way:
+
+| model | role | score | rows |
+|---|---|---|---|
+| qwen2.5:0.5b+banking77-quick | your model | 0.640 | 100 |
+| qwen2.5:0.5b | base (untrained) | 0.210 | 100 |
+
+It took 79.5 s from `pip install` to the end of build, 60.9 s of that the build itself (stage 1
+includes the 0.9 GB download, which the estimate does not count, so it reads 16 s against 1 s).
+The base scored 0.210 here and 0.200 above: bf16 output shifts slightly with batch shape.
 
 ## Decisions
 

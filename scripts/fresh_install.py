@@ -36,6 +36,7 @@ def main() -> int:
 
     def log(text: str) -> None:
         el = time.monotonic() - t0
+        text = text.replace("/private" + str(work), "<tmp>").replace(str(work), "<tmp>")
         line = f"[{time.strftime('%H:%M:%S')} +{el:7.1f}s] {text}"
         lines.append(line)
         print(line, flush=True)
