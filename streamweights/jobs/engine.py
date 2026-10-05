@@ -124,6 +124,8 @@ class Job:
     @classmethod
     def load(cls, job_id: str) -> "Job":
         d = JOBS_DIR / job_id
+        if not (d / "meta.json").exists():
+            raise SpillError(f"no job {job_id}", "spill status")
         meta = json.loads((d / "meta.json").read_text())
         return cls(job_id, d, meta["model"], meta["quant"], meta["ctx"],
                    meta["parallel"], meta["total"])

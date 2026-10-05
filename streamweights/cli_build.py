@@ -49,11 +49,8 @@ class RealBackend(build_mod.Backend):
 
     def tune(self, model, train, name, resume_job):
         from . import cli
-        impl = getattr(cli, "_tune_build", None)
-        if impl is None:
-            raise SpillError("this checkout has no `spill tune` yet (it ships with Phase 3)",
-                             f"spill tune {model} {train} --name {name}")
-        return impl(model, train, name, resume_job, epochs=self.epochs, quiet=self.quiet)
+        return cli._tune_build(model, train, name, resume_job, epochs=self.epochs,
+                               quiet=self.quiet)
 
     def eval(self, model, eval_file, resume_job=None):
         from . import cli, evalrun
@@ -84,6 +81,8 @@ def _make_plan(f, student, teacher, base, compare, weight_own, epochs):
                 a = arch_from_config(r.config) if r.config else None
                 est.register_model(m, r.st_bytes, (a["n_layers"], a["n_kv_heads"],
                                                    a["head_dim"]) if a else None)
+            except SpillError:
+                raise         # a name that is neither a tag nor a repo id fails before anything runs
             except Exception:
                 pass          # an unreachable repo fails properly when its stage runs
     return build_mod.make_plan(f, student, teacher, base, compare, weight_own,

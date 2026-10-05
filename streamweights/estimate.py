@@ -170,7 +170,7 @@ def tune_seconds(tag: str, tokens: float, epochs: float, tflops: float, cal: dic
         stream = steps * 2 * stream_pass_s(cal, tag)
     total = max(compute, stream) if stream else compute
     detail = (f"{tokens * epochs:,.0f} token-passes x 6 x {params_b(tag):.2f}B params / "
-              f"{tflops:g} TFLOP/s = {fmt_dur(compute)}"
+              f"{tflops:.3g} TFLOP/s = {fmt_dur(compute)}"
               + (f"; weight streams floor {fmt_dur(stream)}" if stream else ""))
     return StageEstimate(total, detail, {"compute_s": compute, "stream_s": stream})
 

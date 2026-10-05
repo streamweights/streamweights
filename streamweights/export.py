@@ -129,14 +129,23 @@ def ensure_converter(say=lambda s: None, runner=subprocess.run) -> tuple[Path, P
     if not py.exists():
         say("creating the converter environment (torch, transformers, gguf; once, ~1 GB)")
         uv = shutil.which("uv")
-        if uv:
-            runner([uv, "venv", "--python", "3.12", str(venv)], check=True, capture_output=True)
-            runner([uv, "pip", "install", "--python", str(py), *CONVERT_DEPS,
-                    str(script.parent / "gguf-py")], check=True)
-        else:
-            runner([sys.executable, "-m", "venv", str(venv)], check=True)
-            runner([str(py), "-m", "pip", "install", *CONVERT_DEPS,
-                    str(script.parent / "gguf-py")], check=True)
+        gguf_py = str(script.parent / "gguf-py")
+        try:
+            if uv:
+                runner([uv, "venv", "--python", "3.12", str(venv)], check=True,
+                       capture_output=True)
+                runner([uv, "pip", "install", "--python", str(py), *CONVERT_DEPS, gguf_py],
+                       check=True, capture_output=True)
+            else:
+                runner([sys.executable, "-m", "venv", str(venv)], check=True,
+                       capture_output=True)
+                runner([str(py), "-m", "pip", "install", "-q", *CONVERT_DEPS, gguf_py],
+                       check=True, capture_output=True)
+        except subprocess.CalledProcessError as e:
+            shutil.rmtree(venv, ignore_errors=True)
+            tail = (e.stderr or b"").decode(errors="replace").strip().splitlines()[-1:] or [""]
+            raise SpillError(f"could not set up the GGUF converter environment: {tail[0][:160]}",
+                             "spill export <base>+<adapter> --gguf") from e
     return py, script
 
 

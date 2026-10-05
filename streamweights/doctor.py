@@ -107,7 +107,7 @@ def report(hw: dict, cal: dict, *, registry_tags, models_dir, interrupted_lines:
         f"overnight    largest bf16 model for a {REF_ROWS:,}-row eval inside {OVERNIGHT_H} h: "
         f"about {big:.0f}B parameters ({big * 2:.0f} GB; limited by {limit}; disk stream "
         f"{rate / 1e9:.1f} GB/s, {rate_src})",
-        f"training     {tf:g} TFLOP/s used for prefill and training estimates ({tf_src}); "
+        f"training     {tf:.3g} TFLOP/s used for prefill and training estimates ({tf_src}); "
         f"training and prefill scale with GPU cores, evals with the disk",
     ]
     if not mlx:

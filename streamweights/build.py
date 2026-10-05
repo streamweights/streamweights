@@ -350,7 +350,7 @@ def pre_run_line(plan: Plan, on_battery: bool = False) -> str:
     stages = "; ".join(f"{i + 1} {s.label} {est.fmt_dur(s.est_s)}"
                        for i, s in enumerate(plan.stages))
     line = (f"spill build {plan.folder.name}: path {kinds[plan.path_kind]}. Models: "
-            f"{', '.join(models)}.{mt} Stages: {stages} (at {plan.tflops:g} TFLOP/s, "
+            f"{', '.join(models)}.{mt} Stages: {stages} (at {plan.tflops:.3g} TFLOP/s, "
             f"{plan.tflops_src}; decode disk-bound, prefill 2 x params x tokens, training "
             f"6 x params x tokens). Est. {est.fmt_dur(plan.total_s)}. Cost: $0. "
             f"Adapter -> {plan.adapter_name} (spill adapters), files in "

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import os
@@ -71,7 +72,11 @@ def _fail(e):
     if _DEBUG:
         raise e
     if isinstance(e, SpillError):
-        typer.echo(f"spill: {e.line(default='spill doctor')}", err=True)
+        cmd = next((a for a in sys.argv[1:] if a in COMMAND_ORDER), None)
+        jsonl = next((a for a in sys.argv[1:] if a.endswith(".jsonl")), None)
+        default = (f"spill check {jsonl}" if jsonl and "line " in e.message[:12] else
+                   f"spill {cmd} --help" if cmd else "spill --help")
+        typer.echo(f"spill: {e.line(default=default)}", err=True)
     else:
         again = "spill " + " ".join(sys.argv[1:] + ["--debug"])
         typer.echo(f"spill: {type(e).__name__}: {e}. Try: {again}", err=True)
@@ -96,9 +101,9 @@ def main():
     except typer.Abort:
         raise SystemExit(130)
     except click.ClickException as e:
-        cmd = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else None
-        typer.echo(f"spill: {e.format_message()}. Try: spill {cmd + ' ' if cmd else ''}--help",
-                   err=True)
+        cmd = next((a for a in sys.argv[1:] if a in COMMAND_ORDER), None)
+        typer.echo(f"spill: {e.format_message().rstrip('. ')}. Try: spill {cmd + ' ' if cmd else ''}"
+                   f"--help", err=True)
         raise SystemExit(2)
     except KeyboardInterrupt:
         raise SystemExit(130)
@@ -144,6 +149,17 @@ _NEXT_HINTS = True      # off while `spill build` runs its stages: build prints 
 def _next_hint(cmd: str) -> None:
     if _NEXT_HINTS:
         typer.echo(f"\nnext: {cmd}")
+
+
+@contextlib.contextmanager
+def _no_next_hints():
+    """A command that runs other commands' code (eval) prints one next command, at the end."""
+    global _NEXT_HINTS
+    was, _NEXT_HINTS = _NEXT_HINTS, False
+    try:
+        yield
+    finally:
+        _NEXT_HINTS = was
 
 
 def _gateway_up() -> bool:
@@ -328,7 +344,7 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
     prefill_s = est_mod.prefill_s(model, prefill_tok, tflops) if not scoring else 0.0
     cost_note = ""
     if not scoring:
-        cost_note = (f" Prefill {prefill_tok:,} tokens at {tflops:g} TFLOP/s ({tf_src}) = "
+        cost_note = (f" Prefill {prefill_tok:,} tokens at {tflops:.3g} TFLOP/s ({tf_src}) = "
                      f"{_fmt_dur(prefill_s)}"
                      + (f"; shared prefix {P_est} tokens computed once (saves "
                         f"{(len(tok_lists) - 1) * P_est:,} tokens)" if P_est else "")
@@ -342,6 +358,7 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
         wl = est_mod.Workload(n_prompts, P_est, max(1.0, mean_lens - P_est), max_tokens,
                               max_tokens)
         dec_batch = est_mod.decode_batch(model, wl, ws, bool(P_est)) if tok_lists else 1
+        shown_batch = min(dec_batch, n_prompts)
         est = (math.ceil(n_prompts / dec_batch) * (max_tokens + 1) * size / est_mod.RESIDENT_BYTES_PER_S
                + prefill_s) if not scoring else 0.0
         why = f"{reason}; model fits working set -> mlx_resident"
@@ -354,7 +371,7 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
         index = SafetensorsIndex(path)
         bm = compute_batch(index, MemoryBudget(ws, batch_override=parallel),
                            costs, max_tokens, kv_tok, calibration=cal, quant=key)
-        batch = bm.batch
+        batch = shown_batch = bm.batch
         rate, rate_src = engine_read_rate(cal, hw, key=key)
         pass_s = size / rate
         est = math.ceil(n_prompts / batch) * (max_tokens + 1) * pass_s + prefill_s
@@ -396,12 +413,12 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
                 f"{spec.extra['logprobs']} log-probs each). Est. {_fmt_dur(est)} ({rate_note}).")
     else:
         extra = f" Top-{opts.logprobs} log-probs on." if opts.logprobs else ""
-        what = f"{n_prompts} prompts, batch {batch}. Est. {_fmt_dur(est)}.{cost_note}{extra}"
+        what = f"{n_prompts} prompts, batch {shown_batch}. Est. {_fmt_dur(est)}.{cost_note}{extra}"
         if opts.kind == "distill":
             n_prompt_tok = sum(lens) - sum(r["body"].get("max_tokens", 128) for r in rows)
             what = (f"{n_prompts} prompts, {n_prompt_tok} prompt tokens plus up to "
                     f"{sum(r['body'].get('max_tokens', 128) for r in rows)} generated tokens "
-                    f"scored with the teacher's top-{opts.logprobs} log-probs, batch {batch}. "
+                    f"scored with the teacher's top-{opts.logprobs} log-probs, batch {shown_batch}. "
                     f"Est. {_fmt_dur(est)} (decode from the measured pass time plus "
                     f"prefill).{cost_note}")
     typer.echo(
@@ -710,8 +727,9 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
                 job = j
                 prog = type("P", (), {"done": len(j.done_ids()), "total": j.total})()
             else:
-                job, prog = _run_impl(label, str(path), quant, None, context, parallel, quiet,
-                                      RunOpts(cmd="eval"))
+                with _no_next_hints():
+                    job, prog = _run_impl(label, str(path), quant, None, context, parallel,
+                                          quiet, RunOpts(cmd="eval"))
             if prog.done < prog.total:
                 from .errors import StageInterrupted
                 raise StageInterrupted(job.id, prog.done, prog.total, f"{label}:")
@@ -727,8 +745,9 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
             jpath = dest / f"judge-{n}.jsonl"
             jpath.write_text("".join(json.dumps(r) + "\n" for r in jrows))
             typer.echo(f"judging {label} with {judge}")
-            jjob, jprog = _run_impl(judge, str(jpath), None, None, context, parallel, quiet,
-                                    RunOpts(kind="judge", cmd="eval"))
+            with _no_next_hints():
+                jjob, jprog = _run_impl(judge, str(jpath), None, None, context, parallel, quiet,
+                                        RunOpts(kind="judge", cmd="eval"))
             if jprog.done < jprog.total:
                 raise SpillError(f"judge run stopped at {jprog.done}/{jprog.total}",
                                  f"spill resume {jjob.id}")
@@ -834,8 +853,8 @@ def _tune_pre_line(prep, size_gb: float, ws: int, ram: int, dest: Path) -> None:
         f"{s.schedule}, AdamW. {st.examples} examples, {st.tokens:,} tokens "
         f"({st.trained_tokens:,} trained) at --max-seq {s.max_seq}{trunc}. "
         f"{s.steps} steps of micro-batch {s.micro_batch} x grad-accum {s.grad_accum}. "
-        f"Est. {_fmt_dur(prep.est_total_s)} ({prep.est_note}). Cost: $0. "
-        f"Adapter -> {dest}")
+        f"Est. {_fmt_dur(prep.est_total_s)} ({prep.est_note}). Cost: $0."
+        f"{overnight.battery_note()} Adapter -> {dest}")
     typer.echo(f"   why: {prep.why}")
     for line, why in st.skipped[:5]:
         typer.echo(f"   skipped line {line}: {why}", err=True)
@@ -910,7 +929,7 @@ def _tune_run(prep, job, resume: bool, quiet: bool, hw: dict, base_label: str):
     return res
 
 
-def _tune_report(prep, job, res) -> None:
+def _tune_report(prep, job, res, train_path: Path | None = None) -> None:
     s = prep.spec
     first, last = res["first_loss"], res["final_loss"]
     typer.echo(f"{res['step']}/{res['steps']} steps in {_fmt_dur(res['seconds'])}, loss "
@@ -932,7 +951,9 @@ def _tune_report(prep, job, res) -> None:
         _next_hint(f"spill resume {job.id}")
     else:
         typer.echo(f"adapter saved: {res['adapter']} (PEFT and mlx-lm layouts)")
-        _next_hint(f"spill eval evals.jsonl {s.model} {s.model}+{s.name}")
+        sibling = (Path(train_path).parent / "evals.jsonl") if train_path else Path("evals.jsonl")
+        _next_hint(f"spill eval {sibling if sibling.exists() else 'evals.jsonl'} "
+                   f"{s.model} {s.model}+{s.name}")
 
 
 def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, schedule,
@@ -944,7 +965,8 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
     from .errors import SpillError
     from .tune import job as tj
     if not train_jsonl.exists():
-        raise SpillError(f"training file {train_jsonl} does not exist")
+        raise SpillError(f"training file {train_jsonl} does not exist",
+                         "spill example banking77 --quick")
     if path not in ("auto", "resident", "streamed"):
         raise SpillError("--path must be auto, resident or streamed")
     dest = adapters_mod.ADAPTERS_DIR / name
@@ -981,7 +1003,7 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
                        options={"kind": "tune", "tune": spec.to_dict()}, kind="tune")
     prep.spec = spec
     res = _tune_run(prep, job, False, quiet, hw, label)
-    _tune_report(prep, job, res)
+    _tune_report(prep, job, res, train_jsonl)
     return job, res
 
 
@@ -1208,15 +1230,17 @@ def status():
         typer.echo("no jobs")
         _next_hint("spill run qwen2.5:0.5b sample")
         return
-    typer.echo(f"{'job':28s} {'model':14s} {'quant':7s} {'progress':12s} {'tok/s':>8s} {'eta':>8s} status")
+    metas = []
     for d in sorted(JOBS_DIR.iterdir()):
         mp = d / "meta.json"
-        if not mp.exists():
-            continue
-        meta = json.loads(mp.read_text())
+        if mp.exists():
+            metas.append((d, json.loads(mp.read_text())))
+    w = max([14] + [len(m["model"]) for _, m in metas])
+    typer.echo(f"{'job':28s} {'model':{w}s} {'quant':7s} {'progress':12s} {'tok/s':>8s} {'eta':>8s} status")
+    for d, meta in metas:
         done, total = meta.get("done", 0), meta.get("total", 0)
         eta = meta.get("eta_seconds")
-        typer.echo(f"{meta['id']:28s} {meta['model']:14s} {meta['quant']:7s} "
+        typer.echo(f"{meta['id']:28s} {meta['model']:{w}s} {meta['quant']:7s} "
                    f"{f'{done}/{total}':12s} {meta.get('tokens_per_sec', 0):8.1f} "
                    f"{_fmt_dur(eta) if eta else '-':>8s} {meta.get('status', '?')}")
         if meta.get("status") == "running" and (d / "live.json").exists():
