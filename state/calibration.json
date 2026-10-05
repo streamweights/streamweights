@@ -50,7 +50,7 @@
     }
   ],
   "calibrated_at": "2026-10-01T16:05:59-0700",
-  "bind_ms_per_layer": 37.6,
+  "bind_ms_per_layer": 29.6,
   "mem_model": {
     "llama3.3:70b|8bit": {
       "base_bytes": 9299972360,
@@ -80,8 +80,13 @@
     }
   },
   "engine_rates": {
-    "llama3.3:70b|bf16": 3722.2,
+    "llama3.3:70b|bf16": 3937.4,
     "llama3.3:70b|8bit": 4386.0
   },
-  "measured_pass_s": 35.08
+  "measured_pass_s": 33.16,
+  "tune_rates": {
+    "qwen2.5:0.5b|resident": 1892373742718,
+    "qwen2.5:0.5b|streamed": 2421870827407,
+    "llama3.3:70b|streamed": 4677786821044
+  }
 }

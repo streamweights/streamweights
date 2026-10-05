@@ -15,11 +15,14 @@ for _f in ("hardware.json", "calibration.json"):
 if (_REPO / "models").exists():
     (_home / "models").symlink_to(_REPO / "models")
 os.environ["SPILL_HOME"] = str(_home)
-os.environ["SPILL_DEVICE"] = "cpu"
+GPU_TESTS = os.environ.get("SPILL_GPU_TESTS") == "1"     # opt in to Metal tests
+if not GPU_TESTS:
+    os.environ["SPILL_DEVICE"] = "cpu"
 
 import mlx.core as mx  # noqa: E402
 
-mx.set_default_device(mx.cpu)
+if not GPU_TESTS:
+    mx.set_default_device(mx.cpu)
 
 
 import subprocess  # noqa: E402

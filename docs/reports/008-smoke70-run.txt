@@ -1,0 +1,16 @@
+spill: llama3.3:70b bf16 (131.4 GB, Llama 3.x: verified) does not fit in 48 GB RAM; streaming from NVMe at ~3.6 GB/s (measured engine rate). 4 prompts, batch 4, est. 30 min. Cost: $0. Results -> /Users/amrishkapoor/streamweights-phase3/jobs/20261004-152524-714cc6/results.jsonl (tail with: spill tail)
+   why: batch ~4 (admission by memory, not count): (0.75×36.0G target − 7.1G measured base) ÷ (277 KB/seq-token × 91 mean tokens (actual prompt lens + 48 max_tokens)); rows admitted while calibrated cost fits; probes at B=[16, 48]; quant: bf16 (batch-tier default); est from measured engine rate
+4/4 rows, 110 completion tokens, 0.1 tok/s aggregate
+
+next: spill runs
+   admission: mode=measured, auto_batch=4
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+
+spill: llama3.3:70b+smoke70 bf16 (131.4 GB, Llama 3.x: verified) does not fit in 48 GB RAM; streaming from NVMe at ~3.8 GB/s (measured engine rate). 4 prompts, batch 4, est. 28 min. Cost: $0. Results -> /Users/amrishkapoor/streamweights-phase3/jobs/20261004-154921-ebb424/results.jsonl (tail with: spill tail)
+   why: batch ~4 (admission by memory, not count): (0.75×36.0G target − 7.1G measured base) ÷ (277 KB/seq-token × 91 mean tokens (actual prompt lens + 48 max_tokens)); rows admitted while calibrated cost fits; probes at B=[16, 48]; quant: bf16 (batch-tier default); est from measured engine rate
+4/4 rows, 103 completion tokens, 0.1 tok/s aggregate
+
+next: spill runs
+   admission: mode=measured, auto_batch=4
+[transformers] Ignoring clean_up_tokenization_spaces=True for BPE tokenizer TokenizersBackend. The clean_up_tokenization post-processing step is designed for WordPiece tokenizers and is destructive for BPE (it strips spaces before punctuation). Set clean_up_tokenization_spaces=False to suppress this warning, or set clean_up_tokenization_spaces_for_bpe_even_though_it_will_corrupt_output=True to force cleanup anyway.
+

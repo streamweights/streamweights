@@ -1,0 +1,30 @@
+{
+  "dtype_audit": {
+    "base": "mlx.core.bfloat16",
+    "adapter_params": [
+      "mlx.core.float32"
+    ],
+    "gradients": [
+      "mlx.core.float32"
+    ],
+    "adam_state": [
+      "mlx.core.float32"
+    ]
+  },
+  "streamed_bf16_vs_f32": {
+    "min": 0.9518636465072632,
+    "mean": 0.9965630054828667,
+    "worst": "layers.0.self_attn.q_proj.lora_a"
+  },
+  "mlxlm_bf16_vs_f32": {
+    "min": 0.6657623052597046,
+    "mean": 0.9809939779696011,
+    "worst": "layers.7.self_attn.q_proj.lora_a"
+  },
+  "streamed_vs_mlxlm_bf16": {
+    "min": 0.6496291756629944,
+    "mean": 0.9792559748249394,
+    "worst": "layers.7.self_attn.q_proj.lora_a"
+  },
+  "streamed_no_worse": true
+}

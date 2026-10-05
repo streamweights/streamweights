@@ -655,6 +655,245 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
 
 
 @app.command()
+def tune(
+    model: str = typer.Argument(..., help="base model: tag, Hugging Face repo id, or a local "
+                                          "safetensors directory"),
+    train_jsonl: Path = typer.Argument(..., help="OpenAI fine-tuning chat JSONL "
+                                                 "(messages, optional per-message weight)"),
+    name: str = typer.Option(..., "--name", help="adapter name, saved under <data>/adapters/<name>"),
+    rank: int = typer.Option(16, "--rank"),
+    alpha: float = typer.Option(32.0, "--alpha"),
+    dropout: float = typer.Option(0.0, "--dropout"),
+    targets: str = typer.Option(None, "--targets",
+                                help="comma list of block modules (default: every linear "
+                                     "projection, e.g. self_attn.q_proj,mlp.down_proj)"),
+    lr: float = typer.Option(1e-4, "--lr"),
+    schedule: str = typer.Option("cosine", "--schedule", help="cosine | constant"),
+    weight_decay: float = typer.Option(0.01, "--weight-decay"),
+    steps: int = typer.Option(None, "--steps", help="optimizer steps (default: --epochs of data)"),
+    epochs: float = typer.Option(1.0, "--epochs"),
+    batch: int = typer.Option(None, "--batch",
+                              help="micro-batch (default: 4 resident, sized from the memory "
+                                   "budget when streamed)"),
+    grad_accum: int = typer.Option(1, "--grad-accum", help="micro-batches per optimizer step"),
+    max_seq: int = typer.Option(2048, "--max-seq", help="token cap per example; whole "
+                                "exchanges are dropped from the left, never mid-assistant-turn"),
+    seed: int = typer.Option(0, "--seed"),
+    path: str = typer.Option("auto", "--path", help="auto | resident | streamed"),
+    ckpt_every: int = typer.Option(50, "--ckpt-every"),
+    overwrite: bool = typer.Option(False, "--overwrite", help="replace an existing adapter"),
+    quiet: bool = typer.Option(False, "--quiet"),
+    debug: bool = typer.Option(False, "--debug"),
+):
+    """Train a LoRA adapter on your data against the full-precision base."""
+    global _DEBUG
+    _DEBUG = debug
+    try:
+        _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, schedule,
+                   weight_decay, steps, epochs, batch, grad_accum, max_seq, seed, path,
+                   ckpt_every, overwrite, quiet)
+    except Exception as e:
+        _fail(e)
+
+
+def _tune_model_dir(model: str) -> tuple[str, Path]:
+    """(display name, safetensors dir) for a tag, HF repo id, or local directory."""
+    from .errors import SpillError
+    from .resolve import download_hf, resolve_model
+    p = Path(model).expanduser()
+    if p.is_dir():
+        if not (p / "config.json").exists() or not any(p.glob("*.safetensors")):
+            raise SpillError(f"{p} is not a safetensors model directory (needs config.json "
+                             f"and *.safetensors)", "spill models")
+        return p.name, p
+    res = resolve_model(model)
+    if res.kind == "hf":
+        return res.name, download_hf(res)
+    return res.name, download_safetensors(res.name)
+
+
+def _tune_pre_line(prep, size_gb: float, ws: int, ram: int, dest: Path) -> None:
+    from .engines.supported import classify
+    s, st = prep.spec, prep.stats
+    fam = classify(prep.config)
+    tg = ",".join(sorted({p.rsplit(".", 1)[-1] for p in prep.shapes}))
+    placement = ("streamed from NVMe, two weight streams per micro-batch"
+                 if s.path == "streamed" else "resident (mlx-lm LoRA tuner)")
+    trunc = (f", {st.truncated} truncated" if st.truncated else "") + \
+            (f", {len(st.skipped)} skipped" if st.skipped else "")
+    typer.echo(
+        f"spill: tune {s.model} bf16 ({size_gb:.1f} GB, {fam.label}: {fam.state}) {placement}. "
+        f"Adapter {s.name}: rank {s.rank} alpha {s.alpha:g} dropout {s.dropout:g} on {tg} in "
+        f"{prep.n_layers} layers ({prep.lora_params / 1e6:.1f}M parameters), lr {s.lr:g} "
+        f"{s.schedule}, AdamW. {st.examples} examples, {st.tokens:,} tokens "
+        f"({st.trained_tokens:,} trained) at --max-seq {s.max_seq}{trunc}. "
+        f"{s.steps} steps of micro-batch {s.micro_batch} x grad-accum {s.grad_accum}. "
+        f"Est. {_fmt_dur(prep.est_total_s)} ({prep.est_note}). Cost: $0. "
+        f"Adapter -> {dest}")
+    typer.echo(f"   why: {prep.why}")
+    for line, why in st.skipped[:5]:
+        typer.echo(f"   skipped line {line}: {why}", err=True)
+
+
+def _tune_progress(quiet: bool):
+    def cb(i):
+        line = (f"step {i['step']}/{i['steps']} \u00b7 loss {i['loss']:.4g} \u00b7 "
+                f"{i['avg_step_s']:.3g} s/step \u00b7 ETA {_fmt_eta(i['eta_s'])} \u00b7 "
+                f"{i['peak_gb']:.1f} GB peak")
+        if quiet:
+            if i["step"] % 10 == 0 or i["step"] == i["steps"]:
+                sys.stderr.write(line + "\n")
+        else:
+            sys.stderr.write("\r" + line + "\x1b[K")
+        sys.stderr.flush()
+    return cb
+
+
+def _tune_run(prep, job, resume: bool, quiet: bool, hw: dict, base_label: str):
+    import signal
+    import threading
+
+    from . import runs as runs_mod
+    from .tune.job import run_tune
+    stop = threading.Event()
+    n_int = {"n": 0}
+
+    def on_sig(*_):
+        n_int["n"] += 1
+        if n_int["n"] == 1:
+            stop.set()
+            sys.stderr.write("\nspill: interrupt received, finishing the current step and "
+                             "checkpointing (Ctrl-C again aborts to the last checkpoint)\n")
+        else:
+            raise KeyboardInterrupt
+    prev = {}
+    for sg in (signal.SIGINT, signal.SIGTERM):
+        try:
+            prev[sg] = signal.signal(sg, on_sig)
+        except ValueError:
+            pass
+    try:
+        res = run_tune(prep, job, stop=stop, progress_cb=_tune_progress(quiet), resume=resume,
+                       note=lambda m: typer.echo(f"   {m}", err=True))
+    except Exception as e:
+        if any(k in str(e) for k in ("Insufficient Memory", "kIOGPU", "OutOfMemory",
+                                     "metal::malloc")):
+            from .errors import SpillError
+            mb, ga = prep.spec.micro_batch, prep.spec.grad_accum
+            raise SpillError(
+                f"Metal ran out of memory at micro-batch {mb}; the budget estimate was too "
+                f"optimistic for this model and sequence length (checkpoints are kept)",
+                f"spill tune ... --batch {max(1, mb // 2)} --grad-accum {ga * 2}") from e
+        raise
+    except KeyboardInterrupt:
+        job.write_meta(status="interrupted")
+        runs_mod.finish_run(job.id, status="interrupted", rows_done=job.read_meta().get("done", 0))
+        sys.stderr.write("\n")
+        typer.echo(f"aborted; the last checkpoint is kept")
+        _next_hint(f"spill resume {job.id}")
+        raise typer.Exit(130)
+    finally:
+        for sg, h in prev.items():
+            try:
+                signal.signal(sg, h)
+            except ValueError:
+                pass
+    sys.stderr.write("\n")
+    runs_mod.finish_run(job.id, status="interrupted" if res["interrupted"] else "completed",
+                        rows_done=res["step"])
+    return res
+
+
+def _tune_report(prep, job, res) -> None:
+    s = prep.spec
+    first, last = res["first_loss"], res["final_loss"]
+    typer.echo(f"{res['step']}/{res['steps']} steps in {_fmt_dur(res['seconds'])}, loss "
+               f"{first:.4g} -> {last:.4g}" + (f", {res['peak_gb']:.1f} GB peak"
+                                               if res["peak_gb"] else ""))
+    ss = prep.stream_stats
+    if ss and ss.get("read_seconds"):
+        typer.echo(f"   weight stream: {ss['read_bytes'] / GIB:.0f} GB read, "
+                   f"{ss['read_bytes'] / ss['read_seconds'] / GIB:.2f} GB/s while reading; "
+                   f"{res['seconds'] / max(1, res['step']):.1f} s/step = "
+                   f"{s.grad_accum} x (2 weight streams + compute)")
+    if res.get("tflops_overall"):
+        tc = res.get("tflops_compute")
+        typer.echo(f"   achieved {res['tflops_overall']:.2f} TFLOP/s overall"
+                   + (f", {tc:.2f} while computing" if tc else "")
+                   + f"; {res['padded_tokens_per_s']:.0f} tokens/s through the layers")
+    if res["interrupted"]:
+        typer.echo(f"interrupted at step {res['step']}; checkpoint saved")
+        _next_hint(f"spill resume {job.id}")
+    else:
+        typer.echo(f"adapter saved: {res['adapter']} (PEFT and mlx-lm layouts)")
+        _next_hint(f"spill eval evals.jsonl {s.model} {s.model}+{s.name}")
+
+
+def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, schedule,
+               weight_decay, steps, epochs, batch, grad_accum, max_seq, seed, path,
+               ckpt_every, overwrite, quiet):
+    from . import adapters as adapters_mod
+    from . import runs as runs_mod
+    from .engines.mlx_stream import load_calibration
+    from .errors import SpillError
+    from .tune import job as tj
+    if not train_jsonl.exists():
+        raise SpillError(f"training file {train_jsonl} does not exist")
+    if path not in ("auto", "resident", "streamed"):
+        raise SpillError("--path must be auto, resident or streamed")
+    dest = adapters_mod.ADAPTERS_DIR / name
+    if dest.exists() and not overwrite:
+        raise SpillError(f"adapter {name} already exists at {dest}",
+                         f"spill tune ... --name {name}-2   (or --overwrite)")
+    hw = probe_mod.load()
+    ws = hw["gpu"]["vram_bytes"]
+    label, mdir = _tune_model_dir(model)
+    size = sum(f.stat().st_size for f in mdir.glob("*.safetensors"))
+    chosen = tj.decide_path(size, ws, path)
+    spec = tj.TuneSpec(
+        model=label, quant="bf16", model_dir=str(mdir), data=str(train_jsonl), name=name,
+        path=chosen, rank=rank, alpha=alpha, dropout=dropout,
+        targets=[t.strip() for t in targets.split(",")] if targets else None, lr=lr,
+        weight_decay=weight_decay, schedule=schedule, seed=seed, max_seq=max_seq,
+        micro_batch=batch or 4, grad_accum=grad_accum, steps=steps or 1, epochs=epochs,
+        ckpt_every=ckpt_every, overwrite=overwrite)
+    if spec.grad_accum < 1:
+        raise SpillError("--grad-accum must be at least 1")
+    prep = tj.prepare(spec, working_set=ws, calibration=load_calibration(), hw=hw,
+                      micro_batch_given=batch is not None, steps_given=steps is not None)
+    _tune_pre_line(prep, size / GIB, ws, hw["ram_total_bytes"], dest)
+
+    job = Job.create(train_jsonl, label, "bf16", spec.max_seq, spec.micro_batch, None,
+                     options={"kind": "tune", "tune": spec.to_dict()})
+    typer.echo(f"   job {job.id}: Ctrl-C checkpoints and stops; resume with: spill resume {job.id}")
+    spec.data = str(job.input_path)          # the job's own verbatim copy; resume is self-contained
+    job.write_meta(total=spec.steps, done=0,
+                   options={"kind": "tune", "tune": spec.to_dict()})
+    mspec = ModelSpec(label, "bf16", mdir)
+    runs_mod.start_run(job, command=None, spec=mspec, input_path=train_jsonl, hw=hw,
+                       engine_name="mlx_stream_tune" if chosen == "streamed" else "mlx_lm_lora",
+                       options={"kind": "tune", "tune": spec.to_dict()}, kind="tune")
+    prep.spec = spec
+    res = _tune_run(prep, job, False, quiet, hw, label)
+    _tune_report(prep, job, res)
+
+
+def _tune_resume(j: Job, meta: dict) -> None:
+    from .engines.mlx_stream import load_calibration
+    from .tune import job as tj
+    hw = probe_mod.load()
+    spec = tj.TuneSpec(**meta["options"]["tune"])
+    prep = tj.prepare(spec, working_set=hw["gpu"]["vram_bytes"], calibration=load_calibration(),
+                      hw=hw, micro_batch_given=True, steps_given=True)
+    from . import runs as runs_mod
+    runs_mod.mark_resumed(j.id)
+    typer.echo(f"resuming {j.id}: tune {spec.model} -> {spec.name}, {spec.path} path")
+    res = _tune_run(prep, j, True, False, hw, spec.model)
+    _tune_report(prep, j, res)
+
+
+
+@app.command()
 def adapters():
     """List local LoRA adapters (PEFT or mlx-lm layout) under the data root."""
     from .adapters import ADAPTERS_DIR, list_local_adapters
@@ -734,6 +973,14 @@ def resume(job: str = typer.Argument(None)):
         typer.echo("no jobs to resume")
         _next_hint("spill run qwen2.5:0.5b examples/evals-2000.jsonl")
         raise typer.Exit(1)
+    meta0 = j.read_meta()
+    if meta0.get("options", {}).get("kind") == "tune":
+        if meta0.get("status") == "completed":
+            typer.echo(f"{j.id}: already complete ({meta0.get('done')}/{j.total} steps)")
+            _next_hint("spill adapters")
+            return
+        _tune_resume(j, meta0)
+        return
     done = len(j.done_ids())
     if done >= j.total:
         typer.echo(f"{j.id}: already complete ({done}/{j.total})")

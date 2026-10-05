@@ -130,6 +130,7 @@ def check_file(path: Path) -> dict:
     if not p.exists():
         raise SpillError(f"{path} does not exist")
     n_rows, kinds, expected, targets, seen = 0, set(), 0, 0, set()
+    ends: list[tuple[int, bool]] = []
     for n, line in enumerate(p.read_text().splitlines(), 1):
         if not line.strip():
             continue
@@ -143,6 +144,7 @@ def check_file(path: Path) -> dict:
         msgs = obj["body"]["messages"] if "body" in obj else obj["messages"]
         if msgs[-1]["role"] == "assistant":
             targets += 1
+        ends.append((n, msgs[-1]["role"] == "assistant"))
         expected += "expected" in obj
         n_rows += 1
     if not n_rows:
@@ -154,9 +156,19 @@ def check_file(path: Path) -> dict:
         raise SpillError(f'only {expected} of {n_rows} rows have "expected"; an eval file needs '
                          f'it on every row (or none)')
     if 0 < targets < n_rows:
-        raise SpillError(f"only {targets} of {n_rows} rows end with an assistant message; "
-                         f"training/--score files need it on every row")
+        first = ends[0]
+        n_diff, was = next((n, e) for n, e in ends if e != first[1])
+        has, lacks = (first[0], n_diff) if first[1] else (n_diff, first[0])
+        raise FormatError(lacks, f"does not end with an assistant message, but line {has} does "
+                                 f"(only {targets} of {n_rows} rows have a target; training and "
+                                 f"--score files need it on every row)")
     use = ("eval" if expected else "train/distill targets" if targets else "prompts")
+    if use == "train/distill targets" and kind == "chat":
+        # the same line-numbered errors `spill tune` would raise
+        from .tune.data import validate_train_line
+        for n, line in enumerate(p.read_text().splitlines(), 1):
+            if line.strip():
+                validate_train_line(parse_line(line, n), n)
     return {"rows": n_rows, "shape": kind, "use": use,
             "expected": expected, "targets": targets}
 

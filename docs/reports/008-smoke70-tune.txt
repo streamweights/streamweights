@@ -1,0 +1,10 @@
+spill: tune llama3.3:70b bf16 (131.4 GB, Llama 3.x: verified) streamed from NVMe, two weight streams per micro-batch. Adapter smoke70: rank 16 alpha 32 dropout 0 on down_proj,gate_proj,k_proj,o_proj,q_proj,up_proj,v_proj in 80 layers (207.1M parameters), lr 0.0001 cosine, AdamW. 64 examples, 18,955 tokens (4,224 trained) at --max-seq 512. 3 steps of micro-batch 21 x grad-accum 1. Est. 40 min (1 x (2 weight streams x 36 s at 3.6 GB/s (measured engine rate) + 730 s compute, assumed 3.5 TFLOP/s until the first step measures it)). Cost: $0. Adapter -> /Users/amrishkapoor/streamweights-phase3/adapters/smoke70
+   why: micro-batch 21 (largest that fits 21): 75% of 36.0G working set = 27.0G; fixed 12.8G (ring 3x1.59G + resident 3.9G + lora/optimizer 3.09G + loss head 1.0G); per sample 0.39G saved activations (320 tokens x 8192 x 2 B x 80 layers) + 0.28G layer working buffers => 21 x 0.67G = 14.0G
+   job 20261004-150429-cc8b02: Ctrl-C checkpoints and stops; resume with: spill resume 20261004-150429-cc8b02
+3/3 steps in 21 min, loss 0.9397 -> 0.05849, 24.2 GB peak
+   weight stream: 770 GB read, 2.69 GB/s while reading; 417.3 s/step = 1 x (2 weight streams + compute)
+   achieved 4.55 TFLOP/s overall, 4.68 while computing; 11 tokens/s through the layers
+adapter saved: /Users/amrishkapoor/streamweights-phase3/adapters/smoke70 (PEFT and mlx-lm layouts)
+
+next: spill eval evals.jsonl llama3.3:70b llama3.3:70b+smoke70
+

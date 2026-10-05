@@ -1,0 +1,47 @@
+$ spill tune qwen2.5:0.5b train.jsonl --name toy-res --path resident
+spill: tune qwen2.5:0.5b bf16 (0.9 GB, Qwen2/2.5: verified) resident (mlx-lm LoRA tuner). Adapter toy-res: rank 16 alpha 32 dropout 0 on down_proj,gate_proj,k_proj,o_proj,q_proj,up_proj,v_proj in 24 layers (8.8M parameters), lr 0.0002 cosine, AdamW. 200 examples, 9,863 tokens (600 trained) at --max-seq 2048. 150 steps of micro-batch 4 x grad-accum 1. Est. 22 s (1 x 0.1 s compute, measured for qwen2.5:0.5b, resident). Cost: $0. Adapter -> /Users/amrishkapoor/streamweights-phase3/adapters/toy-res
+   why: resident: 0.9 GB of weights is under 35% of the 36 GB working set; mlx-lm's LoRA tuner
+   job 20261005-150447-94431f: Ctrl-C checkpoints and stops; resume with: spill resume 20261005-150447-94431f
+150/150 steps in 22 s, loss 10.72 -> 0.05949, 2.0 GB peak
+adapter saved: /Users/amrishkapoor/streamweights-phase3/adapters/toy-res (PEFT and mlx-lm layouts)
+
+next: spill eval evals.jsonl qwen2.5:0.5b qwen2.5:0.5b+toy-res
+
+$ spill tune qwen2.5:0.5b train.jsonl --name toy-str --path streamed
+spill: tune qwen2.5:0.5b bf16 (0.9 GB, Qwen2/2.5: verified) streamed from NVMe, two weight streams per micro-batch. Adapter toy-str: rank 16 alpha 32 dropout 0 on down_proj,gate_proj,k_proj,o_proj,q_proj,up_proj,v_proj in 24 layers (8.8M parameters), lr 0.0002 cosine, AdamW. 200 examples, 9,863 tokens (600 trained) at --max-seq 2048. 150 steps of micro-batch 4 x grad-accum 1. Est. 62 s (1 x (2 weight streams x 0 s at 7.7 GB/s (isolated read ceiling) + 0 s compute, measured for qwen2.5:0.5b, streamed)). Cost: $0. Adapter -> /Users/amrishkapoor/streamweights-phase3/adapters/toy-str
+   why: micro-batch 4 (largest that fits 2383): 75% of 36.0G working set = 27.0G; fixed 1.5G (ring 3x0.03G + resident 0.3G + lora/optimizer 0.13G + loss head 1.0G); per sample 0.00G saved activations (64 tokens x 896 x 2 B x 24 layers) + 0.01G layer working buffers => 4 x 0.01G = 0.0G
+   job 20261005-150511-73c46c: Ctrl-C checkpoints and stops; resume with: spill resume 20261005-150511-73c46c
+150/150 steps in 36 s, loss 10.8 -> 0.000375, 0.6 GB peak
+   weight stream: 200 GB read, 9.97 GB/s while reading; 0.2 s/step = 1 x (2 weight streams + compute)
+   achieved 2.42 TFLOP/s overall, 2.42 while computing; 1127 tokens/s through the layers
+adapter saved: /Users/amrishkapoor/streamweights-phase3/adapters/toy-str (PEFT and mlx-lm layouts)
+
+next: spill eval evals.jsonl qwen2.5:0.5b qwen2.5:0.5b+toy-str
+
+$ spill eval heldout.jsonl base base+toy-res base+toy-str
+spill: qwen2.5:0.5b bf16 (0.9 GB, Qwen2/2.5: verified) fits in 48 GB RAM; resident. 60 prompts, batch 1, est. 2 s. Cost: $0. Results -> /Users/amrishkapoor/streamweights-phase3/jobs/20261005-150549-57048d/results.jsonl (tail with: spill tail)
+   why: bf16 (batch-tier default); est from isolated read ceiling; model fits working set -> mlx_resident
+60/60 rows, 717 completion tokens, 478.8 tok/s aggregate
+
+next: spill runs
+spill: qwen2.5:0.5b+toy-res bf16 (0.9 GB, Qwen2/2.5: verified) fits in 48 GB RAM; resident. 60 prompts, batch 1, est. 2 s. Cost: $0. Results -> /Users/amrishkapoor/streamweights-phase3/jobs/20261005-150550-38123c/results.jsonl (tail with: spill tail)
+   why: bf16 (batch-tier default); est from isolated read ceiling; model fits working set -> mlx_resident
+60/60 rows, 180 completion tokens, 93.2 tok/s aggregate
+
+next: spill runs
+spill: qwen2.5:0.5b+toy-str bf16 (0.9 GB, Qwen2/2.5: verified) fits in 48 GB RAM; resident. 60 prompts, batch 1, est. 2 s. Cost: $0. Results -> /Users/amrishkapoor/streamweights-phase3/jobs/20261005-150553-006bbd/results.jsonl (tail with: spill tail)
+   why: bf16 (batch-tier default); est from isolated read ceiling; model fits working set -> mlx_resident
+60/60 rows, 180 completion tokens, 90.9 tok/s aggregate
+
+next: spill runs
+
+eval heldout.jsonl  metric: exact_match  rows: 60
+model         quant  adapter  rows  metric mean  p50 latency  p95 latency  tokens
+qwen2.5:0.5b  bf16   -        60    0.000        1.06 s       1.07 s       3432  
+qwen2.5:0.5b  bf16   toy-res  60    1.000        1.53 s       1.53 s       2895  
+qwen2.5:0.5b  bf16   toy-str  60    1.000        1.58 s       1.59 s       2895  
+
+60 rows where the models disagree -> /Users/amrishkapoor/streamweights-phase3/runs/eval-20261005-150547-29d0c2/diff.jsonl
+
+next: head -n 3 /Users/amrishkapoor/streamweights-phase3/runs/eval-20261005-150547-29d0c2/diff.jsonl
+

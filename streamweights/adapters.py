@@ -32,16 +32,19 @@ _PEFT_KEY = re.compile(r"(?:^|\.)layers\.(\d+)\.(.+?)\.lora_([AB])(?:\.[A-Za-z0-
 class _Slot:
     """Plain holder (not an array/dict/list, so nn.Module keeps it out of the
     parameter tree and the base weight binding never sees it)."""
-    __slots__ = ("a", "b", "scale")
+    __slots__ = ("a", "b", "scale", "p", "key")
 
-    def __init__(self, a, b, scale):
-        self.a, self.b, self.scale = a, b, scale
+    def __init__(self, a, b, scale, p=0.0, key=None):
+        # p/key: training-only input dropout on the LoRA branch (explicit key so a
+        # recomputed forward draws the same mask as the original one)
+        self.a, self.b, self.scale, self.p, self.key = a, b, scale, p, key
 
 
 _CLASSES: dict = {}
 
 
 def _lora_class(cls):
+    import mlx.core as mx
     if cls not in _CLASSES:
         class _Lora(cls):  # type: ignore[misc, valid-type]
             def __call__(self, x):
@@ -49,7 +52,11 @@ def _lora_class(cls):
                 slot = self.__dict__.get("_lora")
                 if slot is None:
                     return y
-                z = (x @ slot.a) @ slot.b
+                xi = x
+                if slot.p and slot.key is not None:
+                    keep = mx.random.bernoulli(1.0 - slot.p, x.shape, key=slot.key)
+                    xi = (1.0 / (1.0 - slot.p)) * keep * x
+                z = (xi @ slot.a) @ slot.b
                 return y + (slot.scale * z).astype(x.dtype)
         _Lora.__name__ = f"Lora{cls.__name__}"
         _CLASSES[cls] = _Lora
