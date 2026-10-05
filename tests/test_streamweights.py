@@ -55,9 +55,14 @@ def test_policy_bf16_default(monkeypatch):
     du = namedtuple("du", "total used free")
     # hermetic: the answer must not depend on how full this machine's disk is
     monkeypatch.setattr(shutil, "disk_usage", lambda p: du(10**13, 0, 10**13))
-    m = load_registry()["qwen2.5:0.5b"]
+    m = load_registry()["llama3.3:70b"]
     c = choose_quant(m, HW)
     assert c.quant == "bf16" and "default" in c.reason
+
+
+def test_policy_uses_q8_where_no_bf16_gguf_is_published():
+    c = choose_quant(load_registry()["qwen2.5:0.5b"], HW)
+    assert c.quant == "Q8_0" and "no published bf16 GGUF" in c.reason
 
 
 def test_policy_drop_no_bf16_compute():
