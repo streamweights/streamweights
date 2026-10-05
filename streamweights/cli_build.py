@@ -89,6 +89,19 @@ def _make_plan(f, student, teacher, base, compare, weight_own, epochs):
                                load_calibration(), hw["gpu"]["vram_bytes"], epochs)
 
 
+def _missing_downloads(plan) -> list[tuple[str, float]]:
+    """Curated tags this build needs that are not on disk yet, with their bf16 size."""
+    from .registry import load_registry, safetensors_downloaded, safetensors_spec
+    reg = load_registry()
+    names = [plan.tuned_model] + ([plan.teacher] if plan.path_kind != "train" else []) \
+        + list(plan.compare)
+    out = []
+    for m in dict.fromkeys(names):
+        if m in reg and not safetensors_downloaded(m):
+            out.append((m, safetensors_spec(m)["bytes"] / GIB))
+    return out
+
+
 def do_build(folder, student, teacher, base, compare, weight_own, epochs, notify, quiet,
              backend=None):
     f = build_mod.read_folder(folder)
@@ -108,6 +121,10 @@ def do_build(folder, student, teacher, base, compare, weight_own, epochs, notify
     elif prior and prior.get("finished"):
         build_mod.apply_state(plan, prior)
     typer.echo(build_mod.pre_run_line(plan, on_battery=overnight.on_battery()))
+    missing = _missing_downloads(plan)
+    if missing:
+        typer.echo("   downloads first, not counted in the estimate: " + ", ".join(
+            f"{m} {gb:.1f} GB" for m, gb in missing))
     done = sum(1 for s in plan.stages if s.status == "done")
     if done:
         typer.echo(f"continuing: {done} of {len(plan.stages)} stages already done")
@@ -271,6 +288,9 @@ def _export_impl(model, out, gguf, ollama, name):
         typer.echo(f"GGUF {kind}: {gf} ({gf.stat().st_size / GIB:.2f} GB), Modelfile: {mf}")
         oname = name or _ollama_name(base, adapter.id)
         nxt = f"ollama create {oname} -f {mf} && ollama run {oname}"
+        if not ollama and not shutil.which("ollama"):
+            typer.echo("ollama is not installed (https://ollama.com); the GGUF and Modelfile "
+                       "are ready, and the line below runs it once it is")
         if ollama:
             line = ex.ollama_create(oname, mf)
             if line:

@@ -240,3 +240,10 @@ def test_edited_inputs_invalidate_finished_stages(folder):
     (folder / "instructions.txt").write_text("changed")
     assert not B.apply_state(plan_for(folder), st)
     assert not B.apply_state(plan_for(folder, weight_own=5.0), st)
+
+
+def test_build_says_which_models_it_has_to_download_first(folder, monkeypatch):
+    from streamweights import cli_build, registry
+    monkeypatch.setattr(registry, "safetensors_downloaded", lambda tag: tag == "llama3.3:70b")
+    missing = cli_build._missing_downloads(plan_for(folder))
+    assert [m for m, _ in missing] == ["qwen2.5:7b"] and 14 < missing[0][1] < 16
