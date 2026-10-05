@@ -151,6 +151,6 @@ from the pre-run line (install → pre-run line was under 30 s; 0.5b first rows 
 
 ## Appendix
 
-- Calibration: `state/calibration.json` (read-rate grid, engine rate, mem_model).
+- Calibration: `docs/reports/data/calibration-m4pro.json` (read-rate grid, engine rate, mem_model).
 - Golden path: `docs/reports/004-golden-path.txt`.
 - Prior: `docs/reports/002-phase1.md`, `docs/reports/001-phase0.md`.

@@ -6,7 +6,7 @@ for f in $(git diff --cached --name-only --diff-filter=AM); do
   [ -f "$f" ] || continue
   size=$(wc -c < "$f")
   if [ "$size" -gt "$LIMIT" ]; then
-    echo "pre-commit: $f is $((size / 1048576)) MB (> 10 MB) — refusing to commit" >&2
+    echo "pre-commit: $f is $((size / 1048576)) MB (> 10 MB); refusing to commit" >&2
     fail=1
   fi
 done

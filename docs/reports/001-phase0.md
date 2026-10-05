@@ -6,7 +6,7 @@ One-line conclusion: **the pipeline works end-to-end and mmap is the bottleneck 
 achieves 8–13% of this machine's sequential NVMe rate, so the Phase 1 streaming runner
 is justified by a factor of ~8.**
 
-## 1. Hardware probe (`state/hardware.json`)
+## 1. Hardware probe (`docs/reports/data/hardware-m4pro.json`)
 
 | field | value |
 |---|---|

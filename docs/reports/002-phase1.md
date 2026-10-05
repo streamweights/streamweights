@@ -22,7 +22,7 @@ impossible into one overnight run.**
 
 Ceiling: **7,909 MB/s at 64 MB chunks × 4 reader threads** - 144% of the
 single-threaded probe (the pooled pread ring exploits NVMe queue parallelism the
-probe cannot). Recorded in `state/calibration.json`; the policy's estimates now come
+probe cannot). Recorded in `docs/reports/data/calibration-m4pro.json`; the policy's estimates now come
 from the measured engine rate, refreshed after every streaming-scale run.
 
 ## 2. Measurement - llama3.3:70b bf16 via safetensors, first 500 rows, ctx 4096, max_tokens 128
@@ -126,6 +126,6 @@ progress line.
 
 ## Appendix
 
-- Measurements: `state/measurements-llama3.3-70b-bf16.json`, `state/calibration.json`
+- Measurements: `state/measurements-llama3.3-70b-bf16.json`, `docs/reports/data/calibration-m4pro.json`
 - Golden path: `docs/reports/002-golden-path.txt`
 - Phase 0 baseline: `docs/reports/001-phase0.md`

@@ -12,7 +12,7 @@ mlx-lm. A 3-step smoke test on Llama 3.3 70B bf16 ran to completion in 21 minute
 
 All numbers below come from files in this directory:
 `008-gate-f32-lr1e-4.json`, `008-gate-*.json`, `008-gradcheck.json`, `008-toy.txt`,
-`008-smoke70-tune.txt`, `008-smoke70-run.txt`, and `state/calibration.json`.
+`008-smoke70-tune.txt`, `008-smoke70-run.txt`, and `docs/reports/data/calibration-m4pro.json`.
 
 ## 1. Float32 identity gate
 
@@ -135,7 +135,7 @@ measured engine stream rate of 3.6 GB/s, and it counted the weight stream and th
 compute as additive. The achieved rate was 4.55 TFLOP/s and the compute overlaps the
 stream, so the estimate was about twice too high. That is the safe direction, but it
 is not accurate. The fix is in place: every tune records its achieved rate in
-`state/calibration.json` (`tune_rates`: 0.5B resident 1.89, 0.5B streamed 2.42,
+`docs/reports/data/calibration-m4pro.json` (`tune_rates`: 0.5B resident 1.89, 0.5B streamed 2.42,
 70B streamed 4.68 TFLOP/s) and the next pre-run line uses it.
 
 ## Decisions

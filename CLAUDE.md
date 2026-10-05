@@ -1,44 +1,62 @@
 # streamweights
 
-(Working name "Spillway" retired in paste set 003: package `streamweights`, CLI `spill`.)
+Package `streamweights`, CLI `spill`. Repo: https://github.com/streamweights/streamweights
 
-**Purpose:** run the unmodified full-size model against my eval set, on my machine, for free, overnight, with no data leaving the building.
+**Purpose:** build your own model on the Mac you already own. Fine-tune and distill from a 70B teacher locally with MLX, even when the model is bigger than RAM. Everything runs on the user's machine, for free, with no data leaving it.
 
-## Developer-experience rules
+## Never-stop rules (binding in every session)
 
-(1) One install, zero config; hardware is probed, never declared.
-(2) No new concepts on the way in; input is OpenAI batch JSONL, endpoints are Ollama and OpenAI shapes.
-(3) First result in minutes, full result overnight; progress, tokens/s and ETA from the first minute.
-(4) Never silently slow, never silently expensive; state model, tier, quant, estimated wall time and cost in one line before running.
-(5) Interruptible and resumable by default; no lost work.
-(6) Models by name, quants by policy; bf16 is the default on the batch tier, a quant is explicit opt-in and is always stated in output metadata.
-(7) Every command ends by printing the one command most likely to come next.
+- Never print a status summary or progress report before the terminal state of the directive; printing one ends the turn and stops all work. Until the end, output only tool calls.
+- Never end a turn to wait. A wait is a foreground shell loop under the tool timeout. No background tasks that rely on waking the session, no scheduled wake-ups, no `/loop`, no questions to the user.
+- If something blocks, make the most reasonable choice, log it under Decisions in the report, and continue.
+- No Claude attribution on any commit. No em-dashes in any file written.
+- Hardware limits are set per directive. Unless a directive says otherwise: no 70B or 7B runs, no model downloads over 2 GB, GPU use limited to `qwen2.5:0.5b`, because the user works on this machine.
+- No PyPI publishing, no release workflow, no tags, until a directive asks. Install lines use the GitHub URL.
+- Paste sets are saved verbatim in `docs/paste-sets/` and committed first.
 
-## Architecture rule
+## Developer-experience rules (binding on every command)
 
-Inference backends are upstream llama.cpp unmodified. streamweights owns only CLI, gateway, jobs, registry, router (and, from Phase 1, the streaming runner - see docs/plan.md).
+1. One install, zero config; hardware is probed, never declared.
+2. No new concepts on the way in; input is plain JSONL (`{"prompt","expected"}`, `{"prompt"}`, `{"prompt","answer"}`, optional `"system"`) or the OpenAI batch and chat shapes; endpoints are Ollama and OpenAI shapes.
+3. First result in minutes, full result overnight; progress, tokens/s and ETA from the first minute.
+4. Never silently slow, never silently expensive: one pre-run line states model, quant, placement, estimated time and cost.
+5. Interruptible and resumable by default; no lost work.
+6. Models by name, quants by policy; bf16 is the default, a quant is an explicit opt-in and is stated in output metadata.
+7. Every command ends by printing the one command most likely to come next (`next: ...`).
+
+Errors are one line ending in the recovery command (`spill: <message>. Try: <command>`), with no traceback unless `--debug`. Pre-run lines read `spill <command> <subject>: <facts>. Est. <time>. Cost: $0. <Dest> -> <path>`.
+
+## Architecture
+
+streamweights owns: the CLI, the gateway, jobs, the registry, the router, the streaming runner, the tuner, build, export.
+Inference backends elsewhere are upstream llama.cpp, unmodified, never vendored. The GGUF converter is downloaded at the pinned release tag.
+
+- `cli.py`, `cli_build.py`: Typer app, commands in loop order (build, example, run, distill, tune, eval, export, then models, adapters, runs, status, tail, resume, doctor, check). `main()` is the entry point.
+- `platforms.py`: where spill runs. MLX engines need Apple silicon; elsewhere run (llama.cpp), export, check, models work.
+- `engines/mlx_stream.py`: the streaming runner (layer-ordered NVMe ring, batching, refill, memory budget, shared-prefix reuse). `engines/mlx_resident.py`: the same loop with weights in memory. `engines/llamacpp.py`: the non-Apple path.
+- `jobs/`: OpenAI-batch-compatible job engine, per-row checkpoint, resume.
+- `tune/`: LoRA training, resident (mlx-lm tuner) and streamed (saved layer inputs, reverse recompute VJP, two weight streams per micro-batch).
+- `build.py`: stage planner and runner over a folder; `export.py` and `safetensors_np.py`: merge adapters with numpy, GGUF via llama.cpp's converter.
+- `estimate.py`, `calibration.py`: one cost model (decode disk-bound, prefill 2 x params x tokens, training 6 x params x tokens, divided by the achieved TFLOP/s).
 
 ## Stack
 
-Python 3.12, uv, FastAPI, Typer.
+Python 3.10 or newer (developed on 3.12), uv, FastAPI, Typer, MLX (Apple silicon only; every MLX import is guarded or lazy).
 
-## Phase 0 result (two lines)
+## Tests
 
-mmap reached only 11–13% of the probed NVMe sequential rate on a model 1.5× RAM (175 s per forward pass on 70B Q8_0).
-GPU OOM from batch 32 up at 4k context; batch 16 ran but completed zero rows in 25 minutes.
+`python -m pytest` runs the CPU suite (`SPILL_DEVICE=cpu` is set by `tests/conftest.py`). GPU tests are skipped unless `SPILL_GPU_TESTS=1`. CI runs the suite on macOS and Linux. `tests/test_docs.py` fails on placeholders, em-dashes, or a README out of shape.
 
-## Phase 1 engine decision
+## Measured facts that drive the design
 
-On macOS the engine is MLX with bf16 safetensors as the native artifact; llama.cpp is retained only as the non-Apple path. No GGUF conversion appears anywhere in the golden path.
+- mmap reached only 11 to 13% of the probed NVMe rate on a model 1.5x RAM (Phase 0). The engine streams layers in order instead.
+- Pass time is flat in batch size only while attention is cheap; at 1k-token prompts the engine becomes compute-bound and KV cost cuts batch by about 5x.
+- Float32 streamed training matches resident to 0.024% in loss; bf16 differs by rounding noise (`docs/reports/008-phase3.md`).
 
-The seven DX rules in docs/plan.md remain binding - in particular "one command, zero config" must hold for `spill run <model> <file>` with no flags.
+## Workflow thesis
 
-## Workflow thesis (Phase 2)
+The product is the local half of building your own model: run, distill, tune, eval, export, against full-precision open models. The eval set is the central artifact. Every command is a run against it.
 
-The product is the local half of building your own model: run, distill, tune, eval, against full-precision open models.
-The eval set is the central artifact.
-Every command is a run against it.
+## Where things are
 
-## Long-prompt finding (proof run)
-
-Pass time is flat in batch size only while attention is cheap; at 1k-token prompts the engine becomes compute-bound and KV cost cuts batch by about 5x.
+`docs/plan.md` (phases and what is next), `docs/linux.md` (the Linux and NVIDIA to-do), `docs/cli.md` (generated from `--help`), `docs/formats.md`, `docs/models.md`, `docs/reports/` (measured results per phase).

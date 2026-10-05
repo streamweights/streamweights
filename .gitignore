@@ -1,21 +1,24 @@
+# runtime state: never committed
 __pycache__/
 *.egg-info/
 .venv/
+.DS_Store
+.pytest_cache/
+.claude/
 /bin/
+/tools/
 /models/
 /jobs/
+/runs/
+/adapters/
+/exports/
 /state/*.json
-!/state/hardware.json
-!/state/calibration.json
+!/state/measurements-*.json
+/state/files/
+/state/*.jsonl
+.build/
+dist/
+build/
 *.gguf
 nohup.out
 # Files over 10 MB are blocked by .githooks/pre-commit (gitignore cannot match by size).
-/state/files/
-/runs/
-/adapters/
-/state/gate_last_check
-/state/GATE_OPEN
-/proof/
-/tools/
-/exports/
-/.build/
