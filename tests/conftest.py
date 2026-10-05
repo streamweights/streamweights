@@ -42,6 +42,8 @@ _ADAPTER = _REPO / "adapters/qwen05-arr"
 @pytest.fixture(scope="session")
 def mlx_adapter():
     if not (_ADAPTER / "adapters.safetensors").exists():
+        if not (_MODEL / "config.json").exists():
+            pytest.skip("needs the qwen2.5:0.5b safetensors (spill run qwen2.5:0.5b sample)")
         _ADAPTER.parent.mkdir(exist_ok=True)
         subprocess.run([sys.executable, str(_REPO / "scripts/make_test_adapter.py"),
                         str(_MODEL), str(_ADAPTER), "--iters", "60"], check=True,
