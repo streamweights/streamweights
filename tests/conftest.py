@@ -19,12 +19,17 @@ GPU_TESTS = os.environ.get("SPILL_GPU_TESTS") == "1"     # opt in to Metal tests
 if not GPU_TESTS:
     os.environ["SPILL_DEVICE"] = "cpu"
 
-import mlx.core as mx  # noqa: E402
+try:
+    import mlx.core as mx  # noqa: E402
+    HAVE_MLX = True
+except ImportError:          # Linux, Windows, Intel Macs: only the platform-neutral tests run
+    HAVE_MLX = False
 
-if not GPU_TESTS:
+if HAVE_MLX and not GPU_TESTS:
     mx.set_default_device(mx.cpu)
 
 
+import re  # noqa: E402
 import subprocess  # noqa: E402
 import sys  # noqa: E402
 
@@ -51,3 +56,29 @@ def _isolated_build_registry(tmp_path, monkeypatch):
     """A fake build in one test must not show up as an interrupted build in the next."""
     from streamweights import overnight
     monkeypatch.setattr(overnight, "BUILDS_FILE", tmp_path / "builds.json")
+
+
+def _needs_mlx(path: Path) -> bool:
+    text = path.read_text()
+    return bool(re.search(r"^\s*(import mlx|from mlx|from tests\.tiny|from \.tiny|from \. import tiny"
+                          r"|from streamweights\.(engines|tune)|from tests\.test_)", text, re.M))
+
+
+collect_ignore = [] if HAVE_MLX else [
+    p.name for p in Path(__file__).parent.glob("test_*.py") if _needs_mlx(p)]
+
+
+# platform-neutral tests that assert the Apple-silicon behavior of a command
+_MLX_ONLY = {"test_cli_build_end_to_end_with_fake_backend",
+             "test_cli_build_interrupted_prints_resume_command",
+             "test_distill_generation_and_score", "test_cli_doctor_prints_next",
+             "test_eval_two_models_with_cache_and_judge", "test_cli_example"}
+
+
+def pytest_collection_modifyitems(config, items):
+    if HAVE_MLX:
+        return
+    skip = pytest.mark.skip(reason="asserts the Apple-silicon (MLX) behavior of the command")
+    for item in items:
+        if item.name in _MLX_ONLY:
+            item.add_marker(skip)
