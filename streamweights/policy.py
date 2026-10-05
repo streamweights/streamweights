@@ -88,6 +88,9 @@ def choose_quant(model: Model, hardware: dict, explicit: str | None = None) -> Q
     if explicit:
         return QuantChoice(explicit, f"--quant {explicit} (explicit opt-in)")
     bf16_bytes = model.quants["bf16"].bytes
+    if not model.quants["bf16"].repo:
+        return QuantChoice("Q8_0", "Q8_0: no published bf16 GGUF for this model (the bf16 "
+                                   "safetensors run on the MLX engines)")
     gpu = hardware.get("gpu", {})
     nvme_rate = hardware.get("nvme_seq_read", {}).get("bytes_per_sec", 0)
     if not gpu.get("bf16_compute"):

@@ -90,7 +90,7 @@ def main():
     except ImportError:
         import click
     try:
-        app(standalone_mode=False)
+        app(prog_name="spill", standalone_mode=False)
     except typer.Exit as e:
         raise SystemExit(e.exit_code)
     except typer.Abort:
@@ -238,14 +238,12 @@ class RunOpts:
     """What distinguishes the phase 2 commands from a plain run."""
     mode: str = "generate"        # generate | score (teacher-forced, prefill only)
     logprobs: int | None = None
-    full_logits: bool = False
     adapter: str | None = None    # spec string of the adapter, if any
     kind: str = "run"             # run | distill | judge
     cmd: str | None = None        # the command named in the pre-run line (default: kind)
     prefix_reuse: bool = True     # shared-prefix KV reuse (SPILL_NO_PREFIX_REUSE=1 to A/B it)
 
 
-VOCAB_BY_TAG = {"qwen2.5:0.5b": 151936, "qwen2.5:7b": 152064, "qwen2.5:32b": 152064, "llama3.3:70b": 128256}
 
 
 def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
@@ -368,7 +366,7 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
         why = f"{bm.reason}; quant: {reason}"
 
     label = model + (f"+{adapter.id}" if adapter is not None else "")
-    options = {"mode": opts.mode, "logprobs": opts.logprobs, "full_logits": opts.full_logits,
+    options = {"mode": opts.mode, "logprobs": opts.logprobs,
                "adapter": opts.adapter, "kind": opts.kind, "max_tokens": max_tokens}
     job = Job.create(input_jsonl, model, quant, context, batch, out, rows=rows,
                      options=options)
@@ -376,8 +374,6 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
                      context)
     if opts.logprobs or scoring:
         spec.extra["logprobs"] = opts.logprobs or 32
-    if opts.full_logits:
-        spec.extra["full_logits_dir"] = str(runs_mod.run_dir(job.id) / "logits")
     if scoring:
         spec.extra["mode"] = "score"
     if adapter is not None:
@@ -447,7 +443,7 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
 def run(
     model: str = typer.Argument(..., help="curated tag (llama3.3:70b), HF repo id (org/name[@rev]), "
                                           "optionally +<adapter> (local dir or HF repo)"),
-    input_jsonl: str = typer.Argument(..., help="OpenAI batch or chat JSONL path, or `sample`"),
+    input_jsonl: str = typer.Argument(..., help="prompts JSONL (plain, OpenAI batch or chat rows), or `sample`"),
     quant: str = typer.Option(None, "--quant",
                               help="8bit|4bit (mlx) or Q8_0|Q4_K_M (gguf); bf16 is the default"),
     out: Path = typer.Option(None, "--out", help="also copy results.jsonl here"),
@@ -458,7 +454,7 @@ def run(
     logprobs: int = typer.Option(None, "--logprobs", help="per-token top-K log-probs, K up to 64"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
-    """Run an OpenAI batch JSONL (or `sample`) against a tag or any HF repo id."""
+    """Run a JSONL of prompts (or `sample`) through a model, a curated tag or any HF repo id."""
     global _DEBUG
     _DEBUG = debug
     try:
@@ -489,15 +485,11 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
     input_jsonl = _resolve_input(input_arg)
     rows = formats.load_rows(input_jsonl, mode=opts.mode)
     max_tokens = max(r["body"].get("max_tokens", 128) for r in rows)
-    if opts.full_logits:
-        vocab = res.config.get("vocab_size") if res.kind == "hf" else VOCAB_BY_TAG.get(model, 152064)
-        lg.check_full_logits(len(rows), max_tokens if not scoring else
-                             max(len(r["body"]["messages"][-1]["content"]) // 2 + 8 for r in rows),
-                             vocab)
     mlx_ok = _is_mac() and quant in (None, "bf16", "8bit", "4bit")
-    if not mlx_ok and (adapter_spec or opts.logprobs or opts.full_logits or scoring):
-        raise SpillError("adapters, --logprobs, --full-logits and --score need the MLX engines "
-                         "(Apple silicon, bf16/8bit/4bit); the llama.cpp path does not support them")
+    if not mlx_ok and (adapter_spec or opts.logprobs or scoring):
+        raise SpillError("adapters, --logprobs and --score need the MLX engines (Apple "
+                         "silicon, bf16/8bit/4bit); the llama.cpp path does not support them",
+                         "spill run <model> <file>")
     adapter = resolve_adapter(adapter_spec) if adapter_spec else None
 
     if mlx_ok:
@@ -533,7 +525,6 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
 
     # non-Apple path (or explicit GGUF quant): llama.cpp, Phase 0 policy
     m = reg[model]
-    input_jsonl = _resolve_input(input_arg) if res.kind == "tag" else input_jsonl
     choice = choose_quant(m, hw, explicit=quant)
     if choice.quant != "bf16":
         typer.echo(f"quant: {choice.reason}")
@@ -612,8 +603,8 @@ def distill(
     notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when done"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
-    """Distillation data from a full-size teacher: its completions plus per-token top-k
-    log-probs (generation), or its log-probs over targets you supply (--score)."""
+    """Collect a big model's answers to learn from: completions plus per-token top-k
+    log-probs, or its log-probs over targets you supply (--score)."""
     global _DEBUG
     _DEBUG = debug
     try:
@@ -1036,7 +1027,7 @@ def _tune_resume(j: Job, meta: dict) -> None:
 @app.command(short_help="List your trained adapters",
              epilog="Example: spill adapters")
 def adapters():
-    """List local LoRA adapters (PEFT or mlx-lm layout) under the data root."""
+    """List the LoRA adapters you have trained or added (PEFT or mlx-lm layout)."""
     from .adapters import ADAPTERS_DIR, list_local_adapters
     found = list_local_adapters()
     if not found:
@@ -1074,7 +1065,7 @@ def check(path: Path = typer.Argument(..., help="a batch, chat, eval or distilla
 
 @app.command(short_help="Follow the results of the latest job",
              epilog="Example: spill tail")
-def tail(job: str = typer.Argument(None)):
+def tail(job: str = typer.Argument(None, help="job id (default: the latest job)")):
     """Follow results.jsonl of the latest (or named) job."""
     j = Job.load(job) if job else Job.latest()
     if not j:
@@ -1109,7 +1100,7 @@ def tail(job: str = typer.Argument(None)):
 
 @app.command(short_help="Continue an interrupted job or build",
              epilog="Example: spill resume banking77-quick")
-def resume(job: str = typer.Argument(None)):
+def resume(job: str = typer.Argument(None, help="job id or build folder (default: the latest job)")):
     """Continue the latest or named job from its checkpoint; a folder continues its build."""
     if job and (Path(job) / ".build" / "state.json").exists():
         from .cli_build import resume_build
@@ -1198,9 +1189,6 @@ def _run_mlx_resume(j: Job, quant: str, hw: dict) -> None:
     o = j.read_meta().get("options", {})
     if o.get("logprobs") or o.get("mode") == "score":
         spec.extra["logprobs"] = o.get("logprobs") or 32
-    if o.get("full_logits"):
-        from . import runs as runs_mod
-        spec.extra["full_logits_dir"] = str(runs_mod.run_dir(j.id) / "logits")
     if o.get("mode") == "score":
         spec.extra["mode"] = "score"
     if o.get("adapter"):

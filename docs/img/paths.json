@@ -1,8 +1,0 @@
-{
-  "seconds": {
-    "labels_only": 3600.0,
-    "labels_plus_teacher": 39600.0,
-    "train_70b": 216000.0
-  },
-  "source": "estimate"
-}

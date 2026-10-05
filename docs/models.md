@@ -5,7 +5,7 @@
 | tag | params | family (state) | bf16 | 8-bit | on 48 GB | disk needed |
 |---|---|---|---|---|---|---|
 | qwen2.5:0.5b | 0.5B | Qwen2/2.5 (verified) | 0.9 GB | 0.7 GB | resident | 21 GB+ |
-| qwen2.5:7b | 7.6B | Qwen2/2.5 (verified) | 14.2 GB | 7.5 GB | resident | 35 GB+ |
+| qwen2.5:7b | 7B | Qwen2/2.5 (verified) | 14.2 GB | 7.5 GB | resident | 34 GB+ |
 | qwen2.5:32b | 32B | Qwen2/2.5 (verified) | 61 GB | 33 GB | streamed | 81 GB+ |
 | llama3.3:70b | 70B | Llama 3.x (verified) | 131 GB | 70 GB | streamed | 151 GB+ |
 
@@ -41,7 +41,9 @@ in the reports under [docs/reports](reports).
 
 | model | quant | placement | workload | pass time | measured |
 |---|---|---|---|---|---|
-| qwen2.5:0.5b | bf16 | resident | 2,000-row eval | ~0.1 s | ~6 min ([report 002](reports/002-phase1.md)) |
+| qwen2.5:0.5b | bf16 | resident | 2,000-row eval | n/a | 712 tok/s aggregate ([report 002](reports/002-phase1.md)) |
+| llama3.3:70b | bf16 | streamed | first streaming runner | 31.6 s | ([report 002](reports/002-phase1.md)) |
+| llama3.3:70b | 8-bit | streamed | golden path | 18.8 s | ([report 002](reports/002-phase1.md)) |
 | llama3.3:70b | bf16 | streamed | 1,334 short and summarize rows | 33-38 s | 15 h 35 m unattended ([report 007](reports/007-phase2.5.md)) |
 | llama3.3:70b | bf16 | streamed | 666 one-thousand-token rows | 33-37 s clean | 23 h 51 m, zero interventions ([report 007](reports/007-phase2.5.md)) |
-| llama3.3:70b | 8-bit | streamed | sample | ~19 s | ([report 002](reports/002-phase1.md)) |
+| llama3.3:70b | bf16 | streamed | LoRA training, 3 steps | 417 s per step | 4.55 TFLOP/s, 11 tokens/s ([report 008](reports/008-phase3.md)) |

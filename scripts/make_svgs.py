@@ -1,17 +1,13 @@
-"""Generate docs/img/flow.svg and docs/img/paths.svg.
+"""Generate docs/img/flow.svg.
 
-  python scripts/make_svgs.py [times.json]
+  python scripts/make_svgs.py
 
-times.json (seconds): {"labels_only": ..., "labels_plus_teacher": ..., "train_70b": ...}.
-Without it the bars use the cost-model estimates; the proof (item 11) and the Phase 3
-report supply the measured numbers, and docs/img/paths.json records which were used.
-
-Both SVGs take their colors from CSS variables, with a dark-scheme override, and use no
-background fill, so they read on light and dark pages.
+The SVG takes its colors from CSS variables, with a dark-scheme override, and uses no
+background fill, so it reads on light and dark pages. A paths.svg (bars proportional to
+measured time per path) is drawn only after the full proof run has measured all three
+paths; until then the README table states rates instead.
 """
 
-import json
-import sys
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parent.parent / "docs" / "img"
@@ -80,54 +76,10 @@ def flow() -> str:
 """
 
 
-def fmt(s: float) -> str:
-    if s < 5400:
-        return f"about {max(1, round(s / 60))} min" if s < 3000 else "about an hour"
-    h = s / 3600
-    if h < 20:
-        return f"about {h:.0f} hours" if h >= 3 else f"about {h:.1f} hours"
-    return f"about {h / 24:.1f} days" if h < 72 else f"about {h / 24:.0f} days"
-
-
-def paths(t: dict) -> str:
-    rows = [("labels only", "student learns from your answers", t["labels_only"], "bar"),
-            ("labels plus teacher", "the big model adds answers", t["labels_plus_teacher"], "bar"),
-            ("train the 70B itself", "an adapter on the big model", t["train_70b"], "bar-big")]
-    x0, wmax = 250, 520
-    mx = max(r[2] for r in rows)
-    body = []
-    for i, (name, sub, s, cls) in enumerate(rows):
-        y = 30 + i * 80
-        w = max(6, wmax * s / mx)
-        body.append(
-            f'<text x="{x0 - 16}" y="{y + 22}" text-anchor="end" font-size="18" '
-            f'font-weight="600">{name}</text>'
-            f'<text class="mute" x="{x0 - 16}" y="{y + 42}" text-anchor="end" '
-            f'font-size="13">{sub}</text>'
-            f'<rect class="{cls}" x="{x0}" y="{y + 4}" width="{w:.0f}" height="40" rx="6"/>'
-            f'<text x="{x0 + w + 12:.0f}" y="{y + 31}" font-size="17" font-weight="600">'
-            f'{fmt(s)}</text>')
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 280" role="img"
-     aria-label="Three bars with lengths proportional to measured time: labels only about an
-     hour, labels plus teacher one night, training the 70B itself several nights.">{STYLE}
-  {''.join(body)}
-  <text class="mute" x="{x0}" y="262" font-size="13">bar length is proportional to wall time on
-  one 48 GB laptop</text>
-</svg>
-"""
-
-
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    t = {"labels_only": 3600.0, "labels_plus_teacher": 11 * 3600.0, "train_70b": 60 * 3600.0}
-    src = "estimate"
-    if len(sys.argv) > 1:
-        t.update(json.loads(Path(sys.argv[1]).read_text()))
-        src = sys.argv[1]
     (OUT / "flow.svg").write_text(flow())
-    (OUT / "paths.svg").write_text(paths(t))
-    (OUT / "paths.json").write_text(json.dumps({"seconds": t, "source": src}, indent=2) + "\n")
-    print("wrote", OUT / "flow.svg", OUT / "paths.svg", "from", src)
+    print("wrote", OUT / "flow.svg")
 
 
 if __name__ == "__main__":

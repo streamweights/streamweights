@@ -111,7 +111,7 @@ all seven projection types in 80 layers (`008-smoke70-tune.txt`).
 | step times | 559 s, 411 s, 475 s (mean 417 s/step by the tune summary) |
 | total | 21 min |
 | loss | 0.9397 to 0.05849 over 3 steps |
-| achieved compute | **4.55 TFLOP/s** overall, 4.68 while computing |
+| achieved compute | **4.55 TFLOP/s** overall, 4.68 while computing (about 4.6 TFLOP/s, the figure the README uses for 7B training) |
 | weight stream | 770 GB read, 2.69 GB/s while reading |
 | trained throughput | **about 11 tokens/s** through the layers |
 | per 10-hour night | **roughly 400,000 tokens** (11 x 36,000 s) |

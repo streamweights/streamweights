@@ -27,7 +27,7 @@ It stays a correctness tier, not a chat tier: slow per prompt, exact, free, loca
 
 Non-negotiable. Every new command is tested against these, in order:
 
-One install, zero config. pip install streamweights, then spill. Hardware is probed, never declared. A folder may carry a spill.json with defaults, and the shipped examples do; nothing is needed before the first result.
+One install, zero config. Install from the GitHub URL (PyPI comes after the proof run), then spill. Hardware is probed, never declared. A folder may carry a spill.json with defaults, and the shipped examples do; nothing is needed before the first result.
 No new concepts on the way in. Input is JSONL in the shapes people already write: {"prompt", "expected"}, {"prompt"}, {"prompt", "answer"}, with an optional "system", or the OpenAI batch and chat shapes, auto-detected per file. Endpoints are the Ollama and OpenAI API shapes.
 First result in minutes, full result overnight. Progress, tokens per second and an ETA from the first minute.
 Never silently slow, never silently expensive. Before a job starts, spill states the path, the models, the quant, the per-stage time estimate from the cost model with its total, and the cost (zero), in one line. It warns when on battery.
@@ -37,7 +37,7 @@ The CLI tells you the next thing. Every command ends with the one command most l
 
 Golden path, which must hold with no flags:
 
-pip install streamweights
+pip install git+https://github.com/streamweights/streamweights
 spill example banking77 --quick && spill build banking77-quick
 
 3. Tiers
@@ -64,14 +64,18 @@ Phases 0 to 2.5 (complete): the wedge on mmap, the streaming runner, measured me
 
 Phase 3 (complete): tune. Streamed LoRA matches resident LoRA within the identity gate; the 70B step time and the achieved FLOP/s are in docs/reports/008-phase3.md.
 
-Phase 3.5 (complete): the build. spill build, spill example, spill export, shared-prefix reuse, overnight safety, spill doctor, qwen2.5:7b as the default student. Proof on banking77 (docs/reports/009-phase3.5.md): @@PROOF_NUMBERS@@
+Phase 3.5 (complete): the build. spill build, spill example, spill export, shared-prefix reuse, overnight safety, spill doctor, qwen2.5:7b as the default student. Verified on the 0.5B only (docs/reports/009-phase3.5.md): banking77-quick goes from 0.200 to 0.640 in 44 s. The 70B and 7B proof runs were deferred to the full proof run below.
 
-Phase 4: vision-language models. Qwen2.5-VL first: the vision tower stays resident (it is small and runs once per image), the decoder streams as today. A public document-image example ships with it, in the same folder shape as banking77 (an exam of images with the right answers, homework, a build). Gate: streamed output identical to resident execution on 20 prompts with images; the golden path works with no flags on the example.
+Next, in this order:
 
-Then, in this order:
-Batched prefill GEMMs: prefill is currently one sequence at a time inside each layer; batching rows into one GEMM per layer raises the achieved FLOP/s that every estimate divides by, and shortens teacher stages.
-CPU path: the loop on Linux and Intel Macs with a portable runner (same layer-ordered reads, CPU or CUDA compute). Gate: the golden path on a Linux box with no GPU; 0.5b output identical to the Metal engine on 20 prompts.
-Mixture-of-experts: Mixtral, Qwen MoE, DeepSeek. Route a batch, group tokens by expert, read only the experts the batch needs per layer. Gate: one MoE family verified.
+1. The full banking77 proof run: 70B teacher, 7B student, the surpass and copy paths, the combined table with the 70B untrained, the 7B untrained, the 7B trained on your labels and the 7B distilled from the 70B, and per-stage estimate versus actual. Tonight's long run. Also draw docs/img/paths.svg from the measured times of that run (the README table states rates until then). Gate: a stranger following only the README.
+2. PyPI release, after the proof run: publish `streamweights`, switch the install lines to `pip install streamweights`, tag 0.1.0. Not done yet; install is from the GitHub URL.
+3. Phase 4, Linux CPU engine: the loop on Linux with a portable runner (same layer-ordered reads, CPU compute), per docs/linux.md and issue #1. Gate: the golden path on a Linux box with no GPU; 0.5b output identical to the Metal engine on 20 prompts.
+4. Phase 5, NVIDIA: the same ring with pinned host memory and CUDA streams.
+5. Phase 6, vision-language models. Qwen2.5-VL first: the vision tower stays resident (it is small and runs once per image), the decoder streams as today. A public document-image example ships with it, in the same folder shape as banking77. Gate: streamed output identical to resident execution on 20 prompts with images.
+6. Phase 7, mixture-of-experts: Mixtral, Qwen MoE, DeepSeek. Route a batch, group tokens by expert, read only the experts the batch needs per layer. Gate: one MoE family verified.
+
+Also open: batched prefill GEMMs. Prefill is one sequence at a time inside each layer; batching rows into one GEMM per layer raises the achieved FLOP/s that every estimate divides by, and shortens teacher stages.
 
 6. Risks
 Risk    Mitigation
@@ -84,4 +88,4 @@ Scope creep into a serving framework    Engines stay upstream where possible; st
 
 7. Stack
 
-Python 3.12, uv, FastAPI, Typer. MLX and mlx-lm on macOS. llama.cpp binaries downloaded per platform, not vendored, for non-Apple hardware and for GGUF conversion.
+Python 3.10 or newer (developed on 3.12), uv, FastAPI, Typer. MLX and mlx-lm on macOS. llama.cpp binaries downloaded per platform, not vendored, for non-Apple hardware and for GGUF conversion.

@@ -45,7 +45,7 @@ Python 3.10 or newer (developed on 3.12), uv, FastAPI, Typer, MLX (Apple silicon
 
 ## Tests
 
-`python -m pytest` runs the CPU suite (`SPILL_DEVICE=cpu` is set by `tests/conftest.py`). GPU tests are skipped unless `SPILL_GPU_TESTS=1`. CI runs the suite on macOS and Linux. `tests/test_docs.py` fails on placeholders, em-dashes, or a README out of shape.
+`python -m pytest` runs the CPU suite (`SPILL_DEVICE=cpu` is set by `tests/conftest.py`). GPU tests are skipped unless `SPILL_GPU_TESTS=1`. CI runs the suite on macOS and Linux. `tests/test_docs.py` fails on unfinished markers, em-dashes, unmeasured numbers, or a README out of shape.
 
 ## Measured facts that drive the design
 

@@ -1,127 +1,338 @@
-# Commands and flags
+# Commands
 
-Every command ends by printing the one command most likely to come next (`next: ...`).
-Long jobs (`run`, `distill`, `tune`, `build`) hold `caffeinate -i` while they run, warn in
-the pre-run line when the Mac is on battery, and post a macOS notification when they finish
-or stop. Any command, on launch, reports an interrupted job or build in one line with its
-`spill resume` command.
+Generated from the real `--help` output by `scripts/make_cli_docs.py`; `tests/test_docs.py` fails if it is out of date. Commands are in the order you use them.
 
-## The loop
+```
+Usage: spill [OPTIONS] COMMAND [ARGS]...
 
-| command | what it does |
-|---|---|
-| `spill build <folder>` | the whole loop from a folder: distill, tune, eval, one table. See below |
-| `spill example <name> [--quick]` | create `./<name>/` with ready files (`banking77`); `--quick` is the under-an-hour variant in `./<name>-quick/` |
-| `spill run <model>[+<adapter>] <file>` | the full-size model over your file |
-| `spill distill <teacher> <file>` | the teacher's completions, or with `--score` its log-probs over targets you supply |
-| `spill tune <model> [<file>] --name <name>` | train a LoRA adapter against the full-precision base. With no file it uses the folder's newest `*.distill.jsonl` or `train.jsonl` |
-| `spill eval <evals.jsonl> [<model>...]` | the same eval set through several models, one table. With no models it uses every model that has a run against the file's hash |
-| `spill export <base>+<adapter>` | merge the adapter into the base: merged safetensors, optionally GGUF and Ollama |
+  Build your own model on your Mac. Errors are one line; add --debug to any
+  command for the traceback.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  build     Build your model from a folder: distill, tune, eval
+  example   Create a ready-to-run example folder
+  run       Run a JSONL of prompts through a model
+  distill   Collect a big model's answers to learn from
+  tune      Train a LoRA adapter on your data
+  eval      Score models on your eval set, one table
+  export    Merge an adapter into its base; GGUF and Ollama
+  models    List the models spill knows and what they need
+  adapters  List your trained adapters
+  runs      List past runs
+  status    Show jobs: progress, tokens/s, ETA
+  tail      Follow the results of the latest job
+  resume    Continue an interrupted job or build
+  doctor    Check this machine and what it can run overnight
+  check     Validate a JSONL file, with line-numbered errors
+
+  Example: spill example banking77 --quick && spill build banking77-quick
+```
 
 ## spill build
 
 ```
-spill build <folder> [--student M] [--teacher M] [--compare M]... [--base M]
-                     [--weight-own 2] [--epochs 2] [--notify URL] [--quiet] [--debug]
+Usage: spill build [OPTIONS] {folder}
+
+  Build your own model from a folder: distill, tune, eval, one table.
+
+Arguments:
+  folder  a folder with evals.jsonl and train.jsonl and/or prompts.jsonl
+          [required]
+
+Options:
+  --student <str>       the small model to build on (default qwen2.5:7b)
+  --teacher <str>       the big model that answers prompts.jsonl (default
+                        llama3.3:70b)
+  --compare <str>       add this model's score to the table (repeatable)
+  --base <str>          train the adapter on this (big) model itself instead
+                        of the student
+  --weight-own <float>  with both train.jsonl and prompts.jsonl: your answers
+                        count this many times to the teacher's 1  [default:
+                        2.0]
+  --epochs <float>      passes over the training data (default 2)
+  --notify <str>        POST a small JSON to this URL when done or stopped
+  --quiet               one progress line per stage
+  --help                Show this message and exit.
+
+  Example: spill build banking77-quick
 ```
 
-The files in the folder decide the path ([formats](formats.md#build-folders)):
+## spill example
 
-| files | what build does |
-|---|---|
-| `evals.jsonl` + `train.jsonl` | eval the student base, tune on `train.jsonl`, eval the student with the adapter |
-| `evals.jsonl` + `prompts.jsonl` | the teacher answers `prompts.jsonl`, tune on its answers, then eval the student base, the student with the adapter, and the teacher |
-| all three | the teacher answers the prompts, tune on your answers (weighted 2:1 against the teacher's by default, `--weight-own`) plus the teacher's, then the same three evals |
+```
+Usage: spill example [OPTIONS] [name]
 
-- `--student` (default `qwen2.5:7b`), `--teacher` (default `llama3.3:70b`).
-- `--base M` trains the adapter on `M` itself (a big model) instead of the student.
-- `--compare M` adds `M`'s score to the table (repeatable).
-- The adapter is named after the folder. Intermediates land in the folder or in
-  `~/.streamweights/adapters/<name>`.
-- The pre-run line states the path, the models, the per-stage time estimate and the total.
-  Evals whose expected values are short labels get `max_tokens` 16, and the line says so.
-- Resumable at any stage: `spill resume <folder>`, or run the same build again.
-- It ends with the table (model, role, score, rows) and one line:
-  `your model: <student>+<name> · spill export <student>+<name>`.
+  Create ./<name>/ with ready files (an exam, homework, and the prompt for
+  untrained models).
+
+Arguments:
+  name  which example (banking77)  [default: banking77]
+
+Options:
+  --quick  the under-an-hour variant: 100 evals, 500 train rows, student
+           qwen2.5:0.5b
+  --force  write into a folder that already exists
+  --help   Show this message and exit.
+
+  Example: spill example banking77 --quick
+```
 
 ## spill run
 
-`spill run <model>[+<adapter>] <input.jsonl|sample>`
+```
+Usage: spill run [OPTIONS] {model} {input_jsonl}
 
-| flag | meaning |
-|---|---|
-| `--quant 8bit\|4bit\|Q8_0\|Q4_K_M` | explicit opt-in to a quant (bf16 is the default) |
-| `--out PATH` | where to copy the results |
-| `--context N` | context length (default 4096) |
-| `--parallel N` | override the computed batch (never required) |
-| `--logprobs K` | per-token top-K log-probs, K up to 64 |
-| `--full-logits` | also write float16 logits per row, for sets under 200 rows |
-| `--no-prefix-reuse` | compute every row's whole prompt (for A/B checks) |
-| `--notify URL` | POST a small JSON to this URL when done |
-| `--quiet` | no live block |
-| `--debug` | tracebacks |
+  Run a JSONL of prompts (or `sample`) through a model, a curated tag or any
+  HF repo id.
 
-**Shared-prefix reuse.** Rows in a job that begin with the same tokens (a system prompt and
-the chat header) compute that prefix once and attend to it from every row, in prefill and in
-decode, so a 900-token label list costs the same as a 20-token one. It engages when the
-common prefix is at least 64 tokens across at least 4 rows, and the pre-run line states how
-many tokens it saves. Output matches an unshared run up to float rounding; the manifest
-records what was used.
+Arguments:
+  model        curated tag (llama3.3:70b), HF repo id (org/name[@rev]),
+               optionally +<adapter> (local dir or HF repo)  [required]
+  input_jsonl  prompts JSONL (plain, OpenAI batch or chat rows), or `sample`
+               [required]
+
+Options:
+  --quant <str>     8bit|4bit (mlx) or Q8_0|Q4_K_M (gguf); bf16 is the default
+  --out <path>      also copy results.jsonl here
+  --context <int>   context window in tokens  [default: 4096]
+  --quiet           one progress line, no live slot block
+  --notify <str>    POST a small JSON to this URL when done
+  --logprobs <int>  per-token top-K log-probs, K up to 64
+  --help            Show this message and exit.
+
+  Example: spill run qwen2.5:0.5b sample
+```
 
 ## spill distill
 
-`spill distill <teacher> <file>` with `--score` (teacher-forced: score the assistant targets
-in the file, prefill only, no sampling), `--logprobs K` (default 32), `--quant`, `--out`,
-`--context`, `--parallel`, `--notify`, `--quiet`, `--debug`.
+```
+Usage: spill distill [OPTIONS] {teacher} {input_jsonl}
+
+  Collect a big model's answers to learn from: completions plus per-token
+  top-k log-probs, or its log-probs over targets you supply (--score).
+
+Arguments:
+  teacher      teacher model: tag or HF repo id (optionally +adapter)
+               [required]
+  input_jsonl  prompts (batch/chat JSONL), or with --score chat rows that end
+               with an assistant target  [required]
+
+Options:
+  --score           teacher-forced: score the given assistant targets, prefill
+                    only, no sampling
+  --logprobs <int>  top-K per token, K up to 64  [default: 32]
+  --quant <str>     8bit | 4bit; bf16 is the default
+  --out <path>      distillation JSONL (default runs/<id>/distill.jsonl)
+  --context <int>   context window in tokens  [default: 4096]
+  --quiet           one progress line, no live slot block
+  --notify <str>    POST a small JSON to this URL when done
+  --help            Show this message and exit.
+
+  Example: spill distill qwen2.5:0.5b sample
+```
 
 ## spill tune
 
-`spill tune <model> [<file>] --name <name>` with `--rank 16`, `--alpha 32`, `--dropout 0`,
-`--targets`, `--lr 1e-4`, `--schedule cosine|constant`, `--weight-decay`, `--steps`,
-`--epochs`, `--batch`, `--grad-accum`, `--max-seq 2048`, `--seed`, `--path auto|resident|streamed`,
-`--ckpt-every 50`, `--overwrite`, `--quiet`, `--debug`. Resumable (`spill resume <job>`),
-clean on Ctrl-C.
+```
+Usage: spill tune [OPTIONS] {model} {train_jsonl}
+
+  Train a LoRA adapter on your data against the full-precision base.
+
+Arguments:
+  model        base model: tag, Hugging Face repo id, or a local safetensors
+               directory  [required]
+  train_jsonl  training JSONL: {prompt, answer} rows, or OpenAI chat rows
+               (messages)  [required]
+
+Options:
+  --name <str>        adapter name (see: spill adapters)  [required]
+  --rank <int>        LoRA rank  [default: 16]
+  --lr <float>        learning rate  [default: 0.0001]
+  --steps <int>       optimizer steps (default: --epochs of the data)
+  --epochs <float>    passes over the data  [default: 1.0]
+  --batch <int>       micro-batch (default: 4 resident, sized from the memory
+                      budget when streamed)
+  --grad-accum <int>  micro-batches per optimizer step  [default: 1]
+  --max-seq <int>     token cap per example; whole exchanges are dropped from
+                      the left  [default: 2048]
+  --path <str>        auto | resident | streamed  [default: auto]
+  --overwrite         replace an existing adapter
+  --quiet             a progress line every 10 steps
+  --notify <str>      POST a small JSON to this URL when done
+  --help              Show this message and exit.
+
+  Example: spill tune qwen2.5:0.5b banking77-quick/train.jsonl --name banking
+```
 
 ## spill eval
 
-`spill eval <evals.jsonl> [<model>...]` with `--metric exact_match|contains|regex|json_field|judge|script:<file.py>`,
-`--judge MODEL`, `--rerun`, `--quant`, `--context`, `--parallel`, `--quiet`, `--debug`.
-Each model without a finished run for this exact input (matched by hash) is run, every row is
-scored, and one table is printed (model, quant, adapter, rows, metric mean, latency, tokens),
-plus `diff.jsonl` with the rows where the models disagree.
+```
+Usage: spill eval [OPTIONS] {input_jsonl} [models]...
+
+  Run the eval set against each model (reusing finished runs for this exact
+  input), score it, and print one table plus the rows where the models
+  disagree.
+
+Arguments:
+  input_jsonl  eval JSONL: prompts plus an `expected` field per row
+               [required]
+  models...    one or more models, each optionally +adapter; omitted: every
+               model with a run against this file's hash
+
+Options:
+  --metric <str>   exact_match | contains | regex | json_field | judge |
+                   script:<file.py>  [default: exact_match]
+  --judge <str>    judge model (implies --metric judge)
+  --rerun          ignore cached runs for this input hash
+  --quant <str>    8bit | 4bit; bf16 is the default
+  --context <int>  context window in tokens  [default: 4096]
+  --quiet          one progress line, no live slot block
+  --notify <str>   POST a small JSON to this URL when done
+  --help           Show this message and exit.
+
+  Example: spill eval banking77-quick/evals.jsonl qwen2.5:0.5b
+  qwen2.5:0.5b+banking
+```
 
 ## spill export
 
-`spill export <base>+<adapter>` with `--out DIR`, `--gguf [bf16|q8_0|q4_k_m]` (bare `--gguf`
-means `q8_0`), `--ollama`, `--name`.
+```
+Usage: spill export [OPTIONS] {model}
 
-The merged safetensors are written shard by shard (`W + scale * (A @ B)^T`, computed in float32
-and stored in the base's dtype). GGUF conversion uses llama.cpp's own converter, downloaded
-at the release tag of the llama.cpp binaries we ship and run in a private environment (never
-vendored); `q4_k_m` is a bf16 conversion followed by `llama-quantize`. A Modelfile is written
-beside the GGUF, and `--ollama` runs `ollama create` when ollama is installed and prints the
-`ollama run` line.
+  Merge the adapter into the base: merged safetensors, optionally GGUF and
+  Ollama.
 
-## Everything else
+Arguments:
+  model  <base>+<adapter>, e.g. qwen2.5:7b+banking77  [required]
 
-| command | what it does |
-|---|---|
-| `spill check <file>` | validate a file of any shape; first error with its line number |
-| `spill doctor` | chip, RAM, Metal working set, disk, Python, version, downloaded models, interrupted jobs, the largest model this machine can run overnight for eval, and the achieved TFLOP/s the estimates use |
-| `spill models [--architectures]` | curated tags and architecture families, live |
-| `spill runs` | every run with model, quant, adapter, input hash, rows, status |
-| `spill adapters` | local LoRA adapters |
-| `spill tail [job]` | follow a job's results; shows the live block while it runs |
-| `spill resume [job\|folder]` | continue the latest or named job, or a build folder, from its checkpoint |
-| `spill status` | all jobs with progress, tokens/s, ETA |
+Options:
+  --out <path>  directory for the merged model (default:
+                <data>/exports/<base>+<adapter>)
+  --gguf <str>  also write a GGUF: bf16 | q8_0 | q4_k_m (bare --gguf: q8_0)
+  --ollama      run `ollama create` if ollama is installed (implies --gguf)
+  --name <str>  Ollama model name
+  --help        Show this message and exit.
 
-## The cost model
+  Example: spill export qwen2.5:0.5b+banking --gguf
+```
 
-Every estimate (pre-run lines, the README, the diagrams) uses one model:
+## spill models
 
-- decode on a streamed model is disk-bound: one weight pass per token step, about 34 s per
-  pass for the 70B on a 48 GB M4 Pro;
-- prefill is compute-bound: 2 x parameters x tokens;
-- training is compute-bound: 6 x parameters x tokens (forward, recompute, backward);
-- both divided by the achieved FLOP/s, which `spill tune` measures and records
-  (`spill doctor` shows it). Until one is measured the estimate uses 5 TFLOP/s and says so.
+```
+Usage: spill models [OPTIONS]
+
+  Curated tags: size, family, placement on this machine, disk needed,
+  downloaded.
+
+Options:
+  --architectures  print the architecture support table
+  --help           Show this message and exit.
+
+  Example: spill models
+```
+
+## spill adapters
+
+```
+Usage: spill adapters [OPTIONS]
+
+  List the LoRA adapters you have trained or added (PEFT or mlx-lm layout).
+
+Options:
+  --help  Show this message and exit.
+
+  Example: spill adapters
+```
+
+## spill runs
+
+```
+Usage: spill runs [OPTIONS]
+
+  List runs with model, quant, adapter, input hash, rows and status.
+
+Options:
+  --limit <int>  most recent N runs  [default: 20]
+  --help         Show this message and exit.
+
+  Example: spill runs
+```
+
+## spill status
+
+```
+Usage: spill status [OPTIONS]
+
+  List jobs with progress, tokens/s, ETA.
+
+Options:
+  --help  Show this message and exit.
+
+  Example: spill status
+```
+
+## spill tail
+
+```
+Usage: spill tail [OPTIONS] [job]
+
+  Follow results.jsonl of the latest (or named) job.
+
+Arguments:
+  job  job id (default: the latest job)
+
+Options:
+  --help  Show this message and exit.
+
+  Example: spill tail
+```
+
+## spill resume
+
+```
+Usage: spill resume [OPTIONS] [job]
+
+  Continue the latest or named job from its checkpoint; a folder continues its
+  build.
+
+Arguments:
+  job  job id or build folder (default: the latest job)
+
+Options:
+  --help  Show this message and exit.
+
+  Example: spill resume banking77-quick
+```
+
+## spill doctor
+
+```
+Usage: spill doctor [OPTIONS]
+
+  One screen: chip, memory, disk, models, interrupted jobs, what runs
+  overnight.
+
+Options:
+  --help  Show this message and exit.
+
+  Example: spill doctor
+```
+
+## spill check
+
+```
+Usage: spill check [OPTIONS] {path}
+
+  Validate a JSONL file; prints the first error with its line number.
+
+Arguments:
+  path  a batch, chat, eval or distillation-target JSONL  [required]
+
+Options:
+  --help  Show this message and exit.
+
+  Example: spill check banking77-quick/evals.jsonl
+```

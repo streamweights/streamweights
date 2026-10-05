@@ -63,8 +63,7 @@ With `--score` the record has `target` and `positions` instead of `completion` a
 (tier, engine, quant, batch, token counts, latency, provenance). `finish_reason` is `stop`
 when the model emitted a real end-of-turn token and `length` when the row hit its own
 `max_tokens`. `--logprobs K` (K up to 64) adds `logprobs: [{token_id, logprob, top: [[id, logprob], ...]}]`
-to each row. `--full-logits` also writes one float16 `.npy` of logits per row, for sets
-under 200 rows.
+to each row.
 
 ## Provenance
 

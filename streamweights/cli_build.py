@@ -178,9 +178,9 @@ def build(
                                                                "this many times to the teacher's 1"),
     epochs: float = typer.Option(None, "--epochs", help=f"passes over the training data "
                                                         f"(default {DEFAULT_EPOCHS:g})"),
-    notify: str = typer.Option(None, "--notify", help="also POST a small JSON to this URL when "
+    notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when "
                                                       "done or stopped"),
-    quiet: bool = typer.Option(False, "--quiet"),
+    quiet: bool = typer.Option(False, "--quiet", help="one progress line per stage"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Build your own model from a folder: distill, tune, eval, one table."""
