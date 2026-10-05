@@ -32,7 +32,7 @@ Run 2026-10-05, Apple M4 Pro, qwen2.5:0.5b only. Directive: `docs/paste-sets/010
 ## Decisions
 
 - **Merge, not rebase, for Phase 3.5.** The branch is squashed afterward, so the history is the same and a rebase would have resolved the same conflict 17 times.
-- **No Docker on this machine.** Platform verification used a clean venv without MLX (91 tests pass, 7 that assert the Apple-silicon behavior skip), a clean Python 3.10 venv, `uv pip compile` for five target platforms (no MLX line for Linux, Windows or Intel Mac), and the Linux CI job on GitHub, which runs `pip install`, `spill doctor`, an MLX-only command and the suite on a real Ubuntu runner.
+- **No Docker on this machine.** Platform verification used a clean venv without MLX (100 tests pass, 7 that assert the Apple-silicon behavior skip), a clean Python 3.10 venv, `uv pip compile` for five target platforms (no MLX line for Linux, Windows or Intel Mac), and the Linux CI job on GitHub, which runs `pip install`, `spill doctor`, an MLX-only command and the suite on a real Ubuntu runner.
 - **`state/hardware.json` and `state/calibration.json` are no longer tracked.** Anyone running from a checkout overwrites them. Copies of this machine's files are kept as `docs/reports/data/hardware-m4pro.json` and `calibration-m4pro.json`, and the reports point there.
 - **Fifteen interrupted job directories** from Phase 0 and 1 experiments were removed. Completed jobs, including the 2,000-row 70B run, were kept; its results are also in `docs/reports/`.
 - **`paths.svg` is omitted.** Its bars need measured times for three paths, and only one was run end to end. The README table states rates instead. Task for tonight: draw it from the proof run.
