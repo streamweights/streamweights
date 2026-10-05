@@ -28,6 +28,9 @@ def resolve_model(arg: str) -> Resolved:
     reg = load_registry()
     if arg in reg:
         return Resolved("tag", arg, st_bytes=safetensors_spec(arg)["bytes"])
+    local = Path(arg).expanduser()
+    if arg.startswith((".", "/", "~")) and local.is_dir():
+        return _resolve_local(local)
     if "/" not in arg:
         raise SpillError(
             f"'{arg}' is not a curated tag or a Hugging Face repo id (org/name)",
@@ -64,6 +67,20 @@ def resolve_model(arg: str) -> Resolved:
     return Resolved("hf", repo, revision, config, st_bytes, fam, local)
 
 
+def _resolve_local(p: Path) -> Resolved:
+    """A local safetensors model directory (an exported merged model, a downloaded repo)."""
+    if not (p / "config.json").exists() or not any(p.glob("*.safetensors")):
+        raise SpillError(f"{p} is not a safetensors model directory (needs config.json and "
+                         f"*.safetensors)", "spill models")
+    config = json.loads((p / "config.json").read_text())
+    fam = classify(config)
+    if fam.state == NOT_YET or fam.module is None:
+        raise SpillError(f"{p.name} is {fam.label}, state '{fam.state}' ({fam.note})",
+                         "spill models --architectures")
+    size = sum(f.stat().st_size for f in p.glob("*.safetensors"))
+    return Resolved("hf", p.name, None, config, size, fam, p.resolve())
+
+
 def _st_total_bytes(repo: str, revision: str | None) -> int:
     from huggingface_hub import HfApi, hf_hub_download
     try:
@@ -87,23 +104,10 @@ def arch_from_config(config: dict) -> dict:
 
 def download_hf(res: Resolved) -> Path:
     """Snapshot the repo's safetensors under models/hf/ with the 20 GB floor."""
-    import shutil
-    from .registry import MIN_FREE_AFTER_DOWNLOAD, REPO_ROOT
+    from .download import fetch
     dest = res.local_dir
     if dest.exists() and (dest / "config.json").exists() and any(dest.glob("*.safetensors")):
         return dest
-    free = shutil.disk_usage(REPO_ROOT).free
-    if free - res.st_bytes < MIN_FREE_AFTER_DOWNLOAD:
-        need = (res.st_bytes + MIN_FREE_AFTER_DOWNLOAD - free) / GIB
-        raise SpillError(
-            f"not enough disk: {res.name} needs {res.st_bytes / GIB:.0f} GB plus the 20 GB "
-            f"floor; free up {need:.0f} GB, or use the 8-bit artifact if one exists",
-            f"spill run {res.name} <input> --quant 8bit")
-    import sys
-    print(f"downloading {res.name} bf16 safetensors: {res.st_bytes / GIB:.1f} GB -> {dest}",
-          file=sys.stderr)
-    from huggingface_hub import snapshot_download
-    snapshot_download(res.name, revision=res.revision,
-                      allow_patterns=["*.safetensors", "*.json", "*.model"],
-                      local_dir=dest)
-    return dest
+    return fetch(res.name, dest, ["*.safetensors", "*.json", "*.model"],
+                 f"{res.name} bf16 safetensors", revision=res.revision,
+                 recovery=f"spill run {res.name} <input> --quant 8bit")

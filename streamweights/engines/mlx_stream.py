@@ -33,6 +33,11 @@ CALIBRATION_JSON = REPO_ROOT / "state" / "calibration.json"
 # pass, so a wave of newcomers never turns one pass into a 28-minute wall
 PREFILL_TOKENS_PER_PASS = 2048
 
+# shared-prefix reuse engages when every row of the job starts with the same
+# token prefix at least this long (and there are enough rows to share it)
+PREFIX_MIN_TOKENS = 64
+PREFIX_MIN_ROWS = 4
+
 MB = 1024 * 1024
 
 ST_DTYPES = {
@@ -357,7 +362,9 @@ class StreamKVCache:
         self.keys[..., self._used:self._used + L, :] = keys
         self.values[..., self._used:self._used + L, :] = values
         self._used += L
-        self.offset += L
+        # not `+=`: with per-row array offsets that would add in place, and every layer's
+        # cache shares one offset array
+        self.offset = self.offset + L
         return self.keys[..., :self._used, :], self.values[..., :self._used, :]
 
     @property
@@ -377,6 +384,45 @@ class StreamKVCache:
             self.keys = self.keys[..., n:, :]
             self.values = self.values[..., n:, :]
             self._used -= n
+
+
+class SharedPrefixCache(StreamKVCache):
+    """StreamKVCache whose rows all begin with one shared prefix (system prompt and chat
+    header). The prefix K/V is computed once per job, at true rope positions 0..P-1, and
+    is NOT stored per row: this cache holds only the row's private tokens. At call time
+    the prefix is broadcast in front of the private K/V, so attention sees the whole
+    sequence while stored KV memory per row is private-only. Private tokens are rotated
+    at their true positions (P + index), so every key is rotated exactly once and the
+    result matches an unshared run up to float rounding."""
+
+    def __init__(self, offset=0, shared=None):
+        super().__init__(offset)
+        self.shared = shared          # (K, V), each [1, H, P, D], or None
+
+    def update_and_fetch(self, keys, values):
+        super().update_and_fetch(keys, values)
+        k = self.keys[..., :self._used, :]
+        v = self.values[..., :self._used, :]
+        if self.shared is None:
+            return k, v
+        sk, sv = self.shared
+        if k.shape[0] != 1:
+            sk = mx.broadcast_to(sk, (k.shape[0],) + tuple(sk.shape[1:]))
+            sv = mx.broadcast_to(sv, (v.shape[0],) + tuple(sv.shape[1:]))
+        return mx.concatenate([sk, k], axis=2), mx.concatenate([sv, v], axis=2)
+
+
+def common_prefix_len(seqs: list[list[int]]) -> int:
+    """Longest token prefix shared by every sequence."""
+    if not seqs:
+        return 0
+    a, b = min(seqs), max(seqs)          # lexicographic extremes bound the common prefix
+    n = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        n += 1
+    return n
 
 
 def _bind(block, plan: LayerPlan, buf: memoryview, prefix: str) -> float:
@@ -561,9 +607,45 @@ class MlxStreamEngine:
         prompts.sort(key=lambda p: -len(p[1]))  # longest first: the cache
         # length is set by the head of the queue, every later row admits
         # freely, and expensive rows are spread through the run, not walled
+
+        # shared-prefix reuse: the token prefix every row starts with (system prompt
+        # and chat header) is computed once for the job and attended to by every row;
+        # rows then carry only their private tokens
+        P = 0
+        prefix_ids: list[int] = []
+        self.prefix_info = {"prefix_tokens": 0, "rows": len(prompts), "reason": "off"}
+        if scoring:
+            self.prefix_info["reason"] = "scoring"
+        elif not spec.extra.get("prefix_reuse", True):
+            self.prefix_info["reason"] = "disabled"
+        elif fam.needs_array_mask:
+            self.prefix_info["reason"] = f"not wired for {fam.label}"
+        elif len(prompts) < PREFIX_MIN_ROWS:
+            self.prefix_info["reason"] = f"fewer than {PREFIX_MIN_ROWS} rows"
+        else:
+            lcp = common_prefix_len([t for _, t, _ in prompts])
+            lcp = min(lcp, min(len(t) for _, t, _ in prompts) - 1)
+            if lcp >= PREFIX_MIN_TOKENS:
+                P, prefix_ids = lcp, list(prompts[0][1][:lcp])
+                prompts = [(r, t[P:], mt) for r, t, mt in prompts]
+                self.prefix_info.update(prefix_tokens=P, reason="shared",
+                                        tokens_saved=(len(prompts) - 1) * P)
+                self.note(f"shared prefix: {P} tokens common to all {len(prompts)} rows, "
+                          f"computed once ({(len(prompts) - 1) * P:,} prefill tokens saved)")
+            else:
+                self.prefix_info["reason"] = f"common prefix {lcp} < {PREFIX_MIN_TOKENS} tokens"
+        prefix_kv: list = [None] * n_layers
         total_rows = len(prompts)
         max_tokens_job = max([p[2] for p in prompts] or [0])
         seq_costs = [(len(t) + mt) * kv_per_token for _, t, mt in prompts]
+        # the shared prefix is stored once, and decode concatenates it in front of
+        # each layer's private K/V (a transient of batch x prefix x one layer)
+        reserve = 0
+        ws_full = budget.working_set_bytes
+        if P:
+            reserve = P * kv_per_token + min(4 * GIB, 512 * P * (kv_per_token // n_layers))
+            budget = MemoryBudget(budget.working_set_bytes - reserve, budget.margin,
+                                  budget.batch_override)
         bm = compute_batch(index, budget, seq_costs, max_tokens_job, kv_per_token,
                            calibration=cal, quant=f"{spec.name}|{spec.quant}")
         auto_batch = bm.batch
@@ -667,7 +749,12 @@ class MlxStreamEngine:
         act_lp: list[list] = []          # per-token (id, logprob, top ids, top logprobs)
         act_full: list[list] = []        # per-token float16 logits (--full-logits)
         act_t0: list[float] = []         # when each row entered a pass
-        caches = [StreamKVCache() for _ in range(n_layers)]
+        def new_caches():
+            if P:
+                return [SharedPrefixCache(shared=prefix_kv[k]) for k in range(n_layers)]
+            return [StreamKVCache() for _ in range(n_layers)]
+
+        caches = new_caches()
         tokens = None                    # [b, 1] next input ids
         completed = 0
         gen_tokens_total = 0
@@ -694,7 +781,7 @@ class MlxStreamEngine:
                         np.stack(act_full[i]))
             return CompletedRow(
                 custom_id=r["custom_id"], content=tokenizer.decode(text_ids),
-                prompt_tokens=len(toks), completion_tokens=len(out),
+                prompt_tokens=len(toks) + P, completion_tokens=len(out),
                 latency_s=round(time.monotonic() - act_t0[i], 3),
                 finish_reason="stop" if stopped else "length",
                 batch_size=len(act_rows), logprobs=recs)
@@ -817,7 +904,7 @@ class MlxStreamEngine:
                 # allocation exceeds 85% of the working set (the 75% steady-state
                 # budget is the primary control; this catches modeling errors)
                 mem_pressure = (mx.default_device() == mx.gpu and
-                                mx.get_active_memory() > 0.85 * budget.working_set_bytes)
+                                mx.get_active_memory() > 0.85 * ws_full)
                 # ---- admission ----
                 admits = []
                 cap = auto_batch
@@ -848,7 +935,7 @@ class MlxStreamEngine:
                     Lpad = max(len(t) for _, t, _ in group)
                     # fresh group: prompt ends align at slot Lpad-1; next write = Lpad
                     admits = [(p, Lpad - len(p[1])) for p in group]
-                    caches = [StreamKVCache() for _ in range(n_layers)]
+                    caches = new_caches()
                     K = Lpad - 1   # so that s = K+1-L matches Lpad-L below
                     abs_off = Lpad - 1
                 else:
@@ -873,15 +960,31 @@ class MlxStreamEngine:
                 pass_t0 = time.monotonic()
                 admit_h = [embed(mx.array(t))[None] for (_, t, _), _ in admits]
                 # physical pad start s vs absolute rope start: differ after compaction
-                admit_caches = [[StreamKVCache(offset=abs_off + 1 - len(p[1]))
-                                 for p, _ in admits] for _ in range(n_layers)]
+                if P:
+                    admit_caches = [[SharedPrefixCache(offset=P) for _ in admits]
+                                    for _ in range(n_layers)]
+                else:
+                    admit_caches = [[StreamKVCache(offset=abs_off + 1 - len(p[1]))
+                                     for p, _ in admits] for _ in range(n_layers)]
                 x = embed(tokens) if act_rows else None   # [b,1,D]
+                compute_prefix = bool(P and admits and prefix_kv[0] is None)
+                if compute_prefix:
+                    h_pre = embed(mx.array(prefix_ids))[None]
+                if P and act_rows:
+                    # true rope position of each active row's input token
+                    offs = mx.array([P + len(act_rows[i][1]) + len(act_gen[i]) - 1
+                                     for i in range(len(act_rows))], dtype=mx.int32)
+                    for c in caches:
+                        c.offset = offs
                 if act_rows:
                     Kcur = K + 1  # physical columns
                     pad_mask = (mx.arange(Kcur)[None, None, None, :]
                                 < mx.array(act_start)[:, None, None, None])
                     mask = mx.where(pad_mask, mx.array(-mx.inf, x.dtype),
                                     mx.array(0, x.dtype))
+                    if P:   # the shared prefix columns are always visible
+                        mask = mx.concatenate(
+                            [mx.zeros((mask.shape[0], 1, 1, P), mask.dtype), mask], axis=-1)
                     if fam.needs_array_mask:
                         # eager GQA attention scores are 5-D [B, Hkv, rep, L, K]
                         mask = mask[:, :, None, :, :]
@@ -889,6 +992,17 @@ class MlxStreamEngine:
                 for k in range(n_layers):
                     slot = bind_layer(k, ring, seqno)
                     seqno += 1
+                    if compute_prefix:
+                        pc = StreamKVCache(offset=0)
+                        h_pre = block(h_pre, mask="causal", cache=pc)
+                        prefix_kv[k] = (mx.contiguous(pc.keys[..., :P, :]),
+                                        mx.contiguous(pc.values[..., :P, :]))
+                        mx.eval(h_pre, *prefix_kv[k])
+                    if P:
+                        if act_rows:
+                            caches[k].shared = prefix_kv[k]
+                        for a in range(len(admits)):
+                            admit_caches[k][a].shared = prefix_kv[k]
                     if act_rows:
                         x = block(x, mask=mask, cache=caches[k])
                     for a in range(len(admits)):
@@ -925,6 +1039,8 @@ class MlxStreamEngine:
                             vs.append(vv)
                         c.keys = mx.concatenate(ks, axis=0)
                         c.values = mx.concatenate(vs, axis=0)
+                        if P:
+                            c.shared = prefix_kv[k]
                         c._used = new_len
                         c.offset = (abs_off + 1) if act_rows else new_len
                         mx.eval(c.keys, c.values)
@@ -996,7 +1112,7 @@ class MlxStreamEngine:
                     act_full = [act_full[i] for i in keep]
                     act_t0 = [act_t0[i] for i in keep]
                     if not act_rows:
-                        caches = [StreamKVCache() for _ in range(n_layers)]
+                        caches = new_caches()
                         mx.clear_cache()
                     else:
                         trim = min(act_start)

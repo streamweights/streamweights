@@ -1,0 +1,44 @@
+{
+  "model": "qwen2.5:0.5b",
+  "rows": 20,
+  "identical": true,
+  "differing_rows": [],
+  "noise_floor_differing_rows": [
+    "r002",
+    "r013"
+  ],
+  "wall_s": {
+    "reuse": 2.3,
+    "no_reuse": 3.5
+  },
+  "wall_s_removed": 1.2,
+  "prefix_tokens": 486,
+  "prefill_tokens_saved": 9234,
+  "runs": {
+    "reuse": "20261005-151031-b48ea5",
+    "no_reuse": "20261005-151034-04539c",
+    "no_reuse_batch7": "20261005-151037-9e5489"
+  },
+  "outputs": {
+    "r011": "change_pin",
+    "r016": "verify_my_identity",
+    "r017": "verify_top_up",
+    "r000": "declined_transfer",
+    "r015": "verify_my_identity",
+    "r005": "card_arrival",
+    "r006": "declined_transfer",
+    "r008": "activate_my_card",
+    "r012": "card_arrival",
+    "r018": "revert_transaction",
+    "r003": "verify_top_up",
+    "r004": "activate_my_card",
+    "r019": "card_acceptance",
+    "r002": "verify_my_identity",
+    "r007": "card_acceptance",
+    "r010": "verify_my_identity",
+    "r001": "activate_my_card",
+    "r009": "get_physical_card",
+    "r014": "declined_transfer",
+    "r013": "accept_top_up_not_recognised"
+  }
+}

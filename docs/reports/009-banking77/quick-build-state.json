@@ -1,0 +1,80 @@
+{
+  "name": "banking77-quick",
+  "path": "train",
+  "student": "qwen2.5:0.5b",
+  "teacher": "llama3.3:70b",
+  "base": null,
+  "compare": [],
+  "weight_own": 2.0,
+  "max_tokens": 16,
+  "classification": true,
+  "tflops": 4.677786821044,
+  "tflops_source": "measured by spill tune",
+  "total_est_s": 28.74602436339661,
+  "epochs": 2.0,
+  "inputs": "936a29b63a2ae8707cdb84112e490c75d13a79e967d220d7a3d1a2190a5d4582",
+  "stages": [
+    {
+      "id": "eval:base",
+      "kind": "eval",
+      "label": "eval qwen2.5:0.5b untrained",
+      "model": "qwen2.5:0.5b",
+      "est_s": 0.6294072549454285,
+      "est_detail": "100 rows, batch 512, resident: prefill 1 s (2,618 tokens, shared prefix once) + decode 0 s (1 x 9 passes x 0.01 s)",
+      "status": "done",
+      "actual_s": 0.0,
+      "result": {
+        "score": 0.2,
+        "rows": 100,
+        "run_id": "20261004-152444-474864",
+        "cached": true,
+        "results_path": "<checkout>/jobs/20261004-152444-474864/results.jsonl",
+        "manifest": "<checkout>/runs/20261004-152444-474864/manifest.json"
+      }
+    },
+    {
+      "id": "tune",
+      "kind": "tune",
+      "label": "tune qwen2.5:0.5b -> qwen2.5:0.5b+banking77-quick",
+      "model": "qwen2.5:0.5b",
+      "est_s": 27.590597634630004,
+      "est_detail": "43,544 token-passes x 6 x 0.49B params / 4.67779 TFLOP/s = 28 s",
+      "status": "done",
+      "actual_s": 40.4,
+      "result": {
+        "training_rows": {
+          "own": 500,
+          "own_reps": 1,
+          "own_skipped": 0,
+          "teacher": 0,
+          "total": 500
+        },
+        "job_id": "20261005-151214-7d6e5b",
+        "adapter": "<checkout>/adapters/banking77-quick",
+        "steps": 250,
+        "final_loss": 0.21638961136341095
+      }
+    },
+    {
+      "id": "eval:tuned",
+      "kind": "eval",
+      "label": "eval qwen2.5:0.5b+banking77-quick",
+      "model": "qwen2.5:0.5b",
+      "est_s": 0.5260194738211785,
+      "est_detail": "100 rows, batch 512, resident: prefill 0 s (2,128 tokens, shared prefix once) + decode 0 s (1 x 9 passes x 0.01 s)",
+      "status": "done",
+      "actual_s": 3.7,
+      "result": {
+        "score": 0.64,
+        "rows": 100,
+        "run_id": "20261005-151253-4b3e48",
+        "cached": false,
+        "results_path": "<checkout>/jobs/20261005-151253-4b3e48/results.jsonl",
+        "manifest": "<checkout>/runs/20261005-151253-4b3e48/manifest.json"
+      }
+    }
+  ],
+  "updated": "2026-10-05T15:12:57-0700",
+  "notify": null,
+  "pid": null
+}

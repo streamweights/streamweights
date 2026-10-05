@@ -243,3 +243,26 @@ def find_cached(model: str, quant: str | None, adapter_hash: str | None,
             continue
         return m
     return None
+
+
+def run_label(m: dict) -> str:
+    ad = (m.get("adapter") or {}).get("id")
+    return m["model"]["id"] + (f"+{ad}" if ad else "")
+
+
+def models_with_runs(in_hash: str) -> list[str]:
+    """Labels (model or model+adapter) with a finished generate run against this input hash,
+    in the order first run."""
+    seen, out = set(), []
+    for m in list_runs():
+        if m.get("kind") != "run" or m.get("status") != "completed":
+            continue
+        if m["input"]["sha256"] != in_hash or m.get("rows_done") != m["input"]["rows"]:
+            continue
+        if (m.get("options") or {}).get("mode", "generate") != "generate":
+            continue
+        lab = run_label(m)
+        if lab not in seen:
+            seen.add(lab)
+            out.append(lab)
+    return out

@@ -208,7 +208,9 @@ def load_adapter_dir(d: Path, adapter_id: str | None = None) -> LoraAdapter:
 def resolve_adapter(spec: str) -> LoraAdapter:
     """Local directory, a name under <data>/adapters/, or a Hugging Face repo id."""
     p = Path(spec).expanduser()
-    if p.is_dir():
+    # a directory only wins when it is an adapter: `spill build my-folder` names its adapter
+    # after the folder, and the folder itself must not shadow it
+    if p.is_dir() and (detect_layout(p) or not (ADAPTERS_DIR / spec).is_dir()):
         return load_adapter_dir(p, spec)
     local = ADAPTERS_DIR / spec
     if local.is_dir():

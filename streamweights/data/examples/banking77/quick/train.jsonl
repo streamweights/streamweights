@@ -1,0 +1,500 @@
+{"prompt": "What if my top up didn't work?", "answer": "top_up_failed"}
+{"prompt": "If I want my son to have his own account is that possible?", "answer": "age_limit"}
+{"prompt": "Which flat currencies do you support for holding and exchange?", "answer": "fiat_currency_support"}
+{"prompt": "I need help with some transactions in my account that I dont recognize or remember purchasing. Im not sure if the name is just different or what. Should my card be put on hold while the issue gets figured out to be safe or is it ok?", "answer": "card_payment_not_recognised"}
+{"prompt": "I received my American Express in Apple Pay, is there a reason why top up is not functioning properly?", "answer": "apple_pay_or_google_pay"}
+{"prompt": "Can I return an item?", "answer": "request_refund"}
+{"prompt": "I got less cash because of the exchange rate.", "answer": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "Can you issue both a Visa and a Mastercard to me?", "answer": "visa_or_mastercard"}
+{"prompt": "Are there any restrictions for the disposable cards that I need to be aware of?", "answer": "disposable_card_limits"}
+{"prompt": "limits on top ups", "answer": "top_up_limits"}
+{"prompt": "I keep checking my statements but no progress.I requested a refund but seems it's not reaching my account for some reason. Can you please help me get the money back from the seller for me", "answer": "refund_not_showing_up"}
+{"prompt": "Am I limited to what ATM I can use my card?", "answer": "atm_support"}
+{"prompt": "I have a trasnger that is pending and wondered about it.", "answer": "pending_transfer"}
+{"prompt": "Is my card denied anywhere?", "answer": "card_acceptance"}
+{"prompt": "Why is your exchange rate different on different days?", "answer": "exchange_rate"}
+{"prompt": "How much longer until I get my new card?", "answer": "card_arrival"}
+{"prompt": "I have a cash withdrawal in my statement. Why is that?", "answer": "cash_withdrawal_not_recognised"}
+{"prompt": "I am angry that I got charged for using my card.", "answer": "card_payment_fee_charged"}
+{"prompt": "How do I cancel a purchase?", "answer": "request_refund"}
+{"prompt": "Will I be charged an extra fee if I need to exchange currency?", "answer": "exchange_charge"}
+{"prompt": "Google play top up help?", "answer": "apple_pay_or_google_pay"}
+{"prompt": "How do I use a card to top up?", "answer": "topping_up_by_card"}
+{"prompt": "I need a transaction reversed from my account.", "answer": "transaction_charged_twice"}
+{"prompt": "If I top up using a European card is there a charge?", "answer": "top_up_by_card_charge"}
+{"prompt": "I would like to get both a Visa and MasterCard?", "answer": "visa_or_mastercard"}
+{"prompt": "What happened to the money that I deposited?", "answer": "top_up_reverted"}
+{"prompt": "What is the procedure to transfer money to my account?", "answer": "transfer_into_account"}
+{"prompt": "It looks like someone besides me ordered something with my card, what should I do?", "answer": "compromised_card"}
+{"prompt": "If my phone was stolen, do I need to do anything?", "answer": "lost_or_stolen_phone"}
+{"prompt": "I have a disposable card but it does not work?", "answer": "virtual_card_not_working"}
+{"prompt": "do you offer refunds? i would like to return purchase.", "answer": "request_refund"}
+{"prompt": "Help!  My card is stolen.", "answer": "lost_or_stolen_card"}
+{"prompt": "Which countries do you support?", "answer": "country_support"}
+{"prompt": "I couldn't transfer money to a beneficiery", "answer": "beneficiary_not_allowed"}
+{"prompt": "What do i do to get a physical card?", "answer": "order_physical_card"}
+{"prompt": "Where can I find the verification code for the top up card?", "answer": "verify_top_up"}
+{"prompt": "Why did I get charged when getting cash?", "answer": "cash_withdrawal_charge"}
+{"prompt": "Can you send me a Mastercard, instead of a Visa?", "answer": "visa_or_mastercard"}
+{"prompt": "Why would a transfer to a beneficiary not go through?", "answer": "beneficiary_not_allowed"}
+{"prompt": "Please help me cancel a transaction.", "answer": "cancel_transfer"}
+{"prompt": "Are SWIFT transfers supported?", "answer": "top_up_by_bank_transfer_charge"}
+{"prompt": "I think I am a victim of fraud.  I noticed there was a charge on my account that I didn't do because I haven't touched my card today.  Can you please reverse the charge and refund my money?", "answer": "direct_debit_payment_not_recognised"}
+{"prompt": "Where is my virtual card?", "answer": "getting_virtual_card"}
+{"prompt": "Am I charged a fee to transfer funds?", "answer": "transfer_fee_charged"}
+{"prompt": "How long will it take to receive a virtual card?", "answer": "getting_virtual_card"}
+{"prompt": "Why wouldn't my contactless work for the metro?", "answer": "contactless_not_working"}
+{"prompt": "Why was my card payment reversed?", "answer": "reverted_card_payment"}
+{"prompt": "I would like to know which fiat currencies are recognized by your organization.", "answer": "fiat_currency_support"}
+{"prompt": "I couldnt transfer money from my account.", "answer": "failed_transfer"}
+{"prompt": "I checked the app and my balance has not been updated for the cash or cheque deposit.", "answer": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "When will my transfer post to my account?", "answer": "transfer_timing"}
+{"prompt": "I see an unfamiliar Direct Debit payment.", "answer": "direct_debit_payment_not_recognised"}
+{"prompt": "Will there be extra charges regarding to adding money into my international card?", "answer": "top_up_by_card_charge"}
+{"prompt": "I couldn't make a transfer because it was declined", "answer": "declined_transfer"}
+{"prompt": "How long to UK transfers usually take? I made a transfer but it didn't pop up in my history yet. I just want to make sure it went through.", "answer": "balance_not_updated_after_bank_transfer"}
+{"prompt": "I need to transfer money into my account, and I don't know how to do that.", "answer": "transfer_into_account"}
+{"prompt": "Can my 8 year old grandson open an account at the bank?", "answer": "age_limit"}
+{"prompt": "Why does it still charge me even though I was unable to withdraw money from the ATM?", "answer": "pending_cash_withdrawal"}
+{"prompt": "I'm trying to make a payment to my new landlord. Even though the payment was sent a few days ago, it isn't clearing on their side. Can you verify that payment has been made?", "answer": "transfer_not_received_by_recipient"}
+{"prompt": "I have a card that expires in the coming month, do I have to specifically ask for the updated card?", "answer": "card_about_to_expire"}
+{"prompt": "What's the youngest I can be to open an account?", "answer": "age_limit"}
+{"prompt": "How do I verify my ID?", "answer": "verify_my_identity"}
+{"prompt": "I draw out money from your ATM during holidays, and was charged insanely. I wouldn't have done it, if i had a little sense about the shocking charges.", "answer": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "I attempted to complete a topup, and I thought all was well, but now the money is gone again. Has there been a glitch?", "answer": "top_up_reverted"}
+{"prompt": "What does the €1 fee mean?", "answer": "extra_charge_on_statement"}
+{"prompt": "Help my prove my identity.", "answer": "unable_to_verify_identity"}
+{"prompt": "What do I do now my credit card has been swallowed by the ATM?", "answer": "card_swallowed"}
+{"prompt": "Where is a ATM that accepts Mastercard?", "answer": "atm_support"}
+{"prompt": "Why hasn't my account updated to reflect my current balance?", "answer": "balance_not_updated_after_bank_transfer"}
+{"prompt": "I made the incorrect payment for my rent yesterday and this needs to be fixed by no later than tomorrow. How can you help?", "answer": "cancel_transfer"}
+{"prompt": "I don't appreciate the extra fees being siphoned from my account. I was helping some friends move to Japan and we were buying home decorations at the local stores. The  receipts differed greatly from what showed up in my bank account and my statement. When can I expect the extra fees to be back in my account?", "answer": "transfer_fee_charged"}
+{"prompt": "Is there restrictions on where I can use my card?", "answer": "card_acceptance"}
+{"prompt": "Somebody is taking money out of my account without my approval in another town separate from me. Please place a freeze on my account until I can make it to the bank.", "answer": "cash_withdrawal_not_recognised"}
+{"prompt": "I would like a physical card", "answer": "order_physical_card"}
+{"prompt": "How long do I have to wait until the transferred money shows up?", "answer": "balance_not_updated_after_bank_transfer"}
+{"prompt": "I'm trying to purchase a flat but i need my first payment for my mortgage to go through first. I keep getting an error. I'm not sure what is going on but i need help making this transfer.", "answer": "failed_transfer"}
+{"prompt": "How can I put more money into my account?", "answer": "top_up_by_cash_or_cheque"}
+{"prompt": "Help me verify my identification.", "answer": "unable_to_verify_identity"}
+{"prompt": "Top up keeps failing", "answer": "top_up_failed"}
+{"prompt": "Is it possible to use an ATM when I am not in the country and make a withdraw with out extra fees?", "answer": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "Please send my refund now.", "answer": "refund_not_showing_up"}
+{"prompt": "Do you charge for transfers?", "answer": "top_up_by_bank_transfer_charge"}
+{"prompt": "Can I use my American Express card to add money into my account?", "answer": "supported_cards_and_currencies"}
+{"prompt": "Can I change my PIN in Austria?", "answer": "change_pin"}
+{"prompt": "My account says there are pending funds right now from withdrawing from an ATM, but my card was declined and I never took out any money. When will that money be deposited back into my account?", "answer": "pending_cash_withdrawal"}
+{"prompt": "I bought something online and it says there was a fee to transfer money. Isn't that free?", "answer": "transfer_fee_charged"}
+{"prompt": "Why haven't I gotten my payment yet?", "answer": "pending_card_payment"}
+{"prompt": "Which currencies do you work with?", "answer": "supported_cards_and_currencies"}
+{"prompt": "I was unable to activate my card.", "answer": "activate_my_card"}
+{"prompt": "the product is not working, can I get a refund?", "answer": "request_refund"}
+{"prompt": "Show me the amount of transactions I can do with a disposable card.", "answer": "disposable_card_limits"}
+{"prompt": "The currency exchange rate was wrong for a purchase I made.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "I made a transfer and according to the receiver \"they haven't received the right amount\" Its lesser than it should be.Now I have to transfer more money to make up for the missing amount . Can you please help me about this,what should be done", "answer": "transfer_fee_charged"}
+{"prompt": "What are the steps for the identity checks?", "answer": "verify_my_identity"}
+{"prompt": "When will my balance reflect a deposit?", "answer": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "What exactly is the exchange fee?", "answer": "exchange_charge"}
+{"prompt": "I'm looking to get an additional card.", "answer": "getting_spare_card"}
+{"prompt": "What is the source of funds for my money?", "answer": "verify_source_of_funds"}
+{"prompt": "How long will a transaction to a friend take?", "answer": "transfer_not_received_by_recipient"}
+{"prompt": "I have a new card and I need to activate it.", "answer": "activate_my_card"}
+{"prompt": "Is it possible to get a real card?", "answer": "order_physical_card"}
+{"prompt": "is there a way i can see source of money?", "answer": "verify_source_of_funds"}
+{"prompt": "My money is gone. I had topped up recently and saw it was there, but now it's disappeared, what's going on?", "answer": "top_up_reverted"}
+{"prompt": "How can my friend send money to me?", "answer": "receiving_money"}
+{"prompt": "Why is my transfer pending when I already made it?", "answer": "pending_transfer"}
+{"prompt": "I thought that transfers are free. Why was I charged an extra fee?", "answer": "transfer_fee_charged"}
+{"prompt": "I had to pay a fee when buying items with my card.", "answer": "card_payment_fee_charged"}
+{"prompt": "How long will a transfer from Europe take?", "answer": "transfer_timing"}
+{"prompt": "I have questions about how to transfer money to my account.", "answer": "transfer_into_account"}
+{"prompt": "Are there any discounts in exchanging currencies frequently?", "answer": "exchange_charge"}
+{"prompt": "How do I prove I am who I am?", "answer": "verify_my_identity"}
+{"prompt": "Am I able to Top Up with Apply Pay?", "answer": "apple_pay_or_google_pay"}
+{"prompt": "Is it possible to get both Visa and Mastercard from you?", "answer": "visa_or_mastercard"}
+{"prompt": "I got double charged!", "answer": "transaction_charged_twice"}
+{"prompt": "I am looking to transfer some money from my other bank account into this one.", "answer": "transfer_into_account"}
+{"prompt": "What is your maximum top up limit per day?", "answer": "top_up_limits"}
+{"prompt": "Can you tell me how many currencies I can hold?", "answer": "fiat_currency_support"}
+{"prompt": "Looks like my top-up has been cancelled", "answer": "top_up_failed"}
+{"prompt": "How do I find the PIN?", "answer": "get_physical_card"}
+{"prompt": "I was charged a fee for a transfer. Where did it come from?", "answer": "transfer_fee_charged"}
+{"prompt": "I cannot find my phone, what should I do?", "answer": "lost_or_stolen_phone"}
+{"prompt": "Can I have a card even if I am not living in the UK?", "answer": "country_support"}
+{"prompt": "My card still hasn't arrived after two weeks, now what?", "answer": "card_arrival"}
+{"prompt": "Delete all of my account information and my account right now.", "answer": "terminate_account"}
+{"prompt": "How long do transfers from Europe take?", "answer": "transfer_timing"}
+{"prompt": "What do I need to know about topping up?", "answer": "top_up_by_card_charge"}
+{"prompt": "My card payment doesn't work.", "answer": "declined_card_payment"}
+{"prompt": "My last name has changed and I need to update my account details.", "answer": "edit_personal_details"}
+{"prompt": "How do I get my card back quickly from a bank machine that it?", "answer": "card_swallowed"}
+{"prompt": "How do I go about cancelling a transaction?", "answer": "cancel_transfer"}
+{"prompt": "Is American Express supported for adding funds?", "answer": "supported_cards_and_currencies"}
+{"prompt": "How do you decide what the exchange rates are?", "answer": "exchange_rate"}
+{"prompt": "How do I know when my card will expire?", "answer": "card_about_to_expire"}
+{"prompt": "I can't find the top-up card verification code.", "answer": "verify_top_up"}
+{"prompt": "need to know places i can withdraw money", "answer": "atm_support"}
+{"prompt": "Why would my beneficiary not be allowed?", "answer": "beneficiary_not_allowed"}
+{"prompt": "How can I go about resetting my passcode?", "answer": "passcode_forgotten"}
+{"prompt": "What's the closest place to withdraw money?", "answer": "atm_support"}
+{"prompt": "My account is devoid of funds. Am I permitted to submit additional money via bank transfer?", "answer": "transfer_into_account"}
+{"prompt": "Why have I been charged for pulling cash out of my own account?", "answer": "cash_withdrawal_charge"}
+{"prompt": "I've tried several times to make a payment and every time my card is declined? Could my card be locked? I don't know what to do.", "answer": "declined_card_payment"}
+{"prompt": "Where can I use my Mastercard?", "answer": "card_acceptance"}
+{"prompt": "Why is there an extra €1 fee in my statement?", "answer": "extra_charge_on_statement"}
+{"prompt": "How do I sign up for a card if I'm in America?", "answer": "country_support"}
+{"prompt": "Is EUR one of the currencies you deal with?", "answer": "fiat_currency_support"}
+{"prompt": "Is there a way to track my card?", "answer": "card_arrival"}
+{"prompt": "When should I expect to receive my card?", "answer": "card_delivery_estimate"}
+{"prompt": "What is the process for setting up and account for my child?", "answer": "age_limit"}
+{"prompt": "I had transferred some money but the balance hasn't changed.", "answer": "balance_not_updated_after_bank_transfer"}
+{"prompt": "I have trouble proving my identity.", "answer": "unable_to_verify_identity"}
+{"prompt": "i need help, i lost my card", "answer": "lost_or_stolen_card"}
+{"prompt": "How can I exchange AUD for GBP?", "answer": "exchange_via_app"}
+{"prompt": "How many incorrect attempts cause card to be blocked?", "answer": "pin_blocked"}
+{"prompt": "I think I may have been charged $1 extra on my app.  Could you provide some insight as to why this may have happened?", "answer": "extra_charge_on_statement"}
+{"prompt": "What's the process for topping up by card?", "answer": "topping_up_by_card"}
+{"prompt": "Can someone help with my passcode?", "answer": "passcode_forgotten"}
+{"prompt": "Do I get charged for withdrawals?", "answer": "cash_withdrawal_charge"}
+{"prompt": "What is the maximum times I can auto top-up?", "answer": "automatic_top_up"}
+{"prompt": "Can money be exchanged from one currency to another?", "answer": "exchange_via_app"}
+{"prompt": "Is this card available to Americans?", "answer": "country_support"}
+{"prompt": "I don't want to give you all my identify details.", "answer": "why_verify_identity"}
+{"prompt": "I recently deposited some money into my account, but it still isn't showing up. What's going on?", "answer": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "What exchange rates do you use?", "answer": "exchange_rate"}
+{"prompt": "I haven't received money from a transfer?", "answer": "transfer_not_received_by_recipient"}
+{"prompt": "Why can I not take out cash?", "answer": "declined_cash_withdrawal"}
+{"prompt": "My currency rate is inaccurate.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Would you please unblock my pin? I don't know why, but it's blocked.", "answer": "pin_blocked"}
+{"prompt": "How do I know where my money comes from?", "answer": "verify_source_of_funds"}
+{"prompt": "Why was one of my transfers declined?", "answer": "declined_transfer"}
+{"prompt": "What happened to my top-up? I think it was cancelled.", "answer": "top_up_reverted"}
+{"prompt": "Where is this card accepted?", "answer": "card_acceptance"}
+{"prompt": "What other currencies are available to change to?", "answer": "exchange_via_app"}
+{"prompt": "my atm transaction was wrong", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "Can I get an item refunded?", "answer": "request_refund"}
+{"prompt": "I tried to use my disposable virtual card to pay a subscription to the gym and it got rejected. Any ideas why?", "answer": "virtual_card_not_working"}
+{"prompt": "How can I prove I am me?", "answer": "verify_my_identity"}
+{"prompt": "For what reason must I authenticate the top up?", "answer": "verify_top_up"}
+{"prompt": "What would be a reason my transfer got declined?", "answer": "declined_transfer"}
+{"prompt": "How would my friend be able to send me money?", "answer": "receiving_money"}
+{"prompt": "Hello, I went ahead and checked my account details to be sure, and they are definitely correct.  I've had a transfer pending for a while, and I can't understand why it hasn't gone through yet.", "answer": "pending_transfer"}
+{"prompt": "can you express my card to me?", "answer": "card_delivery_estimate"}
+{"prompt": "My salary is in GBP, do I need to exchange it before putting it into my account?", "answer": "receiving_money"}
+{"prompt": "Why is it taking so long to update my balance transfer?", "answer": "balance_not_updated_after_bank_transfer"}
+{"prompt": "Explain the card PIN to me.", "answer": "get_physical_card"}
+{"prompt": "Is it possible someone has access to my card? I noticed that there are a couple of payments in the app I'm sure I did not make. Can you find out what's going on here?", "answer": "card_payment_not_recognised"}
+{"prompt": "Can I make a withdraw in my home currency at an ATM? I'm on vacation and am a bit worried because I don't have cash with me. Is it possible to withdraw here without any additional costs or fees?", "answer": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "Why hasn't my transaction arrived?", "answer": "transfer_not_received_by_recipient"}
+{"prompt": "My salary is deposited in GBP. Do I need to choose the currency?", "answer": "receiving_money"}
+{"prompt": "How do I add my card to the app once I get it?", "answer": "card_linking"}
+{"prompt": "How long does a transfer from the US take?", "answer": "transfer_timing"}
+{"prompt": "The app failed to verify my id.", "answer": "unable_to_verify_identity"}
+{"prompt": "How can I request cash back? The ATM just gave me a different amount than what I've been actually charged though...", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "I think that the exchange rate was wrong for the payment made last Saturday - I was charged extra.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Hello, I tried to top up with my card, but it didn't work. I just got it a couple days before and it works fine. What's the deal? Can you check into this?", "answer": "top_up_failed"}
+{"prompt": "My card payment had the wrong exchange rate", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "No option to top up with a cheque ?", "answer": "top_up_by_cash_or_cheque"}
+{"prompt": "How long do transfers take, mine just says pending?", "answer": "pending_transfer"}
+{"prompt": "Hey, I'm buying a flat and I need my mortgage to go though. However, every time I check I get an error message. Is there any way you can help me with this transfer.", "answer": "failed_transfer"}
+{"prompt": "My PIN got blocked, help.", "answer": "pin_blocked"}
+{"prompt": "I need info on activating my card?", "answer": "activate_my_card"}
+{"prompt": "My transfer has been pending for a long time now. I already double checked my account info and it is correct. Why is it taking so long in 2018 to transfer money?", "answer": "pending_transfer"}
+{"prompt": "There is a withdrawal on my account I didn't make.", "answer": "cash_withdrawal_not_recognised"}
+{"prompt": "I attempted to top up using my card, but now the money just disappeared?", "answer": "topping_up_by_card"}
+{"prompt": "Which currencies do you accept for adding money?", "answer": "supported_cards_and_currencies"}
+{"prompt": "Does auto top-up have a limit?", "answer": "automatic_top_up"}
+{"prompt": "Are top-ups unlimited?", "answer": "top_up_limits"}
+{"prompt": "I've tried using my contactless in several locations today and it's not working anywhere. It seemed fine before. How do I get it to work again?", "answer": "contactless_not_working"}
+{"prompt": "My passcode was denied.", "answer": "passcode_forgotten"}
+{"prompt": "My contactless stopped working today for no good reason. It's not working no matter where I try to use it. Can you please help me fix it?", "answer": "contactless_not_working"}
+{"prompt": "Where do my funds originate from?", "answer": "verify_source_of_funds"}
+{"prompt": "I need to order a new card as my other one was stolen.", "answer": "lost_or_stolen_card"}
+{"prompt": "why is there a fee for a payment on my card?", "answer": "card_payment_fee_charged"}
+{"prompt": "Why have I not yet received my virtual card?", "answer": "getting_virtual_card"}
+{"prompt": "How can I pay for top-ups?", "answer": "supported_cards_and_currencies"}
+{"prompt": "how can i track card you sent", "answer": "card_arrival"}
+{"prompt": "Help!  There is a cash withdrawl on the account that I didn't make!", "answer": "cash_withdrawal_not_recognised"}
+{"prompt": "Can I change my PIN without going to a bank?", "answer": "change_pin"}
+{"prompt": "how come i was declined", "answer": "declined_cash_withdrawal"}
+{"prompt": "Can you tell my why my funds transfer did not work properly?", "answer": "failed_transfer"}
+{"prompt": "I need to find the card I received in the app.", "answer": "card_linking"}
+{"prompt": "Show me where to order my card.", "answer": "order_physical_card"}
+{"prompt": "I'm not sure what to do about the PIN, because I don't have one yet.", "answer": "get_physical_card"}
+{"prompt": "I completed a payment with my card a while ago. It's still showing up as pending. What time frame does this normally take? It doesn't appear to have worked.", "answer": "pending_card_payment"}
+{"prompt": "I just went through a old statement and noticed that a very large payment went through and i did not make it. It was from a few months ago, can I still dispute the payment?", "answer": "direct_debit_payment_not_recognised"}
+{"prompt": "I cant find my card.", "answer": "lost_or_stolen_card"}
+{"prompt": "what countries can i use my card in", "answer": "country_support"}
+{"prompt": "Do you provide currency exchange to Euros?", "answer": "fiat_currency_support"}
+{"prompt": "How do you determine your exchange rates?", "answer": "exchange_rate"}
+{"prompt": "A fee came along with me paying with card", "answer": "card_payment_fee_charged"}
+{"prompt": "is there a fee for swift transfer", "answer": "top_up_by_bank_transfer_charge"}
+{"prompt": "Please tell me if I'm going to be charged for sending out more cards?", "answer": "getting_spare_card"}
+{"prompt": "I've just been married and need to update my name", "answer": "edit_personal_details"}
+{"prompt": "How can I get a disposable virtual card?", "answer": "get_disposable_virtual_card"}
+{"prompt": "I can't get my card out of the ATM, what should I do now?", "answer": "card_swallowed"}
+{"prompt": "My bag got stolen with all my cards. Can you please cancel my card and send a new one?", "answer": "lost_or_stolen_card"}
+{"prompt": "How do I cancel a recent transfer?", "answer": "cancel_transfer"}
+{"prompt": "Would I be able to top up as much as I can?", "answer": "top_up_limits"}
+{"prompt": "Can you please explain disposable virtual cards for me?", "answer": "get_disposable_virtual_card"}
+{"prompt": "There is something wrong with my card. Tried to use it a few times today in different places and it just didn't work. The transactions I tried to make were really small so not sure what's going on", "answer": "card_not_working"}
+{"prompt": "There is  an extra 1£ charge on my app. Why did it charge me extra?", "answer": "extra_charge_on_statement"}
+{"prompt": "My card stopped working after multiple transactions. Why?", "answer": "card_not_working"}
+{"prompt": "There was an extra fee on my account when I got cash.", "answer": "cash_withdrawal_charge"}
+{"prompt": "My top is still pending.", "answer": "pending_top_up"}
+{"prompt": "What documents do I need to validate my identity?", "answer": "verify_my_identity"}
+{"prompt": "I cannot remember my passcode, is there a way to retrieve it?", "answer": "passcode_forgotten"}
+{"prompt": "How can I get a refund for a purchase?", "answer": "request_refund"}
+{"prompt": "What do I do if I detect fraudulent use on my car?", "answer": "compromised_card"}
+{"prompt": "I'm pretty sure my top up is still pending.", "answer": "pending_top_up"}
+{"prompt": "There is a payment that I was charged two times for.", "answer": "transaction_charged_twice"}
+{"prompt": "I think I was charged a different exchange rate than what was posted at the time.", "answer": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "Is there a transaction limit on a disposable card?", "answer": "disposable_card_limits"}
+{"prompt": "Is there any fees for top ups?", "answer": "top_up_by_card_charge"}
+{"prompt": "Why couldn't I transfer to a beneficiairy?", "answer": "beneficiary_not_allowed"}
+{"prompt": "What is wrong with my top-up?", "answer": "pending_top_up"}
+{"prompt": "Can I use top-up with Apple pay?", "answer": "apple_pay_or_google_pay"}
+{"prompt": "The exchange rate for my card payment doesn't seem right.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "I believe my top up was reverted.", "answer": "top_up_reverted"}
+{"prompt": "When will my top up go through?", "answer": "pending_top_up"}
+{"prompt": "Help! When will the card arrive at my home?", "answer": "card_delivery_estimate"}
+{"prompt": "I made a payment with my card and it hasn't changed. How long do you think this will take?", "answer": "pending_card_payment"}
+{"prompt": "Why is this not letting me exchange crypto? I need help making this transaction go through.", "answer": "beneficiary_not_allowed"}
+{"prompt": "can i add funds  with a card from the united states", "answer": "supported_cards_and_currencies"}
+{"prompt": "When will I get a virtual card? I haven't gotten one yet", "answer": "getting_virtual_card"}
+{"prompt": "What do I do if I forgot my PIN?", "answer": "pin_blocked"}
+{"prompt": "My throwaway virtual card won't work", "answer": "virtual_card_not_working"}
+{"prompt": "What do I do when I get close to the expiration date of my card?", "answer": "card_about_to_expire"}
+{"prompt": "I need to close my account.  Your company is terrible!", "answer": "terminate_account"}
+{"prompt": "ATM only gave me $20 instead of $100", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "I bought an item and now I want a refund.", "answer": "request_refund"}
+{"prompt": "I need to set up an account for my daughter, how would I do that?", "answer": "age_limit"}
+{"prompt": "I am wanting to refill my card, is there a charge?", "answer": "top_up_by_card_charge"}
+{"prompt": "Is it possible to get a new card in China?", "answer": "card_about_to_expire"}
+{"prompt": "I have a payment that has not gone through yet", "answer": "pending_card_payment"}
+{"prompt": "Is there a way to set up an auto top-up?", "answer": "automatic_top_up"}
+{"prompt": "Why is there a charged fee for debit or credit card payment?", "answer": "card_payment_fee_charged"}
+{"prompt": "I have a payment that shows twice", "answer": "transaction_charged_twice"}
+{"prompt": "There is a direct debit transaction on my statement that I think is not mine. How do I remove?", "answer": "direct_debit_payment_not_recognised"}
+{"prompt": "I might need to exchange between USD and GBP, is this possible with your app?", "answer": "exchange_via_app"}
+{"prompt": "Show me the source of my money.", "answer": "verify_source_of_funds"}
+{"prompt": "Why is my refund not visible on my statement?", "answer": "refund_not_showing_up"}
+{"prompt": "My money is back in my account after a seller contacted me stating they never received payment. I am positive it was deducted out of my account. Please get this sorted out right away.", "answer": "reverted_card_payment"}
+{"prompt": "Is there a charge for cash withdrawals? I always thought it was free.", "answer": "cash_withdrawal_charge"}
+{"prompt": "What ATMs can I use my card at?", "answer": "atm_support"}
+{"prompt": "Show me how to link the new card,", "answer": "card_linking"}
+{"prompt": "It appears my transfer was declined.", "answer": "declined_transfer"}
+{"prompt": "Help me to set up contactless payments.", "answer": "contactless_not_working"}
+{"prompt": "What are the top up fees for using an European bank card?", "answer": "top_up_by_card_charge"}
+{"prompt": "I have my card here with me and someone has just made a withdrawal for 500. Please help!", "answer": "cash_withdrawal_not_recognised"}
+{"prompt": "I'm still expecting the transaction to be finished", "answer": "transfer_not_received_by_recipient"}
+{"prompt": "I'm worried my card might be lost in the mail? How long does it usually take to arrive?", "answer": "card_delivery_estimate"}
+{"prompt": "Could not complete transfer, states 'declined'", "answer": "declined_transfer"}
+{"prompt": "My new card has arrived, what's the activation procedure?", "answer": "activate_my_card"}
+{"prompt": "If I make a mistake can I cancel the transaction?", "answer": "cancel_transfer"}
+{"prompt": "Is there a way to make my money usable in another country?", "answer": "exchange_via_app"}
+{"prompt": "There was a purchase on my card recently to a name that I don't recognize at all. What can be done about this? I need my money back.", "answer": "card_payment_not_recognised"}
+{"prompt": "I'm having trouble with proving my identity.", "answer": "unable_to_verify_identity"}
+{"prompt": "My address needs to be changed.", "answer": "edit_personal_details"}
+{"prompt": "I keep checking to see if I've received a refund that I requested from a seller, but I'm not seeing the refund. I need you to help me get the refund.", "answer": "refund_not_showing_up"}
+{"prompt": "why must I prove ID", "answer": "verify_my_identity"}
+{"prompt": "The ATM did not give me my card back?", "answer": "card_swallowed"}
+{"prompt": "Please explain to me the process of getting a virtual card.", "answer": "getting_virtual_card"}
+{"prompt": "I wanted to know why my transaction didn't go through.", "answer": "declined_transfer"}
+{"prompt": "Are there limits to businesses that will accept this card?", "answer": "card_acceptance"}
+{"prompt": "I want some extra physical cards.", "answer": "getting_spare_card"}
+{"prompt": "How long do I wait for a transfer to take?", "answer": "pending_transfer"}
+{"prompt": "I was out today looking forward to paying with my new card, turns out the payment kept getting declined. This is really sad, what's going on?", "answer": "declined_card_payment"}
+{"prompt": "I wasn't able to do a transfer to an account", "answer": "beneficiary_not_allowed"}
+{"prompt": "I want a backup second card. Is this possible?", "answer": "getting_spare_card"}
+{"prompt": "Hello, I have a question concerning an unfamiliar fee that I notice on my account. I see that you guys charge for ATM withdrawal. Never notice this fee until now. Can you please explain?", "answer": "cash_withdrawal_charge"}
+{"prompt": "I lost my phone and need help so someone doesn't access my account.", "answer": "lost_or_stolen_phone"}
+{"prompt": "I need Australian dollars instead of UK currency.", "answer": "exchange_via_app"}
+{"prompt": "Do I have to go to an actual bank to change my PIN?", "answer": "change_pin"}
+{"prompt": "Hey, I attempted to top up my card today and for some reason it didn't work. When I did it the other way it worked just fine. Could you help me figure out why this is happening please?", "answer": "top_up_failed"}
+{"prompt": "How do you do exchanges?", "answer": "exchange_rate"}
+{"prompt": "Show me how can my friends top up my account.", "answer": "topping_up_by_card"}
+{"prompt": "Why was there a fee when I pulled cash?", "answer": "cash_withdrawal_charge"}
+{"prompt": "How come there is an extra fee on my statement?", "answer": "extra_charge_on_statement"}
+{"prompt": "Can you tell me how to locate my PIN?", "answer": "get_physical_card"}
+{"prompt": "Why is the check I deposited this morning not showing up?", "answer": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "Can you tell me where to go to get a disposable virtual card?", "answer": "get_disposable_virtual_card"}
+{"prompt": "I have been waiting for my top-up to complete and it still hasn't gone through.", "answer": "pending_top_up"}
+{"prompt": "Please help me with the amount that i have withdrawn from the ATM today, the ATM has given me wrong sum of amount, and i could see that the app is displaying the greater amount than taken out.", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "Where are your cards delivered to?", "answer": "order_physical_card"}
+{"prompt": "Why is my balance the same after a transfer?", "answer": "balance_not_updated_after_bank_transfer"}
+{"prompt": "phone is at a hotel, can i still use app", "answer": "lost_or_stolen_phone"}
+{"prompt": "Why are there fees for using a card?", "answer": "card_payment_fee_charged"}
+{"prompt": "Can I edit my details?", "answer": "edit_personal_details"}
+{"prompt": "Do you have a return policy?", "answer": "request_refund"}
+{"prompt": "I am being charged a pound out of nowhere. What is this?", "answer": "extra_charge_on_statement"}
+{"prompt": "I attemped a transfer and it didn't go through.", "answer": "failed_transfer"}
+{"prompt": "Where is my top-up verification code?", "answer": "verify_top_up"}
+{"prompt": "My ID verification hasn't gone through yet, but can I use my account anyway?", "answer": "why_verify_identity"}
+{"prompt": "I bought an item then noticed the exchange rate was wrong.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Why do you have an identity check?", "answer": "why_verify_identity"}
+{"prompt": "Why isn't my topup working?", "answer": "top_up_failed"}
+{"prompt": "There is a top up that has been pending for an hour and I don't know why.  I was expecting it immediately and need it now!", "answer": "pending_top_up"}
+{"prompt": "I tried to transfer money but it didn't go through", "answer": "failed_transfer"}
+{"prompt": "How do I change my name after marriage", "answer": "edit_personal_details"}
+{"prompt": "My PIN can't access my card, can you help?.", "answer": "pin_blocked"}
+{"prompt": "Help!  I fear that my card was stolen,", "answer": "lost_or_stolen_card"}
+{"prompt": "Why check my identity?", "answer": "why_verify_identity"}
+{"prompt": "I no longer want to keep this account.", "answer": "terminate_account"}
+{"prompt": "To receive money are there charges?", "answer": "top_up_by_bank_transfer_charge"}
+{"prompt": "My card has been declined by two separate ATM, and I'm worried something is wrong with my account. Would you please see if my account is okay?", "answer": "declined_cash_withdrawal"}
+{"prompt": "Can you tell me why I can't make any transactions?", "answer": "card_not_working"}
+{"prompt": "Do you offer disposable virtual cards too?", "answer": "get_disposable_virtual_card"}
+{"prompt": "Will there be a charge for sending out more cards?", "answer": "getting_spare_card"}
+{"prompt": "In the app, where do I find my card PIN?", "answer": "get_physical_card"}
+{"prompt": "Why isn't my google top-up pay working?", "answer": "apple_pay_or_google_pay"}
+{"prompt": "What do I do now that I can't use this card?", "answer": "card_not_working"}
+{"prompt": "About two days ago now, I made a transfer from France but it hasn't arrived yet. Is it possible that the international transfer just takes longer?", "answer": "balance_not_updated_after_bank_transfer"}
+{"prompt": "What foreign exchange rate will I get on weekdays and on the weekends?", "answer": "exchange_rate"}
+{"prompt": "I attempted to get cash in the ATM but I was denied", "answer": "declined_cash_withdrawal"}
+{"prompt": "am suspicious of my card's security", "answer": "compromised_card"}
+{"prompt": "I am waiting on the refund", "answer": "refund_not_showing_up"}
+{"prompt": "The machine only paid me a hundred when I wanted 20", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "I need help with understanding why my card is not working.", "answer": "card_not_working"}
+{"prompt": "Can I use my virtual card for recurring monthly payments?", "answer": "virtual_card_not_working"}
+{"prompt": "Hi, I am interested buying crypto currency but unable to purchase it through the application. I do want to do the exchange, Could you please let me know what is the problem?", "answer": "beneficiary_not_allowed"}
+{"prompt": "I refilled my account balance but got an error message.", "answer": "top_up_reverted"}
+{"prompt": "what can I do if I got my American Express in Apple Bay but top up is not working?", "answer": "apple_pay_or_google_pay"}
+{"prompt": "What countries do you operate in?", "answer": "country_support"}
+{"prompt": "Why would the app revert my payment?", "answer": "reverted_card_payment"}
+{"prompt": "My card was used without my permission, what do I do?", "answer": "compromised_card"}
+{"prompt": "Who should I talk to or go to resolve a duplicate charge on my statement?", "answer": "transaction_charged_twice"}
+{"prompt": "Can I change my PIN without being physically present?", "answer": "change_pin"}
+{"prompt": "Where can I activate my card?", "answer": "activate_my_card"}
+{"prompt": "What do I do if my Google pay top up isn't working?", "answer": "apple_pay_or_google_pay"}
+{"prompt": "I want a mastercard", "answer": "visa_or_mastercard"}
+{"prompt": "Did a WD earlier at an ATM.  The amount showing in the App is more than I got though.", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "I have a contactless that's broken.", "answer": "contactless_not_working"}
+{"prompt": "Can I auto top if I'm low on funds?", "answer": "automatic_top_up"}
+{"prompt": "I am very dissatisfied with the services that you are providing.  I want to cancel my account.", "answer": "terminate_account"}
+{"prompt": "how many days processing new card?", "answer": "contactless_not_working"}
+{"prompt": "My identity verification isn't working", "answer": "unable_to_verify_identity"}
+{"prompt": "May I transfer a cheque into my account?", "answer": "top_up_by_cash_or_cheque"}
+{"prompt": "Will you please help me get my card back?", "answer": "card_swallowed"}
+{"prompt": "Can you tell me the limit for top ups?", "answer": "top_up_limits"}
+{"prompt": "There is a payment in the app I did not make", "answer": "card_payment_not_recognised"}
+{"prompt": "I need more physical cards than I have right now!", "answer": "getting_spare_card"}
+{"prompt": "I need my payment in another currency", "answer": "receiving_money"}
+{"prompt": "My app says I withdraw money from my account from an ATM.", "answer": "cash_withdrawal_not_recognised"}
+{"prompt": "What can I do with a disposable virtual card?", "answer": "get_disposable_virtual_card"}
+{"prompt": "How can i reset my passcode ?", "answer": "passcode_forgotten"}
+{"prompt": "What do I do if my smart phone was stolen?", "answer": "lost_or_stolen_phone"}
+{"prompt": "Tell me about the card PIN?", "answer": "get_physical_card"}
+{"prompt": "Why can't I use a disposable card?", "answer": "disposable_card_limits"}
+{"prompt": "Help, the ATM didn't give me all the money I requested", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "How do I top-up automatically?", "answer": "automatic_top_up"}
+{"prompt": "Is there any type of fee for currency exchange?", "answer": "exchange_charge"}
+{"prompt": "I ordered a card and would like to know how to track the delivery progress of it.", "answer": "card_arrival"}
+{"prompt": "My card won't work right now.", "answer": "card_not_working"}
+{"prompt": "Where can virtual cards be ordered?", "answer": "getting_virtual_card"}
+{"prompt": "how long does a US transfer take", "answer": "transfer_timing"}
+{"prompt": "I just did a transfer, but don't see the money in my account. What's up?", "answer": "transfer_timing"}
+{"prompt": "I need to exchange foreign currency will i be charged?", "answer": "exchange_charge"}
+{"prompt": "Where can I modify my information?", "answer": "edit_personal_details"}
+{"prompt": "Can you help me to quickly cancel a transaction I accidentally did to the wrong account?", "answer": "cancel_transfer"}
+{"prompt": "I thought I lost my card but I found it today, so I would like to reactivate it.", "answer": "card_linking"}
+{"prompt": "What fiat currencies do you allow exchange with?", "answer": "fiat_currency_support"}
+{"prompt": "Why does top-up need to be verified?", "answer": "verify_top_up"}
+{"prompt": "Hi - I have made a transaction to my new landlord but unfortunately it shows on my end but not on the landlord's end. The numbers are correct. Can you confirm when that will go through?", "answer": "transfer_not_received_by_recipient"}
+{"prompt": "My card got stuck in an ATM.", "answer": "card_swallowed"}
+{"prompt": "What is the process for unlocking the pin?", "answer": "pin_blocked"}
+{"prompt": "My disposable virtual card isn't working.", "answer": "virtual_card_not_working"}
+{"prompt": "Which ATMs accept Mastercard?", "answer": "atm_support"}
+{"prompt": "Can a credit card be used to transfer money?", "answer": "topping_up_by_card"}
+{"prompt": "what I need to verify my account", "answer": "why_verify_identity"}
+{"prompt": "Is it possible to give a second card from my account to my daughter?", "answer": "getting_spare_card"}
+{"prompt": "How to access my virtual card", "answer": "getting_virtual_card"}
+{"prompt": "Card payment is showing as pending", "answer": "pending_card_payment"}
+{"prompt": "I don't have my passcode to access the app.", "answer": "passcode_forgotten"}
+{"prompt": "Can you check about unauthorized use of my card, I think someone is using mine without my knowledge?", "answer": "compromised_card"}
+{"prompt": "I can't get the top-up to work! What's going on here.", "answer": "top_up_failed"}
+{"prompt": "Is it possible to order a card?", "answer": "order_physical_card"}
+{"prompt": "Is it possible for me to set up separate accounts for my kids?", "answer": "age_limit"}
+{"prompt": "Could you please put a freeze on my card?  There are some payments on it that I don't know where they came from.", "answer": "card_payment_not_recognised"}
+{"prompt": "Why are my withdrawals suddenly being declined?", "answer": "declined_cash_withdrawal"}
+{"prompt": "I still haven't received my card after two weeks, is it lost?", "answer": "card_arrival"}
+{"prompt": "I believe my card payment has reverted", "answer": "reverted_card_payment"}
+{"prompt": "Where to check top ups pending?", "answer": "pending_top_up"}
+{"prompt": "What's the reason for needing to verify my identity?", "answer": "why_verify_identity"}
+{"prompt": "Is my card accepted anywhere?", "answer": "card_acceptance"}
+{"prompt": "I was the victim of someone stealing my wallet.  My card is being used and it isn't me.  What should I do?", "answer": "cash_withdrawal_not_recognised"}
+{"prompt": "Please help me.  My disposable virtual card won't work right.", "answer": "virtual_card_not_working"}
+{"prompt": "Can I have more than 2 disposable cards?", "answer": "disposable_card_limits"}
+{"prompt": "I don't think I made this transaction on my statement", "answer": "card_payment_not_recognised"}
+{"prompt": "Is there an extra fee to exchange currencies?", "answer": "exchange_charge"}
+{"prompt": "I NEED HELP WITH MY CARD!!!!! please. It keeps getting declined when I try to use it. I have tried a few times to use it and it keeps getting rejected. I have no idea why.", "answer": "declined_card_payment"}
+{"prompt": "What countries can I use your services?", "answer": "country_support"}
+{"prompt": "I've just moved and I need to change my details", "answer": "edit_personal_details"}
+{"prompt": "I bought something and already paid for it but now I don't see it.", "answer": "reverted_card_payment"}
+{"prompt": "How old do you have to be?", "answer": "age_limit"}
+{"prompt": "I need my card as quick as possible", "answer": "card_delivery_estimate"}
+{"prompt": "I bought an item at the wrong exchange rate.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Hello, I have a pending transaction in my account due to an ATM machine that wasn't working. In any case if the transaction goes through, after how long can I get my money back?", "answer": "pending_cash_withdrawal"}
+{"prompt": "There's a payment showing in the app today even though I have not used my card at all. I want a refund.", "answer": "direct_debit_payment_not_recognised"}
+{"prompt": "For the identity verification, what do you need?", "answer": "verify_my_identity"}
+{"prompt": "Can I let other people have access to my account in order to top up?", "answer": "topping_up_by_card"}
+{"prompt": "Can I get a card although I'm not in the UK", "answer": "country_support"}
+{"prompt": "Are there ATM fees?", "answer": "cash_withdrawal_charge"}
+{"prompt": "I have money in a foreign account that I want to send to this account.", "answer": "transfer_into_account"}
+{"prompt": "why couldn't I use my card at a store?", "answer": "declined_card_payment"}
+{"prompt": "A payment is showing twice. Why is that?", "answer": "transaction_charged_twice"}
+{"prompt": "How long does it take for a cash withdrawal to show?", "answer": "pending_cash_withdrawal"}
+{"prompt": "Is it normal to see a fee for transferring money?", "answer": "transfer_fee_charged"}
+{"prompt": "This card payment isn't is recognition.", "answer": "card_payment_not_recognised"}
+{"prompt": "Im not sure if a seller is giving me my money back! I asked them to refund my money for the item but It's been a week now and still nothing has been given back to me. Can you resolve this for me?", "answer": "refund_not_showing_up"}
+{"prompt": "I was needing you to see if the exchange rate is correct from when i got cash", "answer": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "Please explain how disposable virtual card work.", "answer": "get_disposable_virtual_card"}
+{"prompt": "The app shows Direct Debit payments that I didn't make", "answer": "direct_debit_payment_not_recognised"}
+{"prompt": "Can I exchange currencies usign this app?", "answer": "exchange_via_app"}
+{"prompt": "Are their certain cash machines where I can change my pin?", "answer": "change_pin"}
+{"prompt": "I cannot tell what my top up currently is.", "answer": "topping_up_by_card"}
+{"prompt": "How can I prove who I am?", "answer": "verify_my_identity"}
+{"prompt": "Can you find out why my credit card didn't process payment? It was declined for top up so what's the deal?", "answer": "top_up_failed"}
+{"prompt": "In a month, my card will reach its expiration date, am I required to request the next card?", "answer": "card_about_to_expire"}
+{"prompt": "I tried to take out some money from an ATM earlier today and it was declined. Looking on my screen now, I still see that it's pending for that amount. I didn't actually get that money, so I don't want it processed on my account.", "answer": "pending_cash_withdrawal"}
+{"prompt": "Is it possible for a friend to personally send me a payment?", "answer": "receiving_money"}
+{"prompt": "Where would I find top up by cash deposit?", "answer": "top_up_by_cash_or_cheque"}
+{"prompt": "My card is about to expire.  How do I order another?", "answer": "card_about_to_expire"}
+{"prompt": "Help me delete my account.  I am not satisfied with the service.", "answer": "terminate_account"}
+{"prompt": "How do I stop fraud to my card?", "answer": "compromised_card"}
+{"prompt": "Can I change my PIN?", "answer": "change_pin"}
+{"prompt": "I made a payment but the app gave the money back.", "answer": "reverted_card_payment"}
+{"prompt": "My card must have used my card as there are some transactions that I haven't done myself..", "answer": "compromised_card"}
+{"prompt": "Why is the payment on my card still pending?", "answer": "pending_card_payment"}
+{"prompt": "Explain the payment that was declined!", "answer": "declined_card_payment"}
+{"prompt": "where do I go to top up with cash?", "answer": "top_up_by_cash_or_cheque"}
+{"prompt": "what is the time frame for transfers", "answer": "transfer_timing"}
+{"prompt": "How long will it take for my top up to work? It's still pending", "answer": "pending_top_up"}
+{"prompt": "Where is the closest ATM to me?", "answer": "atm_support"}
+{"prompt": "What is the process for activating a new card.", "answer": "activate_my_card"}
+{"prompt": "I want to use cash to top up.", "answer": "top_up_by_cash_or_cheque"}
+{"prompt": "I'm not able to withdraw money from the ATM but I'm not sure why.", "answer": "declined_cash_withdrawal"}
+{"prompt": "I have a top up card. Where is the verification code?", "answer": "verify_top_up"}
+{"prompt": "Are you able to delete my account?", "answer": "terminate_account"}
+{"prompt": "My card was declined", "answer": "declined_card_payment"}
+{"prompt": "Will I be fined for topping up by transfer?", "answer": "top_up_by_bank_transfer_charge"}
+{"prompt": "Can I do more than 10 transactions with a disposable card?", "answer": "disposable_card_limits"}
+{"prompt": "What should I do if I see a withdrawal is pending?", "answer": "pending_cash_withdrawal"}
+{"prompt": "How do you decide what your exchange rates are?", "answer": "exchange_rate"}
+{"prompt": "How do I get my card into the app?", "answer": "card_linking"}
+{"prompt": "How can I information on my limit for top-ups?", "answer": "top_up_limits"}
+{"prompt": "What can you tell me about the card PIN?", "answer": "get_physical_card"}
+{"prompt": "i need to expedite my card", "answer": "card_delivery_estimate"}
+{"prompt": "My card is almost going to expire.", "answer": "card_about_to_expire"}
+{"prompt": "My Identity verification hasn't passed yet is it possible to use my account?", "answer": "why_verify_identity"}
+{"prompt": "I noticed that my card was charged more than once for one thing.", "answer": "transaction_charged_twice"}
+{"prompt": "How can I exchange currencies with this app?", "answer": "exchange_via_app"}
+{"prompt": "Why did the cash deposit not show up in my account?", "answer": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "Where can I check out the source of available funds in my account?", "answer": "verify_source_of_funds"}
+{"prompt": "Why is the cash not showing in my account for the check I deposited?", "answer": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "Why was I charged extra using my card?", "answer": "card_payment_fee_charged"}
+{"prompt": "Am I able to do a SWIFT transfer with you?", "answer": "top_up_by_bank_transfer_charge"}
+{"prompt": "My top-up was rejected", "answer": "top_up_failed"}
+{"prompt": "Where do I go to add a new card?", "answer": "card_linking"}
+{"prompt": "Is auto top up available?", "answer": "automatic_top_up"}
+{"prompt": "Can I choose what card I can use", "answer": "visa_or_mastercard"}
+{"prompt": "What do I do if I cannot access the app?", "answer": "lost_or_stolen_phone"}

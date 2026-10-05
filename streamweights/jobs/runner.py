@@ -4,6 +4,7 @@ shape + streamweights metadata, SIGINT-clean, resumable."""
 from __future__ import annotations
 
 import json
+import os
 import signal
 import threading
 import time
@@ -73,7 +74,7 @@ def run_job(job: Job, engine, spec: ModelSpec, budget: MemoryBudget,
     prov = meta0.get("provenance")
     if meta0.get("run_id") and done:
         runs.mark_resumed(meta0["run_id"])
-    job.write_meta(status="running", engine=engine.name)
+    job.write_meta(status="running", engine=engine.name, pid=os.getpid())
     ckpt = open(job.checkpoint_path, "a")
     results = open(job.results_path, "a")
     try:

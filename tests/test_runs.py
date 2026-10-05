@@ -66,3 +66,18 @@ def test_manifest_lifecycle_and_cache(tmp_path, monkeypatch):
     assert runs.find_cached("qwen2.5:0.5b", "bf16", None, m["input"]["sha256"]) is None
     assert runs.find_cached("qwen2.5:0.5b", "bf16", "f" * 64, "0" * 64) is None
     assert [x["id"] for x in runs.list_runs()] == ["r1"]
+
+
+def test_models_with_runs_lists_finished_runs_for_a_hash(tmp_path, monkeypatch):
+    from streamweights import runs
+    monkeypatch.setattr(runs, "RUNS_DIR", tmp_path)
+    def man(id, model, adapter, h, status="completed", rows=5, done=5):
+        runs.write_manifest(id, {"id": id, "kind": "run", "status": status, "rows_done": done,
+                                 "model": {"id": model, "quant": "bf16", "weight_hash": "x"},
+                                 "adapter": {"id": adapter, "hash": "h"} if adapter else None,
+                                 "input": {"sha256": h, "rows": rows}, "options": {"mode": "generate"}})
+    man("r1", "qwen2.5:0.5b", None, "H")
+    man("r2", "qwen2.5:0.5b", "mine", "H")
+    man("r3", "llama3.3:70b", None, "OTHER")
+    man("r4", "qwen2.5:7b", None, "H", status="interrupted", done=2)
+    assert runs.models_with_runs("H") == ["qwen2.5:0.5b", "qwen2.5:0.5b+mine"]

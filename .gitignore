@@ -13,3 +13,9 @@ nohup.out
 /state/files/
 /runs/
 /adapters/
+/state/gate_last_check
+/state/GATE_OPEN
+/proof/
+/tools/
+/exports/
+/.build/

@@ -23,6 +23,27 @@ models:
         files: [qwen2.5-0.5b-instruct-q4_k_m.gguf]
         bytes: 491000000
 
+  qwen2.5:7b:
+    arch: {n_layers: 28, n_kv_heads: 4, head_dim: 128}
+    quants:
+      bf16:
+        convert_from: Qwen/Qwen2.5-7B-Instruct     # no public bf16 GGUF exists (only fp16)
+        files: []
+        bytes: 15230000000
+      Q8_0:
+        repo: Qwen/Qwen2.5-7B-Instruct-GGUF
+        files:
+          - qwen2.5-7b-instruct-q8_0-00001-of-00003.gguf
+          - qwen2.5-7b-instruct-q8_0-00002-of-00003.gguf
+          - qwen2.5-7b-instruct-q8_0-00003-of-00003.gguf
+        bytes: 8098525888
+      Q4_K_M:
+        repo: Qwen/Qwen2.5-7B-Instruct-GGUF
+        files:
+          - qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf
+          - qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf
+        bytes: 4683074240
+
   qwen2.5:32b:
     arch: {n_layers: 64, n_kv_heads: 8, head_dim: 128}
     quants:
@@ -65,10 +86,12 @@ models:
 # exist on 2026-10-01 (HTTP 200): 8bit and 4bit for each model.
 safetensors:
   qwen2.5:0.5b:  {repo: Qwen/Qwen2.5-0.5B-Instruct,       bytes: 988000000,    dir: bf16-st}
+  qwen2.5:7b:    {repo: Qwen/Qwen2.5-7B-Instruct,         bytes: 15231271888,  dir: bf16-st}
   qwen2.5:32b:   {repo: Qwen/Qwen2.5-32B-Instruct,        bytes: 65500000000,  dir: bf16-st}
   llama3.3:70b:  {repo: unsloth/Llama-3.3-70B-Instruct,   bytes: 141100000000, dir: bf16-st}
 
 mlx_quants:
   qwen2.5:0.5b:  {8bit: mlx-community/Qwen2.5-0.5B-Instruct-8bit, 4bit: mlx-community/Qwen2.5-0.5B-Instruct-4bit}
+  qwen2.5:7b:    {8bit: mlx-community/Qwen2.5-7B-Instruct-8bit,  4bit: mlx-community/Qwen2.5-7B-Instruct-4bit}
   qwen2.5:32b:   {8bit: mlx-community/Qwen2.5-32B-Instruct-8bit,  4bit: mlx-community/Qwen2.5-32B-Instruct-4bit}
   llama3.3:70b:  {8bit: mlx-community/Llama-3.3-70B-Instruct-8bit, 4bit: mlx-community/Llama-3.3-70B-Instruct-4bit}

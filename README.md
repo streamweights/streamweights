@@ -1,166 +1,77 @@
 # streamweights
 
-Run the unmodified full-size model against your eval set, on your machine, for free, overnight.
-
-## Why
-
-A model bigger than your machine normally means renting GPUs, and the moment you rent, the whole development loop changes: data leaves the building, iteration gets a meter on it, and "just run the eval again" becomes a budget conversation.
-
-streamweights streams the full bf16 model from disk in layer order at drive speed instead of holding it in memory. One forward pass reads every weight once, whether the batch holds one prompt or two hundred - so each prompt advances one token per pass, a single answer takes minutes, and hundreds of prompts per pass are what make the total worthwhile.
-
-It is for developers who need exact, unquantized results on an eval set and don't want data leaving the machine. It is not a chat tool.
-
-## Requirements
-
-- Apple silicon Mac. Tested on 48 GB (M4 Pro). The memory budget is calibrated at runtime; on 32 GB the same math leaves roughly half the batch headroom (expect ~2× the wall time for streamed models), and on 16 GB the KV budget after the ring and resident tensors is small enough that streamed 70B batches will be tiny - it should run, but overnight becomes days; untested.
-- Free disk per curated model, plus a 20 GB floor that downloads never cross:
-  - llama3.3:70b: 141 GB bf16 (first download: 141 GB), 75 GB 8-bit; needs ~151 GB+ free for bf16.
-  - qwen2.5:32b: 65 GB bf16, 35 GB 8-bit; needs ~81 GB+ free.
-  - qwen2.5:0.5b: 1 GB bf16; needs ~21 GB+ free.
-- Python 3.10 or newer.
-- Linux and Intel Macs get the llama.cpp path today, which is slow and not the point yet.
+Build your own model on the Mac you already own.
 
 ## Quick start
 
 ```
 pip install git+https://github.com/streamweights/streamweights
-spill run llama3.3:70b sample
+spill example banking77 --quick && spill build banking77-quick
 ```
 
-Real output from the machine above (pre-run line, then the live frame that redraws every pass):
+@@QUICK_TABLE@@
+
+## How it works in one picture
+
+![your files go into spill build, which makes your model; a big model optionally helps](docs/img/flow.svg)
+
+- **your exam** (`evals.jsonl`): questions with the right answers. Every model is graded on it, never trained on it.
+- **your homework**: `train.jsonl` with your answers, or `prompts.jsonl` with questions the big model answers.
+- **your model**: a small add-on (an adapter) trained on top of a base, named after your folder.
+
+## Which path, and how long
+
+![three bars with lengths proportional to measured time](docs/img/paths.svg)
+
+@@PATHS_TABLE@@
+
+## Copy or surpass
+
+Trained on the big model's answers, a small model gets close to it at a fraction of the size.
+@@COPY_NUMBERS@@
+
+Trained on your own ground truth, it can beat it on your task. @@SURPASS_NUMBERS@@
+
+The big model is needed when labels are short, as the bar, or to train on directly when small isn't enough. Training it directly takes several nights on a laptop, and training and prefill scale with GPU cores (faster on Max and Ultra chips), while evals are limited by the disk.
+
+## Ship it
 
 ```
-spill: llama3.3:70b bf16 (131.4 GB, Llama 3.x: verified) does not fit in 48 GB RAM; streaming from NVMe at ~4.0 GB/s (measured engine rate). 20 prompts, batch 20, est. 5 min. Cost: $0. Results -> jobs/20261002-163536-e076cf/results.jsonl (tail with: spill tail)
-   why: batch ~20 (admission by memory, not count): (0.85×36.0G target − 7.1G measured base) ÷ (277 KB/seq-token × 91 mean tokens (actual prompt lens + 48 max_tokens)); rows admitted while calibrated cost fits
-
-rows 0/20 · pass 1 (37.5 s) · 0.5 tok/s · ETA 30m 09s · bf16 · batch 20 · ~37.5 s per token per prompt · 8.7 GB peak
-  hamlet-author         1 tok │ The
-  continents            1 tok │ There
-  mona-lisa             1 tok │ The
-  capital-france        1 tok │ The
-  smallest-prime        1 tok │ The
-  red-planet            1 tok │ The
-  seven-times-eight     1 tok │ 7
-  largest-ocean         1 tok │ The
+spill export qwen2.5:7b+banking77 --gguf q8_0 --ollama
 ```
 
-Your own eval set is OpenAI batch JSONL, one request per line:
+That merges the adapter into the base, converts to GGUF with llama.cpp's own converter, writes an Ollama Modelfile beside it, and, if Ollama is installed, runs `ollama create` and prints the `ollama run` line. @@EXPORT_LINE@@
 
-```
-spill run llama3.3:70b your-evals.jsonl
-```
+## What build does
 
-```json
-{"custom_id": "q1", "body": {"messages": [{"role": "user", "content": "What is the capital of France?"}], "max_tokens": 48}}
-```
+The four steps as individual commands, if you want to stop between them:
 
-Any Hugging Face repo id with a supported architecture also works:
+- `spill distill llama3.3:70b prompts.jsonl --out prompts.distill.jsonl` the big model answers your questions
+- `spill tune qwen2.5:7b train.jsonl --name mine` train the adapter (with no file it takes the folder's newest `*.distill.jsonl` or `train.jsonl`)
+- `spill eval evals.jsonl qwen2.5:7b qwen2.5:7b+mine llama3.3:70b` grade every model on the exam (with no models it uses every model that has a run against that file)
+- `spill export qwen2.5:7b+mine --gguf` ship it
 
-```
-spill run org/name your-evals.jsonl
-```
+Every command ends by printing the one that usually comes next. Formats are in [docs/formats.md](docs/formats.md), flags in [docs/cli.md](docs/cli.md), models in [docs/models.md](docs/models.md).
 
-## The loop
+## Requirements
 
-streamweights is the local half of building your own model: run, distill, tune, eval, against full-precision open models. The eval set is the central artifact, and every command is a run against it.
+- An Apple silicon Mac (tested on a 48 GB M4 Pro); Linux and Intel Macs get the slow llama.cpp path.
+- Python 3.10 or newer.
+- Disk for the models you use plus a 20 GB floor that downloads never cross (the 7B student is 15 GB, the 70B teacher 141 GB).
+- Plugged in for anything long: long jobs hold the Mac awake and warn when it is on battery. `spill doctor` checks your machine.
 
-| verb | what it does | example |
-|---|---|---|
-| run | the full-size model (optionally with a LoRA adapter) over your file | `spill run llama3.3:70b+./my-adapter evals.jsonl` |
-| distill | the teacher's completions with per-token top-k log-probs, or its log-probs over targets you supply (`--score`, prefill only, no sampling) | `spill distill llama3.3:70b prompts.jsonl --logprobs 32` |
-| tune | train an adapter on that data | next, not yet available |
-| eval | the same eval set through several models, one table | `spill eval evals.jsonl llama3.3:70b llama3.3:70b+./my-adapter --metric contains` |
+## Under the hood
 
-`spill eval` runs each model that has no finished run for this exact input file (matched by hash; `--rerun` forces), scores every row, prints one table (model, quant, adapter, rows, metric mean, p50 and p95 per-row latency, tokens) and writes `runs/eval-<id>/table.md` plus `diff.jsonl`, the rows where the models disagree. Metrics: `exact_match`, `contains`, `regex`, `json_field`, `judge` (a second model grades each row with a rubric, `--judge <model>`), and `script:<file.py>` (a Python file exposing `score(row) -> float`).
+The full bf16 model is streamed from disk in layer order instead of held in memory: one forward pass reads every weight once whether the batch holds one prompt or five hundred, so a 70B model that cannot fit in 48 GB still runs every row at full precision. Rows that share a system prompt compute its keys and values once. Training streams the same way, recomputing each layer on the way back. Everything else is plain MLX on Apple silicon.
 
-An adapter is a local directory or Hugging Face repo in PEFT or mlx-lm layout. Both engines apply the LoRA deltas at the layer boundary, after each layer's base weights are bound, so the streamed bytes never change and adapter weights stay resident. `spill adapters` lists the ones under `adapters/`.
+## Status
 
-`--logprobs K` (K up to 64) adds `logprobs: [{token_id, logprob, top: [[id, logprob], ...]}]` to each output row. `--full-logits` also writes one float16 `.npy` of logits per row, for sets under 200 rows (it refuses above that and tells you the size it would have written).
-
-### Formats
-
-One family of JSONL, the OpenAI shapes you already have. Training and distillation data are OpenAI fine-tuning chat lines (roles, optional `weight` of 0 or 1 on assistant messages); eval rows are the same plus an `expected` field of any JSON type. Batch lines (`custom_id` plus `body`) work everywhere chat lines do.
-
-Training or distillation target (`spill distill --score`):
-
-```json
-{"messages": [{"role": "user", "content": "What is the capital of France?"}, {"role": "assistant", "content": "The capital of France is Paris."}]}
-```
-
-Eval row (`spill eval`):
-
-```json
-{"messages": [{"role": "user", "content": "What is the capital of France?"}], "expected": "Paris", "max_tokens": 48}
-```
-
-`spill check <file>` validates a file and prints the first error with its line number.
-
-### Provenance
-
-Every run writes `runs/<id>/manifest.json` (command, model id and weight fingerprint, quant, adapter id and hash, input file hash, engine version, hardware probe, start and end) and stamps each result row with its run id and the same hashes, so any number in an eval table can be traced to the exact weights, adapter and input that produced it; `spill runs` lists them.
-
-## Models and architectures
-
-| tag | params | family (state) | bf16 | 8-bit | on 48 GB | disk needed | 
-|---|---|---|---|---|---|---|
-| qwen2.5:0.5b | 0.5B | Qwen2/2.5 (verified) | 0.9 GB | 0.7 GB | resident | 21 GB+ |
-| qwen2.5:32b | 32B | Qwen2/2.5 (verified) | 61 GB | 33 GB | streamed | 81 GB+ |
-| llama3.3:70b | 70B | Llama 3.x (verified) | 131 GB | 70 GB | streamed | 151 GB+ |
-
-Architecture families (`spill models --architectures` prints the live table):
-
-| state | families | 
-|---|---|
-| verified | Llama 3.x · Qwen2/2.5 · Qwen3 (dense) · Phi 3/4 · Gemma 2 · Mistral |
-| expected | Gemma 3 (text) - per-layer alternating sliding-window attention needs per-layer cache windows; not wired yet |
-| not_yet | Mixtral, DeepSeek V2/V3, Qwen MoE, Llama 4 - mixture-of-experts: per-token expert routing defeats layer-order streaming. Multimodal (anything with a vision tower) - vision towers are not streamed. Mamba - state-space recurrence has no KV cache to batch around. Jamba - recurrent layers break the per-layer stream loop. |
-
-"Verified" means the streamed output was tested identical to in-memory execution on 20 prompts, plus first-token agreement with an independent mlx-lm implementation. A family moves from expected to verified when a small model of that family passes both tests.
-
-## What to expect on a 48 GB M4 Pro
-
-Measured on the full 2,000-row eval set (all rows completed):
-
-| model | quant | placement | tier (rows) | pass time | batch | first visible text | measured time |
-|---|---|---|---|---|---|---|---|
-| qwen2.5:0.5b | bf16 | resident | full set | ~0.1 s | up to 512 | < 10 s | ~6 min |
-| llama3.3:70b | bf16 | streamed | short-QA (667) | 33-38 s | 100-300 | 41 s (sample) | 1,334 rows in 15 h 35 m unattended (Phase 1.6 engine) |
-| llama3.3:70b | bf16 | streamed | summarize-300w (667) | 33-40 s | 70-150 | | (same unattended leg) |
-| llama3.3:70b | bf16 | streamed | doc-QA-1k (666) | 33-37 s clean; 45-90 s with refill prefill | 39-50 | | 666 rows in 23 h 51 m, zero interventions (Phase 2.5 engine) |
-| llama3.3:70b | 8-bit | streamed | sample only | ~19 s | ~76 | ~25 s (sample) | ~17.6 h (estimated) |
-
-## Usage
-
-- `spill run <model>[+<adapter>] <input.jsonl|sample>` - flags: `--quant 8bit|4bit|Q8_0|Q4_K_M`, `--out path`, `--context N`, `--parallel N` (override, never required), `--logprobs K`, `--full-logits`, `--quiet` (no live block), `--debug` (tracebacks).
-- `spill distill <teacher> <file.jsonl> [--score] [--logprobs K]` - distillation JSONL from a full-size teacher.
-- `spill eval <evals.jsonl> <model>... [--metric M] [--judge model] [--rerun]` - one table across models.
-- `spill check <file.jsonl>` - validate a file; first error with its line number.
-- `spill runs` - every run with model, quant, adapter, input hash, rows, status.
-- `spill adapters` - local LoRA adapters.
-- `spill tail [job]` - follow a job's results; shows the live block while it runs.
-- `spill resume [job]` - continue the latest or named job from its checkpoint.
-- `spill status` - all jobs with progress, tokens/s, ETA.
-- `spill models` / `spill models --architectures` - the tables above, live.
-
-Results land in `jobs/<id>/results.jsonl` (OpenAI batch output shape plus a `streamweights` metadata object). `finish_reason` is `stop` when the model emitted a real end-of-turn token and `length` when the row hit its own max_tokens. Close the laptop whenever: completed rows are checkpointed per row, and `spill resume` continues from exactly there.
-
-## How it works
-
-The safetensors headers are parsed into a per-layer byte index without loading any tensors. A ring of preallocated buffers is filled by pooled `pread` calls with `F_NOCACHE`, so weights move at drive speed and never pollute the page cache. Pass time is flat in batch size because one pass reads every weight exactly once no matter how many prompts share it. The memory budget is KV-bound and calibrated by probe runs at two batch sizes, then rows are admitted while their measured cost fits under 85% of the Metal working set. When a sequence finishes, the next pending row is prefilled inside the same weight-stream pass and takes over the slot. Streamed execution is bit-identical to running the same loop with all weights in memory.
-
-## Status and roadmap
-
-- Phase 0 (done): measured the mmap baseline - 11–13% of drive speed, 175 s per 70B pass.
-- Phase 1 (done): streaming runner - 31.6 s per 70B bf16 pass at 79% of drive speed, identical-output gate 20/20.
-- Phase 1.5 (done): measured memory calibration; bf16 holds as the no-flags default.
-- Phase 1.6 (done): stranger-installable; six families verified; proof run measured as a partial: 1,400 of 2,000 rows in 15.6 h unattended (the short and summarize tiers, completely); the long-prompt tier runs ~100 s/pass under memory-pressure fault storms, full set projected ~50 h on the current engine; fix in progress (knee-targeting memory budget, batched prefill).
-- Phase 2 (done): the loop - run store and manifests, per-token log-probs, `spill distill` (generation and teacher-forced), LoRA adapters at inference on both engines, metrics, `spill eval`, `spill check`. Verified on the 0.5b against an independent mlx-lm reference.
-- Next: `spill tune` (Phase 3), the long-tier engine fixes (batched prefill, knee-targeting memory budget), outside-developer testing; then the CPU path and MoE. Plan: [docs/plan.md](docs/plan.md).
+Phases 0 to 3.5 are done: run, distill, tune, eval, build, export. Next is vision-language models, then batched prefill, a CPU path and mixture-of-experts ([docs/plan.md](docs/plan.md)). Measured numbers for every phase are in [docs/reports](docs/reports).
 
 ## Feedback
 
-If you try it, send a transcript of your first fifteen minutes and the one moment you got stuck. Open an issue or reply to whoever sent you the link.
+Send a transcript of your first fifteen minutes and the one moment you got stuck. Open an issue.
 
 ## License
 
-Apache-2.0.
+Apache-2.0. The banking77 example data is CC BY 4.0 (PolyAI), see its README.

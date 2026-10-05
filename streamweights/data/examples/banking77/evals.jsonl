@@ -1,0 +1,300 @@
+{"prompt": "My recent transfer needs to be cancelled immediately; it was a mistake, please can you cancel it before it goes through?", "expected": "cancel_transfer"}
+{"prompt": "I have a pending cash withdrawal", "expected": "pending_cash_withdrawal"}
+{"prompt": "What do I do with my card PIN?", "expected": "get_physical_card"}
+{"prompt": "When will my card payment be done pending?", "expected": "pending_card_payment"}
+{"prompt": "got married, need to change account name", "expected": "edit_personal_details"}
+{"prompt": "I need to change my PIN. Can I do that at a cash machine?", "expected": "change_pin"}
+{"prompt": "I asked for $100 cash but only got $20?", "expected": "wrong_amount_of_cash_received"}
+{"prompt": "i live in the US can i still get a card?", "expected": "country_support"}
+{"prompt": "Why did I get a fee?", "expected": "cash_withdrawal_charge"}
+{"prompt": "I don't recognise a cash withdrawal", "expected": "cash_withdrawal_not_recognised"}
+{"prompt": "How old does one have to be to have an account with the bank?", "expected": "age_limit"}
+{"prompt": "My card is stuck in the ATM, what can I do?", "expected": "card_swallowed"}
+{"prompt": "Help me with my contactless which isn't working.", "expected": "contactless_not_working"}
+{"prompt": "I am seeing pending from the card payment I made.", "expected": "pending_card_payment"}
+{"prompt": "Is there an option to top up a with cheque?", "expected": "top_up_by_cash_or_cheque"}
+{"prompt": "What ATMs will accept this type of card?", "expected": "atm_support"}
+{"prompt": "transaction failed?", "expected": "transfer_not_received_by_recipient"}
+{"prompt": "How long until my friend receives my transaction?", "expected": "transfer_not_received_by_recipient"}
+{"prompt": "I can't use my card.", "expected": "card_not_working"}
+{"prompt": "I went to top up and it is no longer there.  Was it sent back?", "expected": "top_up_reverted"}
+{"prompt": "I want to know if there is a maximum I can top up.", "expected": "top_up_limits"}
+{"prompt": "I have a payment I didn't do", "expected": "card_payment_not_recognised"}
+{"prompt": "Why would I have a pending payment?", "expected": "pending_card_payment"}
+{"prompt": "I had a cheque deposited, but I still haven't seen the cash.", "expected": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "Why did I only get $20 when I tried to get $100", "expected": "wrong_amount_of_cash_received"}
+{"prompt": "When topping up by transfer, will I be charged?", "expected": "top_up_by_bank_transfer_charge"}
+{"prompt": "Is it possible to also get a disposable virtual card?", "expected": "get_disposable_virtual_card"}
+{"prompt": "There appears to have been a reversion in my top up", "expected": "top_up_reverted"}
+{"prompt": "How long should I expect for the card to arrive?", "expected": "card_delivery_estimate"}
+{"prompt": "I would like to refill my account using SWIFT.", "expected": "top_up_by_bank_transfer_charge"}
+{"prompt": "why was my transfer declined", "expected": "declined_transfer"}
+{"prompt": "My transfer has been declined and I know it should have went through.", "expected": "declined_transfer"}
+{"prompt": "Which forms of currency are accepted?", "expected": "supported_cards_and_currencies"}
+{"prompt": "I am concerned about the security in my account and would like to make a dispute.", "expected": "direct_debit_payment_not_recognised"}
+{"prompt": "What fiat currencies are used for holding transactions?", "expected": "fiat_currency_support"}
+{"prompt": "help me obtain a virtual card", "expected": "getting_virtual_card"}
+{"prompt": "My address has updated and I need to change it.", "expected": "edit_personal_details"}
+{"prompt": "can i top up with apple pay", "expected": "apple_pay_or_google_pay"}
+{"prompt": "The ATM keeps declining my card. I tried at two different ATMs. Can you tell me if there's an issue with my account?", "expected": "declined_cash_withdrawal"}
+{"prompt": "What are the fees of using an international card to add money?", "expected": "top_up_by_card_charge"}
+{"prompt": "I don't recognize a debit payment that was made and would like to find out about the payment.", "expected": "direct_debit_payment_not_recognised"}
+{"prompt": "How come I don't see my deposit in my account yet?", "expected": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "how to change name", "expected": "edit_personal_details"}
+{"prompt": "Can I top up by cheque?", "expected": "top_up_by_cash_or_cheque"}
+{"prompt": "I tried to top up using my card, but now the money just disappeared!", "expected": "topping_up_by_card"}
+{"prompt": "Does it cost extra to exchange currencies?", "expected": "exchange_charge"}
+{"prompt": "what are exchange rates based on", "expected": "exchange_rate"}
+{"prompt": "Can I reactivate a card I thought I lost?", "expected": "card_linking"}
+{"prompt": "If I want a physical card, do I have to pay anything?", "expected": "order_physical_card"}
+{"prompt": "What's the most disposable cards I can have?", "expected": "disposable_card_limits"}
+{"prompt": "Can I order extra cards?", "expected": "getting_spare_card"}
+{"prompt": "The ATM gave me the wrong amount of cash today when I went to withdraw. The app says it was more.", "expected": "wrong_amount_of_cash_received"}
+{"prompt": "What is the youngest someone can be to open an account?", "expected": "age_limit"}
+{"prompt": "Why do I have to verify my identity?", "expected": "why_verify_identity"}
+{"prompt": "There was an extra charge when I made a transfer.", "expected": "transfer_fee_charged"}
+{"prompt": "Where can you deliver cards?", "expected": "order_physical_card"}
+{"prompt": "I requested a refund, and never received it. What can I do?", "expected": "refund_not_showing_up"}
+{"prompt": "Can I open an account for a child?", "expected": "age_limit"}
+{"prompt": "What is accepted in regards to cards and currencies?", "expected": "supported_cards_and_currencies"}
+{"prompt": "I attempted to use my card while I was intoxicated, and I failed to input my PIN, and the machine kept my card. How soon can I have it back?", "expected": "pin_blocked"}
+{"prompt": "Can I use my card at any ATMs?", "expected": "atm_support"}
+{"prompt": "Is there a disposable virtual card I can order?", "expected": "get_disposable_virtual_card"}
+{"prompt": "I want to skip verification of my identity.", "expected": "why_verify_identity"}
+{"prompt": "My card payment did not work.", "expected": "declined_card_payment"}
+{"prompt": "How long will it take to activate my new card?", "expected": "activate_my_card"}
+{"prompt": "How do I deposit my paycheck to this account?", "expected": "receiving_money"}
+{"prompt": "My account got charged for taking out cash, why did this happen?", "expected": "cash_withdrawal_charge"}
+{"prompt": "Why won't my passcode work?", "expected": "passcode_forgotten"}
+{"prompt": "Why did you charge me for a cash withdrawal?", "expected": "cash_withdrawal_charge"}
+{"prompt": "The exchange rate on my purchase is wrong.", "expected": "card_payment_wrong_exchange_rate"}
+{"prompt": "I need to find out why my transfer didn't get there.", "expected": "transfer_not_received_by_recipient"}
+{"prompt": "Cash withdrawal still pending?", "expected": "pending_cash_withdrawal"}
+{"prompt": "How much does it cost in fees to use your card?", "expected": "order_physical_card"}
+{"prompt": "I tried activating my bill of fare and it didn't workplace", "expected": "activate_my_card"}
+{"prompt": "How can I get a second card for my daughter?", "expected": "getting_spare_card"}
+{"prompt": "Is there a verification code for the top-up card?", "expected": "verify_top_up"}
+{"prompt": "are both visa and mastercard available to me?", "expected": "visa_or_mastercard"}
+{"prompt": "I had a transfer blocked", "expected": "beneficiary_not_allowed"}
+{"prompt": "Could you please activate my card", "expected": "activate_my_card"}
+{"prompt": "And what about the Card's PIN?", "expected": "get_physical_card"}
+{"prompt": "When should I expect to see my transfer hit my account?", "expected": "transfer_timing"}
+{"prompt": "How many disposable cards can I have?", "expected": "disposable_card_limits"}
+{"prompt": "How can I transfer funds from my bank to my top up account?", "expected": "transfer_into_account"}
+{"prompt": "I have a pending payment from stuff I bought this morning.", "expected": "pending_card_payment"}
+{"prompt": "Why doesn't the card payment work", "expected": "declined_card_payment"}
+{"prompt": "What do I do since the machine swallowed my card. I need one.", "expected": "card_swallowed"}
+{"prompt": "I recently got a new place while I'm staying abroad and have been using this account to manage payments, but suddenly I am seeing fees increase. Where are these additional fees coming from?", "expected": "transfer_fee_charged"}
+{"prompt": "How can I change the PIN?  Do I have to go to a real bank?", "expected": "change_pin"}
+{"prompt": "The app failed to verify my identity.", "expected": "unable_to_verify_identity"}
+{"prompt": "Where do you support?", "expected": "country_support"}
+{"prompt": "How long does an item I bought show as pending?", "expected": "pending_card_payment"}
+{"prompt": "Is there a limit on how much I can withdraw from my account without being charged?", "expected": "cash_withdrawal_charge"}
+{"prompt": "They charged me for paying with my card.", "expected": "card_payment_fee_charged"}
+{"prompt": "I've now been trying to do a really standard transfer 5 times already. What's going on, is your system broken or something?!", "expected": "failed_transfer"}
+{"prompt": "What steps must I follow to get a Visa credit card?", "expected": "visa_or_mastercard"}
+{"prompt": "Why was the transfer declined?", "expected": "declined_transfer"}
+{"prompt": "Hi! I was wondering if you can help me. I used the city centre ATM to get some cash, but the machine declined my card. My account shows that transaction is still pending. I didn't receive the money, so please cancel that transaction.", "expected": "pending_cash_withdrawal"}
+{"prompt": "I was contacted by a seller with a message that they never received my money. I am 100% sure it was taken from my account so I definitely need this sorted out soon.", "expected": "reverted_card_payment"}
+{"prompt": "Do you support any currency?", "expected": "fiat_currency_support"}
+{"prompt": "My bank transfer is still not showing up in my account.", "expected": "balance_not_updated_after_bank_transfer"}
+{"prompt": "the balance on my account didnt change when i transferred money", "expected": "balance_not_updated_after_bank_transfer"}
+{"prompt": "The refund isn't showing up on my account.", "expected": "refund_not_showing_up"}
+{"prompt": "I am attempting to make a purchase online, but my card is not working.  I know there are funds available, is this an issue on the banks end?", "expected": "reverted_card_payment"}
+{"prompt": "Why did I need to verfiy my identity?", "expected": "why_verify_identity"}
+{"prompt": "This company is terrible! Can you delete my account?", "expected": "terminate_account"}
+{"prompt": "It doesn't let me verify my identity.", "expected": "unable_to_verify_identity"}
+{"prompt": "Why isn't my top up working using my saved American Express in ApplePay?", "expected": "apple_pay_or_google_pay"}
+{"prompt": "Can I link an existing card?", "expected": "card_linking"}
+{"prompt": "I'm attempting to top-up my account but it has been pending for an hour.", "expected": "pending_top_up"}
+{"prompt": "How do I use contactless pay?", "expected": "contactless_not_working"}
+{"prompt": "Where can I find the top-up verification code?", "expected": "verify_top_up"}
+{"prompt": "How can I fix a problem where my virtual card is rejected?", "expected": "virtual_card_not_working"}
+{"prompt": "What can I use a virtual disposable card for?", "expected": "disposable_card_limits"}
+{"prompt": "My cash withdrawal charged me the wrong exchange rate", "expected": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "How do I pay by check?", "expected": "top_up_by_cash_or_cheque"}
+{"prompt": "How long to I have to wait for a transfer to reach my account?", "expected": "transfer_timing"}
+{"prompt": "What is the reason that my card payment was cancelled?", "expected": "reverted_card_payment"}
+{"prompt": "Why can't I verify my id?", "expected": "unable_to_verify_identity"}
+{"prompt": "How do I transfer money using a credit card?", "expected": "topping_up_by_card"}
+{"prompt": "What ATMs can I withdraw money from?", "expected": "atm_support"}
+{"prompt": "When I submit a transfer, it is being declined.  The information I put in has been reviewed.", "expected": "declined_transfer"}
+{"prompt": "Heyy I tried to top up with my card today but it failed! I just got the couple days before but it has worked last time. What's going on, can you double check please?", "expected": "top_up_failed"}
+{"prompt": "There is a suspicious cash withdraw on the account.", "expected": "cash_withdrawal_not_recognised"}
+{"prompt": "How do I update my details?", "expected": "edit_personal_details"}
+{"prompt": "Can I get one of your cards in the EU", "expected": "country_support"}
+{"prompt": "I have 1 other US card.  Can you take that?", "expected": "supported_cards_and_currencies"}
+{"prompt": "I am having issues with identity verification", "expected": "unable_to_verify_identity"}
+{"prompt": "I have a strange cash withdrawal in my statement", "expected": "cash_withdrawal_not_recognised"}
+{"prompt": "Please check payments on my card. There is a duplicate and I only bought it once.", "expected": "transaction_charged_twice"}
+{"prompt": "If the transfer details have already but reviewed and confirmed that they are correct, what other reason would cause my transfer to be declined?", "expected": "declined_transfer"}
+{"prompt": "Why do you need all this information about my Source of Funds?", "expected": "verify_source_of_funds"}
+{"prompt": "My disposable virtual card is not working when I try to use it at a point of sale transaction. What do I do now?", "expected": "virtual_card_not_working"}
+{"prompt": "How much am I charged to receive money?", "expected": "top_up_by_bank_transfer_charge"}
+{"prompt": "I didn't get the right amount at the ATM.", "expected": "wrong_amount_of_cash_received"}
+{"prompt": "How do I report my card lost or stolen?", "expected": "lost_or_stolen_card"}
+{"prompt": "The exchange rate you gave me for my cash withdrawal is wrong", "expected": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "I am not Happy with this product can i get a refund?", "expected": "request_refund"}
+{"prompt": "Can I use my American Express to add money to my account?", "expected": "supported_cards_and_currencies"}
+{"prompt": "Is there currency exchange on this app?", "expected": "exchange_via_app"}
+{"prompt": "I'v exhausted all the of times I can try my PIN", "expected": "pin_blocked"}
+{"prompt": "I live in the US but want to get a card", "expected": "country_support"}
+{"prompt": "I made a currency exchange and think I was charged more than I should of been.", "expected": "card_payment_wrong_exchange_rate"}
+{"prompt": "I receive my salary in GBP. Do I need to configure this somehwere?", "expected": "receiving_money"}
+{"prompt": "When I travel, what will it cost to switch for my currency?", "expected": "exchange_charge"}
+{"prompt": "Tell me which cards and what currency is supported.", "expected": "supported_cards_and_currencies"}
+{"prompt": "Top up on my Google Pay isn't working.", "expected": "apple_pay_or_google_pay"}
+{"prompt": "What is a disposable virtual card?", "expected": "get_disposable_virtual_card"}
+{"prompt": "In my statement there is a payment that is I do not recognize", "expected": "card_payment_not_recognised"}
+{"prompt": "My withdrawl is still pending.  Why?", "expected": "pending_cash_withdrawal"}
+{"prompt": "I requested a virtual card but it is not showing up. Why?", "expected": "getting_virtual_card"}
+{"prompt": "Why is my cash withdrawal from the ATM still not yet showing as confirmed in my account?", "expected": "pending_cash_withdrawal"}
+{"prompt": "There is a transaction from my account that I don't recognize can you trace back the information so I can make sure it's something I did or not?", "expected": "direct_debit_payment_not_recognised"}
+{"prompt": "I accidentally blocked my PIN. How do I reset it?", "expected": "pin_blocked"}
+{"prompt": "I got some cash of an ATM earlier but this shows up as pending in the app. How can this be still pending, I've got the cash already?", "expected": "pending_cash_withdrawal"}
+{"prompt": "How do I use a disposable virtual card?", "expected": "get_disposable_virtual_card"}
+{"prompt": "This is very frustrating. I can't get my card to work on any ATM I try and I've tried 3 of them so far. What's going on? Can you please fix this issue immediately?", "expected": "declined_cash_withdrawal"}
+{"prompt": "There is more than one of the same transaction on my account.", "expected": "transaction_charged_twice"}
+{"prompt": "I'm unable to use contactless payments for purchases.", "expected": "contactless_not_working"}
+{"prompt": "What do you need so I can verify my identity?", "expected": "verify_my_identity"}
+{"prompt": "Do you know why my contactless won't work?", "expected": "contactless_not_working"}
+{"prompt": "The app doesn't know it's me.", "expected": "unable_to_verify_identity"}
+{"prompt": "Do you accept checks?", "expected": "top_up_by_cash_or_cheque"}
+{"prompt": "how old do i need to be to get an account for myself", "expected": "age_limit"}
+{"prompt": "Can you explain the virtual cards limit?", "expected": "disposable_card_limits"}
+{"prompt": "What do you base your exchange rates on?", "expected": "exchange_rate"}
+{"prompt": "I have to have several disposable cards per day.", "expected": "disposable_card_limits"}
+{"prompt": "Do you have to order a new card before your current card expires?", "expected": "card_about_to_expire"}
+{"prompt": "If I will be traveling, is there a way to auto top-up my card on certain days?", "expected": "automatic_top_up"}
+{"prompt": "i think someone is using my card to withdraw money. Someone stole my wallet. What can I do? it is urgent.", "expected": "cash_withdrawal_not_recognised"}
+{"prompt": "Tell me why my virtual disposable card won't work.", "expected": "virtual_card_not_working"}
+{"prompt": "How can I get a physical card", "expected": "order_physical_card"}
+{"prompt": "I thought cash withdrawals were free? Why have I been charged a fee? Also, how much is this fee?", "expected": "cash_withdrawal_charge"}
+{"prompt": "My card payment was reverted.  Why?", "expected": "reverted_card_payment"}
+{"prompt": "Can I get a real card?", "expected": "order_physical_card"}
+{"prompt": "How much money can i top up?", "expected": "top_up_limits"}
+{"prompt": "How old do I have to be?", "expected": "age_limit"}
+{"prompt": "What steps do I take to receive another passcode?", "expected": "passcode_forgotten"}
+{"prompt": "I might need AUD instead of GBP, how to change?", "expected": "exchange_via_app"}
+{"prompt": "If I need GBP instead of AUD what do I do?", "expected": "exchange_via_app"}
+{"prompt": "My card is about to expire. What do I need to do?", "expected": "card_about_to_expire"}
+{"prompt": "I've been charged more than once for the same transaction", "expected": "transaction_charged_twice"}
+{"prompt": "Are there any extra fees for adding money into the international card?", "expected": "top_up_by_card_charge"}
+{"prompt": "May I use my account now, even though the identity verification has not gone through yet?", "expected": "why_verify_identity"}
+{"prompt": "How can I activate my card so I can start using it?", "expected": "activate_my_card"}
+{"prompt": "What should I do to get transactions off of my account if I didn't make them?  My card must have been compromised and I need to freeze it asap!", "expected": "card_payment_not_recognised"}
+{"prompt": "When will a transfer reach my account?", "expected": "transfer_timing"}
+{"prompt": "The expiration date of my card is approaching .", "expected": "card_about_to_expire"}
+{"prompt": "A cheque deposit hasn't posted to my account, when will my balance update?", "expected": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "I cannot use my disposable virtual card.", "expected": "virtual_card_not_working"}
+{"prompt": "The app won't let me log in as myself.", "expected": "unable_to_verify_identity"}
+{"prompt": "I think my top-up was cancelled.", "expected": "top_up_reverted"}
+{"prompt": "How do I know which ATMs will accept this card?", "expected": "atm_support"}
+{"prompt": "The withdrawal was declined I am unsure as to why this happened?", "expected": "declined_cash_withdrawal"}
+{"prompt": "My transfer to beneficiary didn't go through", "expected": "beneficiary_not_allowed"}
+{"prompt": "I am still waiting for a money transfer to show", "expected": "pending_transfer"}
+{"prompt": "I made a bank transfer and my account balance did not show it.", "expected": "balance_not_updated_after_bank_transfer"}
+{"prompt": "I made a transfer and am still waiting.", "expected": "balance_not_updated_after_bank_transfer"}
+{"prompt": "What are some reasons that would cause ATM machines to decline my card? It has happened to me multiple times!", "expected": "declined_cash_withdrawal"}
+{"prompt": "I topped up my card but the money disappeared.", "expected": "topping_up_by_card"}
+{"prompt": "If I lost my phone, can someone use my account?", "expected": "lost_or_stolen_phone"}
+{"prompt": "Help!  I can't find my card.", "expected": "lost_or_stolen_card"}
+{"prompt": "What is the source of my money?", "expected": "verify_source_of_funds"}
+{"prompt": "Why does my account have a pending cash withdrawal?", "expected": "pending_cash_withdrawal"}
+{"prompt": "My card was confiscated by an ATM. How do I get my card back?", "expected": "card_swallowed"}
+{"prompt": "Where do I go if I want to link my new card?", "expected": "card_linking"}
+{"prompt": "I transferred the rent payment for my new place a couple days ago but the landlord says it's not there yet, despite showing up as done on my side. I checked the account number I sent it to and it's definitely correct. Can you please verify if the transaction really went through or not?", "expected": "transfer_not_received_by_recipient"}
+{"prompt": "When I got cash, my exchange rate was wrong.", "expected": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "how does a virtual card work", "expected": "get_disposable_virtual_card"}
+{"prompt": "I think my child used my card while I wasn't home.", "expected": "compromised_card"}
+{"prompt": "Someone needs to make me aware when there are extra charges for payments. I happened to be looking at the app earlier and noticed a charge associated to a payment that was extra that no one made me aware of before at all.", "expected": "card_payment_fee_charged"}
+{"prompt": "Could you explain why my top-up has gone through yet?", "expected": "pending_top_up"}
+{"prompt": "Can I use American Express to add money into my account?", "expected": "supported_cards_and_currencies"}
+{"prompt": "Can you give me information about verification code?", "expected": "verify_top_up"}
+{"prompt": "How do I reset my PIN, I can't seem to use my card?", "expected": "pin_blocked"}
+{"prompt": "The app reverted my action when I topped up.", "expected": "top_up_reverted"}
+{"prompt": "I lost my phone and need help securing it.", "expected": "lost_or_stolen_phone"}
+{"prompt": "If I started the Bank transfer from Europe, how long will the process take to complete?", "expected": "transfer_timing"}
+{"prompt": "Will you handle EUR?", "expected": "fiat_currency_support"}
+{"prompt": "How many card payments can I use on a disposable card?", "expected": "disposable_card_limits"}
+{"prompt": "I got a fee for an ATM withdrawal.", "expected": "cash_withdrawal_charge"}
+{"prompt": "Do you have a list of exchange rates?", "expected": "exchange_rate"}
+{"prompt": "What does a pending transaction mean?", "expected": "pending_card_payment"}
+{"prompt": "I have waited 15 days, but my payment still hasn't cleared.", "expected": "pending_card_payment"}
+{"prompt": "there is a transaction on my account that i didnt make", "expected": "card_payment_not_recognised"}
+{"prompt": "I have paid by my card but payment is still its coming as pending. I think there is some issue please check and let me know when the status will complete.", "expected": "pending_card_payment"}
+{"prompt": "Can I cancel a transfer", "expected": "cancel_transfer"}
+{"prompt": "Hi, I have been overcharged for my payment last Saturday. I guess exchange rate was wrong.", "expected": "card_payment_wrong_exchange_rate"}
+{"prompt": "Are there charges for receiving a SEPA transfer?", "expected": "top_up_by_bank_transfer_charge"}
+{"prompt": "Can I exchange and hold all fiat currencies?", "expected": "fiat_currency_support"}
+{"prompt": "Can I receive a new card while I am in China?", "expected": "card_about_to_expire"}
+{"prompt": "Do you have an auto top-up option?", "expected": "automatic_top_up"}
+{"prompt": "How do I make more than one disposable card in a day?", "expected": "disposable_card_limits"}
+{"prompt": "What is this $1 charge on my statement?", "expected": "extra_charge_on_statement"}
+{"prompt": "My transfer didn't work", "expected": "failed_transfer"}
+{"prompt": "Will my transfer immediately show up in my account?", "expected": "transfer_timing"}
+{"prompt": "How do I make my virtual card work?", "expected": "virtual_card_not_working"}
+{"prompt": "where can user find pin?", "expected": "get_physical_card"}
+{"prompt": "Is their a fee for top ups?", "expected": "top_up_by_card_charge"}
+{"prompt": "I thought cash withdrawals didn't have a fee", "expected": "cash_withdrawal_charge"}
+{"prompt": "Will my friend be able to top off my account?", "expected": "topping_up_by_card"}
+{"prompt": "Can I find the origination of my funds?", "expected": "verify_source_of_funds"}
+{"prompt": "The card I have doesn't work.", "expected": "card_not_working"}
+{"prompt": "Can I add to my account balance with a cheque?", "expected": "top_up_by_cash_or_cheque"}
+{"prompt": "I like Mastercard better.", "expected": "visa_or_mastercard"}
+{"prompt": "How many days until the money will be in my account?", "expected": "transfer_timing"}
+{"prompt": "I need someone to alert me as to what's going on. I had transferred an amount but the receiver is saying that the amount is somewhat less than what I sent over. I now have to make another transfer to make up the difference.", "expected": "transfer_fee_charged"}
+{"prompt": "Is there an option to have a virtual card?", "expected": "getting_virtual_card"}
+{"prompt": "How do you fix  my card payment?", "expected": "declined_card_payment"}
+{"prompt": "I am having trouble verifying my identity.", "expected": "unable_to_verify_identity"}
+{"prompt": "I just got this card & I don't know how to activate it.", "expected": "activate_my_card"}
+{"prompt": "Why would I be charged more than once for the same transaction?", "expected": "transaction_charged_twice"}
+{"prompt": "I found an unauthorized card payment", "expected": "card_payment_not_recognised"}
+{"prompt": "Can I check somewhere if there will be a fee on my payment or not? Seems you are charging in some cases, what's the pattern there?", "expected": "card_payment_fee_charged"}
+{"prompt": "How do I unblock my PIN?", "expected": "pin_blocked"}
+{"prompt": "What is the youngest age in order to have an account?", "expected": "age_limit"}
+{"prompt": "I'm running out of money, can I  auto top up?", "expected": "automatic_top_up"}
+{"prompt": "I tried using my card and it kept getting declined, Why?", "expected": "declined_card_payment"}
+{"prompt": "I can't transfer money from my account.", "expected": "declined_transfer"}
+{"prompt": "Are there any limits on where I can use my card?", "expected": "card_acceptance"}
+{"prompt": "I am seeing a weird payment showing up that I know I did not make, how can I get it cancelled?", "expected": "direct_debit_payment_not_recognised"}
+{"prompt": "If I don't want a physical card can i get a virtual version?", "expected": "getting_virtual_card"}
+{"prompt": "Assist me please with card activation.", "expected": "activate_my_card"}
+{"prompt": "Can I link my new card?", "expected": "card_linking"}
+{"prompt": "How long does a transfer take from the point it's sent, to the point it arrives in my account?", "expected": "transfer_timing"}
+{"prompt": "What do I do if an ATM \"stole\" my card?", "expected": "card_swallowed"}
+{"prompt": "I am having difficulties to verify my identity.", "expected": "unable_to_verify_identity"}
+{"prompt": "More fees, this time for withdrawing my own cash. Why are you robbing me?", "expected": "cash_withdrawal_charge"}
+{"prompt": "Please advise what is the exchange rate", "expected": "exchange_rate"}
+{"prompt": "how do you determine your exchange rates because one of yours was off when i got cash", "expected": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "Cash deposit to my account but it has not appeared.", "expected": "balance_not_updated_after_cheque_or_cash_deposit"}
+{"prompt": "I'm not sure why my top up request was denied", "expected": "top_up_failed"}
+{"prompt": "Hello I changed my mind and really need a refund on one of things I bought recently. Can you please cancel the transaction and get my money back. Please it's urgent.", "expected": "request_refund"}
+{"prompt": "How many cards can I have for one account?", "expected": "getting_spare_card"}
+{"prompt": "Why has my transfer failed?", "expected": "failed_transfer"}
+{"prompt": "Do I need to verify my identity each time I wish to use my account?", "expected": "why_verify_identity"}
+{"prompt": "Can I have it add money at certain time intervals when I travel?", "expected": "automatic_top_up"}
+{"prompt": "What should I do if I think someone is using my card.", "expected": "compromised_card"}
+{"prompt": "Can a transaction be cancelled?", "expected": "cancel_transfer"}
+{"prompt": "can I choose a date for delivery?", "expected": "card_delivery_estimate"}
+{"prompt": "What are the fees to get a physical card?", "expected": "order_physical_card"}
+{"prompt": "I noticed after looking over my transactions that I have been charged twice from an earlier restaurant visit this week. Is it possible that one of these can be removed so I get the money back for the one that is not accurate?", "expected": "transaction_charged_twice"}
+{"prompt": "How do I make contactless work", "expected": "contactless_not_working"}
+{"prompt": "is apple pay eligible for top up", "expected": "apple_pay_or_google_pay"}
+{"prompt": "How young can someone be in order to open an account?", "expected": "age_limit"}
+{"prompt": "I withdrew some cash out of the ATM over the holiday. It seems that I was charged some outrageous fees. I would not have done that had I been aware of these outrageous charges!", "expected": "wrong_exchange_rate_for_cash_withdrawal"}
+{"prompt": "I was charged extra for a withdrawal", "expected": "cash_withdrawal_charge"}
+{"prompt": "What do you charge for physical cards?", "expected": "order_physical_card"}
+{"prompt": "I'm trying to figure out the current exchange rate.", "expected": "exchange_rate"}
+{"prompt": "What's the minimum age for opening an account?", "expected": "age_limit"}
+{"prompt": "Why isn't my contactless not working?", "expected": "contactless_not_working"}
+{"prompt": "Where do I link the new card?", "expected": "card_linking"}
+{"prompt": "My card was declined in a shop", "expected": "declined_card_payment"}
+{"prompt": "Besides USD what other currencies can I have?", "expected": "fiat_currency_support"}
+{"prompt": "What methods can I use to top up my account?", "expected": "top_up_by_cash_or_cheque"}
+{"prompt": "I am not able to do contactless.", "expected": "contactless_not_working"}
+{"prompt": "Is cash good to top up with?", "expected": "top_up_by_cash_or_cheque"}
+{"prompt": "My card is being declined for a purchase. I bought items before and the card worked. Do you know what the problem is?", "expected": "reverted_card_payment"}
+{"prompt": "There is an unauthorized cash withdrawal from my account for 500£.  I definitely didn't make this withdrawal.  I need your help.", "expected": "cash_withdrawal_not_recognised"}
+{"prompt": "Can I give my friends access to my account so they can top it up for me?", "expected": "topping_up_by_card"}
+{"prompt": "I believe I left my smartphone at the hotel I was staying at.", "expected": "lost_or_stolen_phone"}

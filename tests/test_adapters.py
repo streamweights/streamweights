@@ -141,3 +141,17 @@ def test_adapter_logits_match_mlx_lm_own_lora(mlx_adapter):
     # and the adapter really is applied: scoring without it gives a different answer
     base = _run(MlxResidentEngine, None, rows, mode="score", logprobs=4)["s0"]
     assert abs(base.extra["score"]["logprob_sum"] - got.extra["score"]["logprob_sum"]) > 1.0
+
+
+def test_folder_named_like_the_adapter_does_not_shadow_it(tmp_path, monkeypatch):
+    """`spill build banking77-quick` names the adapter after the folder in the cwd."""
+    from streamweights import adapters as A
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "myname").mkdir()                       # the build folder, not an adapter
+    store = tmp_path / "store"
+    (store / "myname").mkdir(parents=True)
+    monkeypatch.setattr(A, "ADAPTERS_DIR", store)
+    seen = []
+    monkeypatch.setattr(A, "load_adapter_dir", lambda d, i=None: seen.append(Path(d)) or "ok")
+    assert A.resolve_adapter("myname") == "ok"
+    assert seen == [store / "myname"]

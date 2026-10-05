@@ -206,19 +206,13 @@ def safetensors_downloaded(model_name: str) -> bool:
 
 
 def download_safetensors(model_name: str) -> Path:
-    """Same disk policy as GGUF downloads: print size+destination, 20 GB floor."""
+    """bf16 safetensors with the 20 GB floor checked before the first byte, one progress
+    line with speed and ETA, and resume after an interruption."""
     spec = safetensors_spec(model_name)
     dest = safetensors_dir(model_name)
     if safetensors_downloaded(model_name):
         return dest
-    free = shutil.disk_usage(REPO_ROOT).free
-    if free - spec["bytes"] < MIN_FREE_AFTER_DOWNLOAD:
-        raise RuntimeError(
-            f"refusing download: {spec['bytes'] / GIB:.1f} GB to {dest} would leave "
-            f"{(free - spec['bytes']) / GIB:.1f} GB free (< 20 GB floor)")
-    print(f"downloading {model_name} bf16 safetensors: {spec['bytes'] / GIB:.1f} GB -> {dest}",
-          file=sys.stderr)
-    from huggingface_hub import snapshot_download
-    snapshot_download(spec["repo"], allow_patterns=["*.safetensors", "*.json"],
-                      local_dir=dest)
-    return dest
+    from .download import fetch
+    return fetch(spec["repo"], dest, ["*.safetensors", "*.json"],
+                 f"{model_name} bf16 safetensors",
+                 recovery=f"spill run {model_name} <input> --quant 8bit")

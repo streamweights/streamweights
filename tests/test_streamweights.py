@@ -25,7 +25,7 @@ HW = {
 
 def test_registry_models_present():
     reg = load_registry()
-    assert set(reg) == {"qwen2.5:0.5b", "qwen2.5:32b", "llama3.3:70b"}
+    assert set(reg) == {"qwen2.5:0.5b", "qwen2.5:7b", "qwen2.5:32b", "llama3.3:70b"}
     for m in reg.values():
         assert {"bf16", "Q8_0", "Q4_K_M"} <= set(m.quants)
 
@@ -163,7 +163,7 @@ def test_gateway_tags_shape():
     r = client.get("/api/tags")
     assert r.status_code == 200
     models = r.json()["models"]
-    assert {m["name"] for m in models} == {"qwen2.5:0.5b", "qwen2.5:32b", "llama3.3:70b"}
+    assert {m["name"] for m in models} == {"qwen2.5:0.5b", "qwen2.5:7b", "qwen2.5:32b", "llama3.3:70b"}
     r = client.get("/health")
     assert r.json() == {"status": "ok"}
 

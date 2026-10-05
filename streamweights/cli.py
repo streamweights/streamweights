@@ -12,6 +12,7 @@ from pathlib import Path
 
 import typer
 
+from . import overnight
 from . import probe as probe_mod
 from .engines.base import MemoryBudget, ModelSpec
 from .jobs.engine import Job, JOBS_DIR, compute_offload
@@ -28,6 +29,20 @@ if sys.version_info < (3, 10):  # pragma: no cover
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 _DEBUG = False
+
+
+@app.callback()
+def _main(ctx: typer.Context):
+    """On launch, any command reports an interrupted job or build in one line."""
+    if ctx.invoked_subcommand in ("resume", "doctor", None) or "--help" in sys.argv:
+        return
+    try:
+        from . import overnight
+        line = overnight.banner(JOBS_DIR)
+    except Exception:
+        line = None
+    if line:
+        typer.echo(line, err=True)
 
 SAMPLE_PATH = Path(__file__).parent / "data" / "sample-20.jsonl"
 
@@ -72,8 +87,12 @@ def _fmt_dur(s: float) -> str:
     return f"{s / 3600:.1f} h"
 
 
+_NEXT_HINTS = True      # off while `spill build` runs its stages: build prints the one next command
+
+
 def _next_hint(cmd: str) -> None:
-    typer.echo(f"\nnext: {cmd}")
+    if _NEXT_HINTS:
+        typer.echo(f"\nnext: {cmd}")
 
 
 def _gateway_up() -> bool:
@@ -171,9 +190,10 @@ class RunOpts:
     full_logits: bool = False
     adapter: str | None = None    # spec string of the adapter, if any
     kind: str = "run"             # run | distill | judge
+    prefix_reuse: bool = True     # shared-prefix KV reuse (--no-prefix-reuse to A/B it)
 
 
-VOCAB_BY_TAG = {"qwen2.5:0.5b": 151936, "qwen2.5:32b": 152064, "llama3.3:70b": 128256}
+VOCAB_BY_TAG = {"qwen2.5:0.5b": 151936, "qwen2.5:7b": 152064, "qwen2.5:32b": 152064, "llama3.3:70b": 128256}
 
 
 def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
@@ -208,18 +228,8 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
         from .registry import MIN_FREE_AFTER_DOWNLOAD, MODELS_DIR
         path = MODELS_DIR / model.replace(":", "-") / f"mlx-{quant}"
         if not (Path(path) / "config.json").exists():
-            import shutil as _sh
-            info = HfApi().model_info(repo, files_metadata=True)
-            dl_bytes = sum(f.size or 0 for f in info.siblings)
-            free = _sh.disk_usage(path.parent.parent).free
-            if free - dl_bytes < MIN_FREE_AFTER_DOWNLOAD:
-                typer.echo(f"refusing download: {dl_bytes / GIB:.1f} GB to {path} would "
-                           f"leave {(free - dl_bytes) / GIB:.1f} GB free (< 20 GB floor)",
-                           err=True)
-                raise typer.Exit(1)
-            typer.echo(f"downloading {model} {quant} (mlx): {dl_bytes / GIB:.1f} GB -> {path}",
-                       file=sys.stderr)
-            snapshot_download(repo, local_dir=path)
+            from .download import fetch
+            fetch(repo, Path(path), ["*"], f"{model} {quant} (mlx)")
         size = sum(f.stat().st_size for f in Path(path).glob("*.safetensors"))
 
     fits = size <= ws * 0.70
@@ -235,7 +245,7 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
     eos = collect_eos_ids(Path(path), tokenizer) if scoring else None
     kv_tok = (2 * cfg["num_hidden_layers"] * cfg["num_key_value_heads"]
               * (cfg.get("head_dim") or cfg["hidden_size"] // cfg["num_attention_heads"]) * 2)
-    lens, n_target = [], 0
+    lens, n_target, tok_lists = [], 0, []
     if scoring:
         from .formats import tokenize_scored
         for r in rows:
@@ -246,16 +256,44 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
         for r in rows:
             toks = tokenizer.apply_chat_template(r["body"]["messages"],
                                                  add_generation_prompt=True)
+            tok_lists.append(list(toks))
             lens.append(len(toks) + r["body"].get("max_tokens", 128))
     costs = [n * kv_tok for n in lens]
     cal = load_calibration()
     key = f"{model}|{quant}"
 
+    # cost model: prefill is compute-bound (2 x params x tokens / achieved FLOP/s), and rows
+    # that share a prefix compute it once (the engine does the same computation below)
+    from . import estimate as est_mod
+    from .engines.mlx_stream import PREFIX_MIN_ROWS, PREFIX_MIN_TOKENS, common_prefix_len
+    P_est = 0
+    if (not scoring and opts.prefix_reuse and len(tok_lists) >= PREFIX_MIN_ROWS
+            and not fam.needs_array_mask):
+        P_est = min(common_prefix_len(tok_lists), min(len(t) for t in tok_lists) - 1)
+        if P_est < PREFIX_MIN_TOKENS:
+            P_est = 0
+    tflops, tf_src = est_mod.achieved_tflops(cal)
+    prompt_tok = sum(len(t) for t in tok_lists)
+    prefill_tok = prompt_tok - (len(tok_lists) - 1) * P_est
+    prefill_s = est_mod.prefill_s(model, prefill_tok, tflops) if not scoring else 0.0
+    cost_note = ""
+    if not scoring:
+        cost_note = (f" Prefill {prefill_tok:,} tokens at {tflops:g} TFLOP/s ({tf_src}) = "
+                     f"{_fmt_dur(prefill_s)}"
+                     + (f"; shared prefix {P_est} tokens computed once (saves "
+                        f"{(len(tok_lists) - 1) * P_est:,} tokens)" if P_est else "")
+                     + ".")
+
     if fits:
-        engine = MlxResidentEngine()
+        engine = MlxResidentEngine(progress_note=lambda s: typer.echo(f"   {s}", err=True))
         batch = 1
         placement = "resident"
-        est = est_s or n_prompts * max_tokens / 150
+        mean_lens = sum(len(t) for t in tok_lists) / max(1, len(tok_lists)) if tok_lists else 0
+        wl = est_mod.Workload(n_prompts, P_est, max(1.0, mean_lens - P_est), max_tokens,
+                              max_tokens)
+        dec_batch = est_mod.decode_batch(model, wl, ws, bool(P_est)) if tok_lists else 1
+        est = (math.ceil(n_prompts / dec_batch) * (max_tokens + 1) * size / est_mod.RESIDENT_BYTES_PER_S
+               + prefill_s) if not scoring else 0.0
         why = f"{reason}; model fits working set -> mlx_resident"
         rate_note = ""
         if scoring:
@@ -269,7 +307,7 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
         batch = bm.batch
         rate, rate_src = engine_read_rate(cal, hw, key=key)
         pass_s = size / rate
-        est = math.ceil(n_prompts / batch) * (max_tokens + 1) * pass_s
+        est = math.ceil(n_prompts / batch) * (max_tokens + 1) * pass_s + prefill_s
         rate_note = ""
         if scoring:
             est, rate_note = estimate_score_seconds(sum(lens), size, quant, cal, key,
@@ -292,6 +330,8 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
         spec.extra["mode"] = "score"
     if adapter is not None:
         spec.extra["adapter"] = adapter
+    if not opts.prefix_reuse:
+        spec.extra["prefix_reuse"] = False
     runs_mod.start_run(job, command=None, spec=spec, input_path=input_jsonl, hw=hw,
                        engine_name=engine.name,
                        adapter={k: v for k, v in adapter.info().items()
@@ -309,18 +349,18 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
     else:
         extra = (f" Top-{opts.logprobs} log-probs on"
                  f"{' + full logits' if opts.full_logits else ''}." if opts.logprobs else "")
-        what = f"{n_prompts} prompts, batch {batch}, est. {_fmt_dur(est)}.{extra}"
+        what = f"{n_prompts} prompts, batch {batch}, est. {_fmt_dur(est)}.{cost_note}{extra}"
         if opts.kind == "distill":
             n_prompt_tok = sum(lens) - sum(r["body"].get("max_tokens", 128) for r in rows)
             what = (f"mode: generate, teacher top-{opts.logprobs} log-probs per token. "
                     f"{n_prompts} prompts, {n_prompt_tok} prompt tokens plus up to "
                     f"{sum(r['body'].get('max_tokens', 128) for r in rows)} generated tokens "
-                    f"to score, batch {batch}, est. {_fmt_dur(est)} (decode, from the "
-                    f"measured pass time).")
+                    f"to score, batch {batch}, est. {_fmt_dur(est)} (decode from the "
+                    f"measured pass time plus prefill).{cost_note}")
     typer.echo(
         f"spill: {label} {quant} ({size / GIB:.1f} GB, {fam.label}: {fam.state}) "
         f"{'fits' if size <= ram else 'does not fit'} in {ram / GIB:.0f} GB RAM; {placement}. "
-        f"{what} Cost: $0. "
+        f"{what} Cost: $0.{overnight.battery_note()} "
         f"Results -> {out_path} (tail with: spill tail)")
     typer.echo(f"   why: {why}")
 
@@ -339,6 +379,8 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
         else:
             raise
     sys.stderr.write("\n")
+    if getattr(engine, "prefix_info", None):
+        runs_mod.update_manifest(job.id, prefix_reuse=engine.prefix_info)
     if out and opts.kind == "run" and Path(out) != job.results_path:
         Path(out).write_bytes(job.results_path.read_bytes())
     typer.echo(f"{prog.done}/{prog.total} rows, {prog.completion_tokens} "
@@ -360,6 +402,9 @@ def run(
     context: int = typer.Option(4096, "--context"),
     parallel: int = typer.Option(None, "--parallel", help="override computed batch (never required)"),
     quiet: bool = typer.Option(False, "--quiet", help="suppress the live tail block"),
+    notify: str = typer.Option(None, "--notify", help="also POST a small JSON to this URL when done"),
+    no_prefix_reuse: bool = typer.Option(False, "--no-prefix-reuse",
+                                         help="compute every row's whole prompt (for A/B checks)"),
     logprobs: int = typer.Option(None, "--logprobs", help="per-token top-K log-probs, K up to 64"),
     full_logits: bool = typer.Option(False, "--full-logits",
                                      help="also write a float16 .npy of logits per row (sets under 200 rows)"),
@@ -369,8 +414,10 @@ def run(
     global _DEBUG
     _DEBUG = debug
     try:
-        _run_impl(model, input_jsonl, quant, out, context, parallel, quiet,
-                  RunOpts(logprobs=logprobs, full_logits=full_logits))
+        with overnight.long_job("spill run " + model, notify):
+            _run_impl(model, input_jsonl, quant, out, context, parallel, quiet,
+                      RunOpts(logprobs=logprobs, full_logits=full_logits,
+                              prefix_reuse=not no_prefix_reuse))
     except Exception as e:
         _fail(e)
 
@@ -514,6 +561,7 @@ def distill(
     context: int = typer.Option(4096, "--context"),
     parallel: int = typer.Option(None, "--parallel"),
     quiet: bool = typer.Option(False, "--quiet"),
+    notify: str = typer.Option(None, "--notify", help="also POST a small JSON to this URL when done"),
     debug: bool = typer.Option(False, "--debug"),
 ):
     """Distillation data from a full-size teacher: its completions plus per-token top-k
@@ -523,7 +571,9 @@ def distill(
     try:
         opts = RunOpts(mode="score" if score else "generate", logprobs=logprobs,
                        kind="distill")
-        job, prog = _run_impl(teacher, input_jsonl, quant, out, context, parallel, quiet, opts)
+        with overnight.long_job("spill distill " + teacher, notify):
+            job, prog = _run_impl(teacher, input_jsonl, quant, out, context, parallel,
+                                  quiet, opts)
         if prog.done >= prog.total:
             dest = _finalize_distill(job)
             _next_hint(f"spill check {dest}" if not score else
@@ -537,7 +587,9 @@ def distill(
 @app.command("eval")
 def eval_cmd(
     input_jsonl: str = typer.Argument(..., help="eval JSONL: prompts plus an `expected` field per row"),
-    models: list[str] = typer.Argument(..., help="one or more models, each optionally +adapter"),
+    models: list[str] = typer.Argument(None, help="one or more models, each optionally +adapter; "
+                                                  "omitted: every model with a run against this "
+                                                  "file's hash"),
     metric: str = typer.Option("exact_match", "--metric",
                                help="exact_match | contains | regex | json_field | judge | script:<file.py>"),
     judge: str = typer.Option(None, "--judge", help="judge model (implies --metric judge)"),
@@ -558,7 +610,10 @@ def eval_cmd(
         _fail(e)
 
 
-def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel, quiet):
+def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel, quiet,
+               echo=True, resume_jobs: dict | None = None):
+    """Returns the list of ScoredRun, one per model. `resume_jobs` maps a model label to an
+    interrupted job id to continue instead of starting over (used by `spill build`)."""
     import uuid
 
     from . import evalrun, formats
@@ -572,6 +627,12 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
     path = _resolve_input(input_arg)
     rows = formats.load_rows(path)
     expected = {r["custom_id"]: r["expected"] for r in rows if "expected" in r}
+    if not models:
+        models = runs_mod.models_with_runs(runs_mod.input_hash(path))
+        if not models:
+            raise SpillError(f"no model has a run against {Path(path).name} yet",
+                             f"spill eval {input_arg} <model-a> <model-b>")
+        typer.echo(f"models with a run against this file: {', '.join(models)}")
     if judge:
         metric = "judge"
     if metric == "judge" and not judge:
@@ -600,12 +661,18 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
             typer.echo(f"{label}: reusing run {m['id']} (same model, adapter and input hash; "
                        f"--rerun forces)")
         else:
-            job, prog = _run_impl(label, str(path), quant, None, context, parallel, quiet,
-                                  RunOpts())
+            rj = (resume_jobs or {}).get(label)
+            if rj:
+                j = Job.load(rj)
+                _run_mlx_resume(j, j.quant, probe_mod.load())
+                job = j
+                prog = type("P", (), {"done": len(j.done_ids()), "total": j.total})()
+            else:
+                job, prog = _run_impl(label, str(path), quant, None, context, parallel, quiet,
+                                      RunOpts())
             if prog.done < prog.total:
-                raise SpillError(f"{label}: stopped at {prog.done}/{prog.total}; finish it with "
-                                 f"spill resume {job.id}, then run this eval again (finished "
-                                 f"runs are reused)", f"spill resume {job.id}")
+                from .errors import StageInterrupted
+                raise StageInterrupted(job.id, prog.done, prog.total, f"{label}:")
             m = runs_mod.read_manifest(job.id)
         results = evalrun.read_results(Path(m["job_dir"]) / "results.jsonl")
         judge_scores = None
@@ -636,11 +703,13 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
     diff = evalrun.build_diff(scored, rows)
     metric_label = metric + (f" ({judge})" if judge else "")
     evalrun.write_report(dest, scored, metric_label, str(path), in_hash, diff)
-    typer.echo("")
-    typer.echo(f"eval {Path(path).name}  metric: {metric_label}  rows: {len(rows)}")
-    typer.echo(evalrun.render_table(scored, metric_label))
-    typer.echo(f"\n{len(diff)} rows where the models disagree -> {dest / 'diff.jsonl'}"
-               if len(scored) > 1 else f"\n(one model: no comparison; table -> {dest / 'table.md'})")
+    if echo:
+        typer.echo("")
+        typer.echo(f"eval {Path(path).name}  metric: {metric_label}  rows: {len(rows)}")
+        typer.echo(evalrun.render_table(scored, metric_label))
+        typer.echo(f"\n{len(diff)} rows where the models disagree -> {dest / 'diff.jsonl'}"
+                   if len(scored) > 1 else
+                   f"\n(one model: no comparison; table -> {dest / 'table.md'})")
     runs_mod.write_manifest(eval_id, {
         "id": eval_id, "kind": "eval", "command": command,
         "model": {"id": ", ".join(models), "quant": "-", "weight_hash": ""},
@@ -650,8 +719,10 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
         "disagreements": len(diff), "started": started, "ended": runs_mod.now(),
         "status": "completed", "rows_done": len(rows),
         "table": evalrun.render_table(scored, metric_label, markdown=True)})
-    _next_hint(f"head -n 3 {dest / 'diff.jsonl'}" if len(scored) > 1
-               else f"spill eval {input_arg} {models[0]} <another-model>")
+    if echo:
+        _next_hint(f"head -n 3 {dest / 'diff.jsonl'}" if len(scored) > 1
+                   else f"spill eval {input_arg} {models[0]} <another-model>")
+    return scored
 
 
 @app.command()
@@ -876,6 +947,31 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
     prep.spec = spec
     res = _tune_run(prep, job, False, quiet, hw, label)
     _tune_report(prep, job, res)
+    return job, res
+
+
+def _tune_build(model, train, name, resume_job, epochs=1.0, quiet=True):
+    """`spill tune` as one stage of `spill build`: defaults, the adapter replaced on a
+    re-run, the stage's own output kept off the terminal (build prints one line per stage)."""
+    import contextlib
+    import io
+    if resume_job and (JOBS_DIR / resume_job / "meta.json").exists():
+        j = Job.load(resume_job)
+        meta = j.read_meta()
+        if meta.get("status") != "completed":
+            with contextlib.redirect_stdout(io.StringIO()):
+                _tune_resume(j, meta)
+            meta = j.read_meta()
+        if meta.get("status") != "completed":
+            return {"interrupted": True, "job_id": j.id}
+        return {"job_id": j.id, "adapter": meta["options"]["tune"]["name"]}
+    with contextlib.redirect_stdout(io.StringIO()):
+        job, res = _tune_impl(model, train, name, 16, 32.0, 0.0, None, 1e-4, "cosine", 0.01,
+                              None, epochs, None, 1, 2048, 0, "auto", 50, True, quiet)
+    if res["interrupted"]:
+        return {"interrupted": True, "job_id": job.id}
+    return {"job_id": job.id, "adapter": res["adapter"], "steps": res["steps"],
+            "final_loss": res["final_loss"]}
 
 
 def _tune_resume(j: Job, meta: dict) -> None:
@@ -924,7 +1020,8 @@ def check(path: Path = typer.Argument(..., help="a batch, chat, eval or distilla
         raise typer.Exit(1)
     typer.echo(f"{path}: ok, {info['rows']} rows, {info['shape']} lines, use: {info['use']}")
     nxt = {"eval": f"spill eval {path} <model-a> <model-b>",
-           "train/distill targets": f"spill distill <teacher> {path} --score",
+           "train/distill targets": f"spill tune <base-model> {path} --name <name>",
+           "distillation records": f"spill tune <base-model> {path} --name <name>",
            "prompts": f"spill run <model> {path}"}[info["use"]]
     _next_hint(nxt)
 
@@ -967,7 +1064,11 @@ def tail(job: str = typer.Argument(None)):
 
 @app.command()
 def resume(job: str = typer.Argument(None)):
-    """Continue the latest or named job from its checkpoint."""
+    """Continue the latest or named job from its checkpoint; a folder continues its build."""
+    if job and (Path(job) / ".build" / "state.json").exists():
+        from .cli_build import resume_build
+        resume_build(Path(job))
+        return
     j = Job.load(job) if job else Job.latest()
     if not j:
         typer.echo("no jobs to resume")
@@ -1093,8 +1194,8 @@ def status():
     _next_hint("spill tail")
 
 
-PARAMS = {"qwen2.5:0.5b": "0.5B", "qwen2.5:32b": "32B", "llama3.3:70b": "70B"}
-MLX8_BYTES = {"qwen2.5:0.5b": 700_000_000, "qwen2.5:32b": 35_000_000_000,
+PARAMS = {"qwen2.5:0.5b": "0.5B", "qwen2.5:7b": "7B", "qwen2.5:32b": "32B", "llama3.3:70b": "70B"}
+MLX8_BYTES = {"qwen2.5:0.5b": 700_000_000, "qwen2.5:7b": 8_091_987_725, "qwen2.5:32b": 35_000_000_000,
               "llama3.3:70b": 75_000_000_000}
 
 
@@ -1114,7 +1215,8 @@ def models(architectures: bool = typer.Option(False, "--architectures",
     from .registry import MODELS_DIR
     typer.echo(f"{'tag':14s} {'params':7s} {'family (state)':26s} {'bf16':>8s} {'8-bit':>8s} "
                f"{'placement':10s} {'disk needed':>12s} {'downloaded':>10s}")
-    fam_of = {"qwen2.5:0.5b": "qwen2", "qwen2.5:32b": "qwen2", "llama3.3:70b": "llama"}
+    fam_of = {"qwen2.5:0.5b": "qwen2", "qwen2.5:7b": "qwen2", "qwen2.5:32b": "qwen2",
+              "llama3.3:70b": "llama"}
     for name in reg:
         st = safetensors_spec(name)
         fam = FAMILIES[fam_of[name]]
@@ -1132,5 +1234,8 @@ def models(architectures: bool = typer.Option(False, "--architectures",
     _next_hint("spill run llama3.3:70b sample")
 
 
-if __name__ == "__main__":
-    app()
+from . import cli_build  # noqa: E402,F401  (registers build, example, export, doctor)
+
+if __name__ == "__main__":      # `python -m streamweights.cli`: use the module that has every command
+    from streamweights.cli import app as _app
+    _app()
