@@ -28,6 +28,13 @@ jobs:
         run: |
           spill --help
           spill doctor
+      - name: MLX-only commands say so in one line (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          out=$(spill build . 2>&1 || true)
+          echo "$out"
+          test "$(echo "$out" | wc -l)" = 1
+          echo "$out" | grep -q "needs Apple silicon with MLX; works here today"
       - name: CPU test suite
         run: python -m pytest -q
         env:
