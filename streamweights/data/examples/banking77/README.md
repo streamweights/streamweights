@@ -6,8 +6,10 @@ answer with its intent.
 
 ```
 $ spill example banking77 && spill build banking77
-<!--TABLE-->
 ```
+
+The scores for the 70B teacher and the 7B student arrive with the full proof run. For
+a result in under a minute, use `spill example banking77 --quick`.
 
 ## Files
 

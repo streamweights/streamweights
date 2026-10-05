@@ -6,8 +6,17 @@ rows (at least 6 of each of the 77 intents), no prompts file, and the small mode
 
 ```
 $ spill example banking77 --quick && spill build banking77-quick
-<!--TABLE-->
+
+stage 1/3: eval qwen2.5:0.5b untrained
+stage 2/3: tune qwen2.5:0.5b -> qwen2.5:0.5b+banking77-quick
+stage 3/3: eval qwen2.5:0.5b+banking77-quick
+
+model                         role              score  rows
+qwen2.5:0.5b+banking77-quick  your model        0.640  100
+qwen2.5:0.5b                  base (untrained)  0.200  100
 ```
+
+That run took 44 s on an M4 Pro with the 0.5B model already downloaded (the tune stage 40 s).
 
 `instructions.txt` lists the 77 labels. The untrained base gets it as a system prompt; your
 model, the base plus the adapter, is trained and evaluated without it.
