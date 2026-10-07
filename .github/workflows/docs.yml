@@ -29,7 +29,7 @@ jobs:
         run: python -m pip install -r docs-requirements.txt
       - name: Render the home page from the README
         run: python scripts/make_site_home.py
-      - name: Build (strict: a broken link fails the build)
+      - name: Build (strict, so a broken link fails the build)
         run: mkdocs build --strict
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
