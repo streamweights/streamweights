@@ -647,6 +647,8 @@ def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = N
             + ("; continuing where it stopped" if st.resumed else ""))
         st.status = "running"
         save_state(plan)
+        runtime.emit("stage", stage=st.id, status="start", index=i + 1, of=len(plan.stages),
+                     label=st.label, resumed=st.resumed)
         sync_in(plan, st)
         env = runtime.ENV
         saved = (env.state, env.state_leaf, env.stop_after, env.in_build)
@@ -692,6 +694,8 @@ def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = N
                               if k not in ("interrupted", "producers")})
             st.producers = normalize_producers(res.get("producers"))
             save_state(plan)
+            runtime.emit("stage", stage=st.id, status="interrupted", index=i + 1,
+                         seconds=st.actual_s)
             interrupted = True
             stopped_early = runtime.ENV.stopped_early
             say(f"stage {i + 1} stopped after {est.fmt_dur(st.actual_s)}; nothing is lost")
@@ -701,6 +705,9 @@ def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = N
         st.producers = normalize_producers(res.get("producers")) or [local_producer(plan.engine)]
         sync_out(plan, st)
         save_state(plan)
+        runtime.emit("stage", stage=st.id, status="done", index=i + 1, seconds=st.actual_s,
+                     where=where(st.producers),
+                     score=res.get("score") if st.kind == "eval" else None)
         _record_ratio(plan, st)
         say(f"stage {i + 1} done in {est.fmt_dur(st.actual_s)} "
             f"(estimate {est.fmt_dur(st.est_s)}); {where(st.producers)}"
@@ -712,7 +719,8 @@ def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = N
             break
     order = {"your model": 0, "base (untrained)": 1, "teacher": 2, "compare": 3}
     table.sort(key=lambda r: order.get(r["role"], 9))
-    save_state(plan, {"finished": not interrupted, "table": table})
+    plan.extra.update(finished=not interrupted, table=table)
+    save_state(plan)
     return BuildResult(table, plan.stages, plan.adapter_name, interrupted, label,
                        time.monotonic() - t_start, stopped_early)
 
