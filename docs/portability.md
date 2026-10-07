@@ -81,6 +81,48 @@ between engines mid-run is the same kind of difference: continued across hardwar
 stays within the distance that two clean runs on different engines have from each other
 (gate 8 in the report).
 
+## A build moves too
+
+`spill build <folder> --state <uri>` keeps the whole build in the same portable layout: the stage
+reached, each stage's checkpoint, the intermediate files and the input fingerprint.
+
+| under `--state` | contents |
+|---|---|
+| `state.json` | the plan, every stage's status and result, the engine, hardware, OS and numerics that produced each stage, the input fingerprint. One atomic object, written after everything it names |
+| `stages/<stage>/` | the stage's own state: a tune checkpoint (`ckpt/`) or committed row segments (`rows/`) |
+| `files/` | the teacher's answers, once the distill stage is done |
+| `adapters/<name>/` | the tuned adapter in both layouts, once the tune stage is done |
+
+Without `--state` it is the folder's own `.build/`. A build stopped on one engine or machine is
+continued by running the same command, or `spill resume <folder> --state <uri>`, on another: stages
+that finished are skipped, the stage that stopped continues at its row or step, and the models the
+build started with are kept (the defaults are chosen from the machine only at the start). Edited inputs start the state fresh. The final table shows which engine, machine and OS made each stage; a stage that moved lists both.
+
+`--stop-after tune:20` stops a build 20 steps into the tune stage (`distill:5`, `eval:base` and a
+bare stage name work too); it exits 0 and the state is complete.
+
+### The relay
+
+`spill example relay && ./relay/relay.sh` starts a build, stops it partway through the tune stage and
+finishes it somewhere else: in the `ghcr.io/streamweights/spill:cpu` container if Docker is
+installed, otherwise on the other engine on the same machine, or with `--two-machines` it prints what to copy
+and the command to run there.
+
+`.github/workflows/relay.yml` does it on every push, between real machines: a build started on a Linux runner is finished on a macOS runner, and one started on macOS is finished on Linux, each stopped
+with `--stop-after tune:20`; an uninterrupted Linux build is the reference. The last job checks
+that:
+
+- both relays completed;
+- each relay's base and tuned scores are within the tolerance of the reference. The tolerance is
+  measured, not chosen: the tiny build grades 20 rows, six runs of it on one Mac (two engines, two
+  batch shapes, a build moved between engines in both directions) spread 0.10 in tuned score, and the tolerance is that spread plus one row, 0.15. It is stored with
+  its justification in `docs/reports/014-noise-floor.json`. Agreement tighter than 0.15 is not claimed;
+- no row and no step is missing or repeated (read off the committed segments and the checkpoint
+  in the state);
+- each stage's recorded machine and OS are the machine and OS of the job that ran it.
+
+It writes a summary to the run page and commits nothing. Where the macOS runner has no Metal the macOS side runs on torch-cpu, and the table records which engine ran.
+
 ## What a quantum costs
 
 - **A tune step** writes a checkpoint every `--ckpt-every` steps (default 50) and on stop. The

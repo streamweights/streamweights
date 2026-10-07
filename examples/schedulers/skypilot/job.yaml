@@ -1,4 +1,4 @@
-# A SkyPilot managed job: spill tune, headless, from an emitted config.
+# A SkyPilot managed job: spill build, headless, from an emitted config.
 #
 #   sky jobs launch examples/schedulers/skypilot/job.yaml --env BUCKET=my-spill-bucket
 #
@@ -6,7 +6,7 @@
 # one (any of the accelerators below, or a CPU-only machine) and reruns `run`; spill finds the
 # latest committed checkpoint under --state in the bucket and continues from it.
 
-name: spill-tune
+name: spill-build
 
 resources:
   use_spot: true
@@ -23,7 +23,7 @@ resources:
 
 envs:
   BUCKET: my-spill-bucket     # an existing bucket (or a new name SkyPilot creates)
-  SPILL_HOME: /bucket/home    # per-job cache; weights are staged from /bucket/weights
+  SPILL_HOME: /bucket/home    # per-job cache for downloaded models and adapters
 
 file_mounts:
   /bucket:
@@ -40,8 +40,10 @@ setup: |
   pip install "streamweights[cloud] @ git+https://github.com/streamweights/streamweights"
 
 run: |
-  # tune.json was written on a laptop with --emit-config and uploaded:
-  #   spill tune qwen2.5:7b train.jsonl --name mine --state /bucket/state/mine \
-  #        --weights /bucket/weights/qwen2.5-7b --emit-config tune.json
+  # build.json was written on a laptop with --emit-config and uploaded; the folder of
+  # evals.jsonl, train.jsonl and/or prompts.jsonl is in the bucket too:
+  #   spill build /bucket/data/mine --state /bucket/state/mine --emit-config build.json
   #   (the path /bucket does not need to exist on the laptop; nothing runs)
-  spill tune --config /bucket/jobs/tune.json --headless
+  # The build's state (the stage reached, each stage's checkpoint, the adapter) is under --state,
+  # so a recovered machine, of any kind, continues at the stage and step where it stopped.
+  spill build --config /bucket/jobs/build.json --headless
