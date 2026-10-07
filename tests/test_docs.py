@@ -42,7 +42,7 @@ def test_readme_shape():
                      "What build does", "Requirements", "Under the hood",
                      "Status and roadmap", "Feedback", "License"]
     assert "shields.io" not in README
-    badges = re.findall(r"\]\((\S*badge\S*)\)", README)       # one badge, for the relay workflow only
+    badges = re.findall(r"!\[[^\]]*\]\(([^)]*badge[^)]*)\)", README)       # one badge, for the relay workflow only
     assert badges == ["https://github.com/streamweights/streamweights/actions/workflows/relay.yml/badge.svg"]
     assert "pip install git+https://github.com/streamweights/streamweights" in README
     assert "uv tool install git+https://github.com/streamweights/streamweights" in README

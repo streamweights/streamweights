@@ -32,8 +32,13 @@ Run `spill build` with `--state` pointing at a folder both machines can reach, s
 4. Read the table. `spill build relay --state ./relay-state --table` prints, for every stage, the engine, machine and OS that produced it, and the score:
 
    ```
-   @@TRANSCRIPT@@
+   stage         engine     machine                        os            score  reference
+   1 eval:base   torch-cpu  runnervmmprz5                  Linux x86_64  0.400  0.400
+   2 tune        torch-cpu  runnervmmprz5 -> 964408b0e5ea  Linux x86_64  -      -
+   3 eval:tuned  torch-cpu  964408b0e5ea                   Linux x86_64  1.000  1.000
    ```
+
+   That table is from the Docker relay job of the CI workflow, on a Linux runner: the build started on the host and the tune finished in the container (the machine column lists both). On a Mac the first engine is `mlx` and the second `torch-cpu`.
 
 `./relay/relay.sh` runs all of this: Docker if it is installed, otherwise the other engine on this machine, or with `--two-machines` it stops and prints what to copy and the one command to run there.
 

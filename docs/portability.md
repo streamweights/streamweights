@@ -116,7 +116,7 @@ that:
 - each relay's base and tuned scores are within the tolerance of the reference. The tolerance is
   measured, not chosen: the tiny build grades 20 rows, six runs of it on one Mac (two engines, two
   batch shapes, a build moved between engines in both directions) spread 0.10 in tuned score, and the tolerance is that spread plus one row, 0.15. It is stored with
-  its justification in `docs/reports/014-noise-floor.json`. Agreement tighter than 0.15 is not claimed;
+  its justification in `docs/reports/014-noise-floor.json`. Agreement tighter than 0.15 is not claimed. The tuned score must also beat the base;
 - no row and no step is missing or repeated (read off the committed segments and the checkpoint
   in the state);
 - each stage's recorded machine and OS are the machine and OS of the job that ran it.

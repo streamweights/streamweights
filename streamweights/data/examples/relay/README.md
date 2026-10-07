@@ -24,4 +24,21 @@ BANKING77 (Casanueva et al., 2020), PolyAI, CC BY 4.0; attribution in the README
 
 ## A run
 
-TRANSCRIPT
+The Docker mode, as run by the relay workflow on a Linux runner (`.github/workflows/relay.yml`, the Docker relay job). The machine column lists the host and then the container that finished the tune:
+
+```
+1. start the build here on torch-cpu, Linux
+   stopped after 20 tune steps; the state is in ./relay-state
+2. finish it in a Linux container: ghcr.io/streamweights/spill:cpu
+   finished
+3. the same build, start to finish, for a reference
+   done
+
+the final table: who made each stage, and the score next to the reference
+stage         engine     machine                        os            score  reference
+1 eval:base   torch-cpu  runnervmmprz5                  Linux x86_64  0.400  0.400
+2 tune        torch-cpu  runnervmmprz5 -> 964408b0e5ea  Linux x86_64  -      -
+3 eval:tuned  torch-cpu  964408b0e5ea                   Linux x86_64  1.000  1.000
+```
+
+A relay passes when the score is within the measured noise of the reference: on this tiny build (20 exam rows) six runs spread 0.10, so the tolerance is 0.15, and no tighter agreement is claimed.

@@ -78,7 +78,18 @@ A build stopped on Linux is finished on a Mac, and the reverse, on every push: s
 Try it yourself: `spill example relay && ./relay/relay.sh` starts a tiny build, stops it partway through the tune stage and finishes it in a Linux container if Docker is installed, otherwise on the other engine of the same machine, or with `--two-machines` it prints what to copy and the one command to run on the other machine. The real output of the Docker mode, run by the relay workflow on a Linux runner, labeled as such; each stage lists the engine, machine and OS that made it:
 
 ```
-@@TRANSCRIPT@@
+1. start the build here on torch-cpu, Linux
+   stopped after 20 tune steps; the state is in ./relay-state
+2. finish it in a Linux container: ghcr.io/streamweights/spill:cpu
+   finished
+3. the same build, start to finish, for a reference
+   done
+
+the final table: who made each stage, and the score next to the reference
+stage         engine     machine                        os            score  reference
+1 eval:base   torch-cpu  runnervmmprz5                  Linux x86_64  0.400  0.400
+2 tune        torch-cpu  runnervmmprz5 -> 964408b0e5ea  Linux x86_64  -      -
+3 eval:tuned  torch-cpu  964408b0e5ea                   Linux x86_64  1.000  1.000
 ```
 
 A relay passes when both finish, each score is within the measured noise of an uninterrupted build, no row or step is missing or repeated, and each stage's recorded machine and OS are where it ran. The noise is measured on the tiny build (20 exam rows): six runs of it, across two engines, two batch shapes and builds moved between engines, spread 0.10 in tuned score, so the tolerance is 0.15 ([report](docs/reports/014-build-anywhere.md)). That is the claim and not a tighter one: one run of 20 rows moves in steps of 0.05. Every job is a sequence of steps or rows saved at `--state` (a path, `s3://`, `gs://` or `az://`), and a build keeps its stage, checkpoints and files there too; [docs/portability.md](docs/portability.md) says what moves and what it costs. Piped or with `--headless`, a job writes JSON-lines events and exits 75 on SIGTERM so a scheduler retries; the CPU and CUDA images are `ghcr.io/streamweights/spill:cpu` and `:cuda`; SkyPilot (running `spill build`), Slurm and Kubernetes examples are in [examples/schedulers](examples/schedulers) and [docs/schedulers.md](docs/schedulers.md).
