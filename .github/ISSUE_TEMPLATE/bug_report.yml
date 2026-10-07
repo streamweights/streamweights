@@ -1,0 +1,25 @@
+name: Bug report
+description: Something spill did that it should not have, or did not do.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, what you expected, and what you got. The one-line error spill prints ends with a command to try; say whether you tried it.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `spill doctor`
+      description: Paste the whole output. It records your hardware, the engine spill picked and why.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: debug
+    attributes:
+      label: Traceback (optional)
+      description: Rerun the command with `--debug` and paste the traceback.
+      render: text

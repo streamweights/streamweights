@@ -1,0 +1,30 @@
+name: Hardware report
+description: Tell us what spill did on your machine, especially NVIDIA GPUs and Linux.
+labels: [hardware report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        NVIDIA is built and awaiting verification. On a CUDA machine run
+        `docker run --gpus all ghcr.io/streamweights/spill:cuda python -m streamweights.verify_cuda`
+        or, with the package installed, `python -m streamweights.verify_cuda`. It prints a pass or fail per gate and writes a JSON report.
+  - type: textarea
+    id: verify
+    attributes:
+      label: Output of `verify_cuda` (NVIDIA) or of `spill doctor` (anything else)
+      description: Paste the whole output, and attach the JSON report if there is one.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: machine
+    attributes:
+      label: The machine
+      description: CPU model, RAM, disk type, GPU if any, OS.
+    validations:
+      required: true
+  - type: textarea
+    id: ran
+    attributes:
+      label: What you ran and what you saw
+      description: For example `spill example banking77 --quick` and the pass times it printed.

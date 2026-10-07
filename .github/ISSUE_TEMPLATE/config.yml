@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and first-fifteen-minutes transcripts
+    url: https://github.com/streamweights/streamweights/discussions
+    about: Ask a question, or share where you got stuck.
