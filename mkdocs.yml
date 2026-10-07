@@ -36,6 +36,7 @@ nav:
       - LoRA fine-tuning without a big GPU: guides/lora-fine-tuning-without-a-big-gpu.md
       - Resume a fine-tuning job on a different machine: guides/resume-fine-tuning-on-a-different-machine.md
       - Run fine-tuning on spot instances with SkyPilot: guides/fine-tuning-on-spot-instances-with-skypilot.md
+      - Start a fine-tuning job on one machine and finish it on another: guides/start-a-fine-tuning-job-on-one-machine-and-finish-it-on-another.md
   - Reports:
       - reports/index.md
       - Phase 0, mmap: reports/001-phase0.md
@@ -49,6 +50,7 @@ nav:
       - Cleanup: reports/010-cleanup.md
       - Run anywhere: reports/012-run-anywhere.md
       - Tagline and docs site: reports/013-tagline-seo.md
+      - Build anywhere: reports/014-build-anywhere.md
   - Reference:
       - Commands: cli.md
       - Formats: formats.md
