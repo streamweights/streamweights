@@ -6,7 +6,8 @@ from pathlib import Path
 
 import torch
 
-from tests.tinymodel import CHATML  # noqa: F401  (the same ChatML template as the MLX tests)
+CHATML = ("{% for m in messages %}<|im_start|>{{ m['role'] }}\n{{ m['content'] }}<|im_end|>\n"
+          "{% endfor %}{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}")
 
 TINY = dict(hidden_size=64, intermediate_size=128, num_hidden_layers=3, num_attention_heads=4,
             num_key_value_heads=2, vocab_size=300, max_position_embeddings=1024,

@@ -373,7 +373,10 @@ class Core:
         self.norm = inner.norm
         self.norm.to_empty(device=device)
         rot_cls = type(inner.rotary_emb)
-        self.rotary = rot_cls(config=cfg, device=device)
+        try:
+            self.rotary = rot_cls(config=cfg, device=device)
+        except TypeError:                     # newer transformers: no device argument
+            self.rotary = rot_cls(config=cfg).to(device)
         self.n_layers = index.n_layers
         self.hidden = cfg.hidden_size
         self.embed_scale = (cfg.hidden_size ** 0.5) if cfg.model_type in ("gemma2", "gemma") \
