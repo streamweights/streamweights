@@ -39,16 +39,20 @@ Commands:
 ```
 Usage: spill build [OPTIONS] {folder}
 
-  Build your own model from a folder: distill, tune, eval, one table.
+  Build your own model from a folder: distill, tune, eval, one table. Runs on
+  MLX on Apple silicon and on PyTorch (CPU or CUDA) everywhere else.
 
 Arguments:
   folder  a folder with evals.jsonl and train.jsonl and/or prompts.jsonl
           [required]
 
 Options:
-  --student <str>       the small model to build on (default qwen2.5:7b)
-  --teacher <str>       the big model that answers prompts.jsonl (default
-                        llama3.3:70b)
+  --student <str>       the small model to build on (default: chosen from this
+                        machine: qwen2.5:7b on Apple silicon, qwen2.5:0.5b on
+                        a CPU)
+  --teacher <str>       the big model that answers prompts.jsonl (default:
+                        llama3.3:70b on Apple silicon; on a CPU the largest
+                        whose distill estimate is under 12 h)
   --compare <str>       add this model's score to the table (repeatable)
   --base <str>          train the adapter on this (big) model itself instead
                         of the student
@@ -58,6 +62,20 @@ Options:
   --epochs <float>      passes over the training data (default 2)
   --notify <str>        POST a small JSON to this URL when done or stopped
   --quiet               one progress line per stage
+  --state <str>         portable build state: a path, s3://, gs://, az://
+                        (default: <folder>/.build/); the build continues from
+                        it on any machine and engine
+  --engine <str>        mlx | torch-cpu | torch-cuda (default: chosen from the
+                        hardware)
+  --headless            JSON-lines events on stdout, exit 75 when preempted
+                        (automatic when stdout is not a terminal)
+  --config <path>       run the invocation stored in this job.json
+  --emit-config <path>  write this invocation to job.json and exit
+  --table               print the table of a finished or stopped build from
+                        its state (which engine, machine and OS made each
+                        stage) and exit
+  --reference <str>     with --table: the state of an uninterrupted build, for
+                        a reference column
   --help                Show this message and exit.
 
   Example: spill build banking77-quick
@@ -72,11 +90,13 @@ Usage: spill example [OPTIONS] [name]
   untrained models).
 
 Arguments:
-  name  which example (banking77)  [default: banking77]
+  name  which example (banking77, relay)  [default: banking77]
 
 Options:
   --quick  the under-an-hour variant: 100 evals, 500 train rows, student
            qwen2.5:0.5b
+  --tiny   the CI-sized variant: 20 evals, 100 train rows over 10 intents,
+           student qwen2.5:0.5b
   --force  write into a folder that already exists
   --help   Show this message and exit.
 
@@ -350,6 +370,12 @@ Arguments:
 Options:
   --headless       JSON-lines events on stdout, exit 75 when preempted
   --weights <str>  stage the model from this location instead of Hugging Face
+  --state <str>    portable state to continue from: a path, s3://, gs://,
+                   az:// (a build folder kept its own)
+  --engine <str>   mlx | torch-cpu | torch-cuda (default: the one this machine
+                   would choose; any engine continues any engine's work)
+  --notify <str>   POST a small JSON to this URL when a build is done or
+                   stopped
   --help           Show this message and exit.
 
   Example: spill resume banking77-quick

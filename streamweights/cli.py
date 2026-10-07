@@ -1243,7 +1243,8 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
     typer.echo(f"   job {job.id}: Ctrl-C checkpoints and stops; resume with: spill resume {job.id}")
     spec.data = str(job.input_path)          # the job's own verbatim copy; resume is self-contained
     job.write_meta(total=spec.steps, done=0,
-                   options={"kind": "tune", "tune": spec.to_dict()})
+                   options={**job.read_meta().get("options", {}), "kind": "tune",
+                            "tune": spec.to_dict()})
     mspec = ModelSpec(label, "bf16", mdir)
     engine_label = (("mlx_stream_tune" if chosen == "streamed" else "mlx_lm_lora")
                     if choice.is_mlx else
