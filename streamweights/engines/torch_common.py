@@ -88,6 +88,9 @@ def resolve_dtype(engine: str, requested: str | None = None) -> tuple["torch.dty
     if requested in ("bf16", "bfloat16"):
         return torch.bfloat16, "bf16 base weights (requested)"
     if engine == "torch-cuda":
+        if not torch.cuda.is_bf16_supported():
+            return torch.bfloat16, ("bf16 base weights on the GPU (this GPU has no native bf16; "
+                                    "expect it to be slow)")
         return torch.bfloat16, "bf16 base weights on the GPU"
     if cpu_bf16_ok():
         return torch.bfloat16, "bf16 base weights (this CPU has fast bf16 matmul)"
@@ -515,12 +518,15 @@ class CudaRingProvider:
         chunk_mb, threads, mode = ring_settings(core.index, note)
         dev = core.device
 
+        self.host = []                  # the pinned tensors themselves (numpy views share them)
+
         def pinned(n):
-            return torch.empty(n, dtype=torch.uint8).pin_memory().numpy()
+            t = torch.empty(n, dtype=torch.uint8).pin_memory()
+            self.host.append(t)
+            return t.numpy()
         self.ring = RingReader(core.index, 4, chunk_mb * 1024 * 1024, threads, mode=mode,
                                alloc=pinned)
         self.mode = mode
-        self.host = [torch.from_numpy(b) for b in self.ring.bufs]
         n = core.index.max_layer_bytes
         self.free = queue.Queue()
         for _ in range(self.N_DEVICE):
@@ -539,11 +545,12 @@ class CudaRingProvider:
 
     def _copy_loop(self, index):
         try:
+            torch.cuda.set_device(self.core.device)
             seq = 0
             while not self._stop.is_set():
                 slot, _ = self.ring.get(seq)
+                nbytes = index.layers[self.ring.last_layer].nbytes
                 dbuf, done_ev = self.free.get()
-                nbytes = index.layers[self.ring.layer_ids.pop(seq)].nbytes
                 with torch.cuda.stream(self.side):
                     if done_ev is not None:
                         self.side.wait_event(done_ev)

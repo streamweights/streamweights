@@ -233,3 +233,36 @@ def test_doctor_lines_name_the_choice_and_each_engine():
     assert lines[0].startswith("engine") and "torch-cpu (no CUDA)" in lines[0]
     assert "1.5 TFLOP/s" in text and "not usable here: no CUDA device is visible" in text
     assert "mlx: not usable here: needs Apple silicon" in text
+
+
+def test_sigterm_on_a_row_job_exits_75_and_the_retry_finishes_every_row_once(tiny, tmp_path):
+    rows = tmp_path / "many.jsonl"
+    rows.write_text("".join(json.dumps({"custom_id": f"m{i:04d}", "prompt": f"hello {i} " + "q" * (i % 9)})
+                            + "\n" for i in range(300)))
+    state = str(tmp_path / "rowstate")
+    args = ["run", str(tiny["model"]), str(rows), "--engine", "torch-cpu", "--state", state,
+            "--headless", "--parallel", "2"]
+    p = spill(args)
+    t_sig = None
+    for line in p.stdout:
+        ev = json.loads(line)
+        if ev["event"] == "row" and ev["step"] >= 15 and t_sig is None:
+            p.send_signal(signal.SIGTERM)
+            t_sig = time.monotonic()
+        last = ev
+    p.wait(timeout=60)
+    assert p.returncode == 75, p.stderr.read()
+    assert last["event"] == "preempted" and last["signal"] == "SIGTERM"
+    assert time.monotonic() - t_sig < headless.GRACE_SECONDS
+    from streamweights.portable import rows as pr
+    first_leg = pr.done_ids(Store(state))
+    assert 15 <= len(first_leg) < 300
+    rc, out, err = run_spill(args)
+    assert rc == 0, err
+    recs = events(out)
+    done_rows = [r for r in recs if r["event"] == "row"]
+    assert len(done_rows) == 300 - len(first_leg)             # only what was missing
+    assert not ({r["custom_id"] for r in done_rows} & first_leg)
+    assert recs[0]["event"] == "restore" or any(r["event"] == "restore" for r in recs)
+    assert pr.done_ids(Store(state)) == {f"m{i:04d}" for i in range(300)}
+    assert recs[-1]["event"] == "done" and recs[-1]["complete"] is True

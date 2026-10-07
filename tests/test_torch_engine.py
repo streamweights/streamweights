@@ -195,3 +195,31 @@ def test_pass_callback_reports_what_the_live_line_needs(models):
     run(eng, d, rows(4))
     assert seen and {"rows_done", "total", "pass_s", "tok_s", "eta_s", "batch", "peak_gb"} <= set(seen[-1])
     assert lg.MAX_K == 64
+
+
+def test_export_merges_a_torch_trained_adapter_and_the_merged_model_agrees(models, tmp_path):
+    """spill export is numpy-only: the merged model it writes behaves like the adapter does at
+    inference on the torch engine."""
+    from streamweights import export as ex
+    from streamweights.adapters import load_adapter_dir
+    from streamweights.tune import lora_core as lo
+    d = models["llama"]
+    cfg = lo.LoraConfig(rank=4, alpha=8)
+    shapes = {"self_attn.q_proj": (64, 64), "self_attn.v_proj": (64, 32), "mlp.up_proj": (64, 128)}
+    params = lo.init_params_np(shapes, 3, 4, seed=5)
+    rng = np.random.default_rng(1)
+    for k in params:
+        if k.endswith("lora_b"):
+            params[k] = rng.normal(0, 0.4, params[k].shape).astype(np.float32)
+    ad_dir = tmp_path / "ad"
+    lo.save_adapter_dir(ad_dir, params, cfg, "tiny", 3, shapes)
+    ad = load_adapter_dir(ad_dir, numpy=True)
+    merged = tmp_path / "merged"
+    info = ex.merge_adapter(d, ad, merged)
+    assert info["modules"] == 9
+    R = rows(5)
+    via_adapter = run(TorchEngine(), d, R, adapter=ad)
+    via_merge = run(TorchEngine(), merged, R)
+    plain = run(TorchEngine(), d, R)
+    assert any(plain[k].content != via_merge[k].content for k in plain)
+    assert {k: v.content for k, v in via_adapter.items()} == {k: v.content for k, v in via_merge.items()}

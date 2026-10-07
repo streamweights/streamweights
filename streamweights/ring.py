@@ -208,6 +208,7 @@ class RingReader:
         self._tls = threading.local()
         self.error: BaseException | None = None
         self.layer_ids: dict[int, int] = {}   # schedule seq -> layer id, until consumed
+        self.last_layer: int | None = None
 
     # -- one chunk, by mode
 
@@ -303,6 +304,7 @@ class RingReader:
                     raise self.error
                 self.cond.wait(timeout=60)
         slot = self.ready.pop(seq)
+        self.last_layer = self.layer_ids.pop(seq, None)      # the layer this slot holds
         return slot, memoryview(self.bufs[slot])
 
     def release(self, slot: int):

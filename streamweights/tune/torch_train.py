@@ -45,6 +45,7 @@ class AdamW:
 
     def __init__(self, params: dict, lr: float, steps: int, schedule: str = "cosine",
                  weight_decay: float = 0.01, betas=(0.9, 0.999), eps: float = 1e-8):
+        self.device = next(iter(params.values())).device
         self.lr, self.steps, self.schedule = lr, max(1, steps), schedule
         self.wd, self.b1, self.b2, self.eps = weight_decay, betas[0], betas[1], eps
         self.m = {k: torch.zeros_like(v) for k, v in params.items()}
@@ -58,7 +59,7 @@ class AdamW:
         return float(np.float32(0.5 * (1.0 + math.cos(math.pi / self.steps * s)) * self.lr))
 
     def apply(self, params: dict, grads: dict) -> None:
-        lr = torch.tensor(self.lr_at(self.step), dtype=torch.float32)
+        lr = torch.tensor(self.lr_at(self.step), dtype=torch.float32, device=self.device)
         self.step += 1
         with torch.no_grad():
             for k, p in params.items():
@@ -74,8 +75,10 @@ class AdamW:
     def load(self, state: dict) -> None:
         self.step = int(state["step"])
         for k in self.m:
-            self.m[k] = torch.as_tensor(np.array(state["m"][k]), dtype=torch.float32)
-            self.v[k] = torch.as_tensor(np.array(state["v"][k]), dtype=torch.float32)
+            self.m[k] = torch.as_tensor(np.array(state["m"][k]), dtype=torch.float32,
+                                        device=self.device)
+            self.v[k] = torch.as_tensor(np.array(state["v"][k]), dtype=torch.float32,
+                                        device=self.device)
 
 
 def masked_ce(logits, targets, mask):
@@ -86,8 +89,10 @@ def masked_ce(logits, targets, mask):
     return ce.sum() / ntoks, ntoks
 
 
-def to_params(np_params: dict) -> dict:
-    return {k: torch.as_tensor(np.array(v), dtype=torch.float32).contiguous()
+def to_params(np_params: dict, device=None) -> dict:
+    """float32 tensors on the compute device (adapters and optimizer state live next to the
+    activations; they are small)."""
+    return {k: torch.as_tensor(np.array(v), dtype=torch.float32, device=device).contiguous()
             for k, v in np_params.items()}
 
 
@@ -105,7 +110,7 @@ class StreamedTrainer:
         self.device, self.dtype = device, dtype
         np_params = params if params is not None else lo.init_params_np(
             shapes, self.L, cfg.rank, cfg.seed)
-        self.params = to_params(np_params)
+        self.params = to_params(np_params, device)
         make_lora_aware(self.core.layer, self.paths)
 
         def schedule():
@@ -236,7 +241,7 @@ class PeftTrainer:
         self.model = get_peft_model(base, pcfg)
         np_params = params if params is not None else lo.init_params_np(
             shapes, self.L, cfg.rank, cfg.seed)
-        self.params = to_params(np_params)
+        self.params = to_params(np_params, device)
         self.mods = {}
         for k in range(self.L):
             for p in self.paths:

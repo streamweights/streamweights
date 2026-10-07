@@ -56,3 +56,42 @@ def test_eval_rows_move_between_mlx_and_torch_without_loss_or_duplication(env, f
     assert out["pass"], out
     assert out["by_engine"].keys() and len(out["by_engine"]) == 2
     assert sum(out["by_engine"].values()) == 20
+
+
+def test_the_torch_optimizer_is_the_mlx_optimizer():
+    """AdamW without bias correction, decoupled weight decay first, cosine schedule read at the
+    step count before counting: the checkpoint's optimizer state means the same on both."""
+    import mlx.core as mx
+    import mlx.optimizers as optim
+    import numpy as np
+
+    from streamweights.tune.torch_train import AdamW
+    rng = np.random.default_rng(0)
+    p0 = {"a": rng.normal(size=(5, 3)).astype(np.float32), "b": rng.normal(size=(4,)).astype(np.float32)}
+    mp = {k: mx.array(v) for k, v in p0.items()}
+    tp = {k: torch.tensor(v.copy()) for k, v in p0.items()}
+    steps = 12
+    mopt = optim.AdamW(learning_rate=optim.cosine_decay(1e-2, steps), weight_decay=0.01)
+    topt = AdamW(tp, 1e-2, steps, "cosine", 0.01)
+    for _ in range(steps + 3):                        # past the end of the schedule too
+        g = {k: rng.normal(size=v.shape).astype(np.float32) for k, v in p0.items()}
+        mp = mopt.apply_gradients({k: mx.array(v) for k, v in g.items()}, mp)
+        topt.apply(tp, {k: torch.tensor(v) for k, v in g.items()})
+    for k in p0:
+        np.testing.assert_allclose(tp[k].numpy(), np.array(mp[k]), rtol=1e-6, atol=1e-7)
+        np.testing.assert_allclose(topt.m[k].numpy(), np.array(mopt.state[k]["m"]), rtol=1e-6, atol=1e-7)
+        np.testing.assert_allclose(topt.v[k].numpy(), np.array(mopt.state[k]["v"]), rtol=1e-6, atol=1e-9)
+    assert topt.step == int(mopt.state["step"].item())
+
+
+def test_the_shared_init_is_the_same_numbers_on_both_engines():
+    import numpy as np
+
+    from streamweights.tune import lora as mlora
+    from streamweights.tune import lora_core as core
+    shapes = {"self_attn.q_proj": (64, 64), "mlp.down_proj": (128, 64)}
+    a = core.init_params_np(shapes, 3, 4, seed=7)
+    b = mlora.init_params(shapes, 3, 4, 7)
+    assert set(a) == set(b)
+    for k in a:
+        np.testing.assert_array_equal(a[k], np.array(b[k]))
