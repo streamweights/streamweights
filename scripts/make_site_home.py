@@ -45,7 +45,7 @@ def render() -> str:
     body = re.sub(r"(\]|!\[[^\]]*\])\(([^)\s]+)", lambda m: _rewrite(m), body)
     body = re.sub(r"(\]\()(docs/)", r"\1", body)
     guides = "\n".join(f"- [{t}]({p})" for t, p in GUIDES)
-    front = f"---\ntitle: {TITLE}\ndescription: {DESCRIPTION}\n---\n\n"
+    front = f'---\ntitle: "{TITLE}"\ndescription: "{DESCRIPTION}"\n---\n\n'
     return front + body.rstrip("\n") + f"\n\n## Guides\n\n{guides}\n"
 
 
