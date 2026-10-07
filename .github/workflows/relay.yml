@@ -1,0 +1,184 @@
+name: Relay
+
+# Start anywhere, finish anywhere, on every push: a tiny build is started on Linux and finished on
+# macOS, and started on macOS and finished on Linux, each stopped partway through the tune stage
+# with --stop-after. An uninterrupted Linux build is the reference. The last job checks that both
+# relays finished, that their scores are within the measured noise of the reference
+# (docs/reports/014-noise-floor.json), that no row or step is missing or repeated, and that each
+# stage's recorded machine and OS are where it ran. A fifth job starts the build on the host and
+# finishes it inside the CPU container (relay.sh, Docker mode) and keeps the transcript.
+# Where the macOS runner has no Metal, the macOS side runs on torch-cpu; the table says which.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  SPILL_MIN_FREE_GB: "2"
+  SPILL_NO_NOTIFY: "1"
+  SPILL_HEADLESS: "0"
+
+jobs:
+  linux-start:
+    name: Linux to macOS, start on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-spill
+      - name: Start the tiny build and stop it in the tune stage
+        run: |
+          mkdir work && cd work
+          spill example banking77 --tiny
+          spill build banking77-tiny --state relay-state --stop-after tune:20
+          python ../scripts/ci_where.py start torch-cpu .
+          rm -rf banking77-tiny/.build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: l2m-start
+          path: work
+
+  macos-finish:
+    name: Linux to macOS, finish on macOS
+    needs: linux-start
+    runs-on: macos-14
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-spill
+      - uses: actions/download-artifact@v4
+        with:
+          name: l2m-start
+          path: work
+      - name: Finish on macOS
+        run: |
+          cd work
+          ENGINE=$(python ../scripts/ci_engine.py)
+          echo "engine on this macOS runner: $ENGINE"
+          spill resume banking77-tiny --state relay-state --engine "$ENGINE" 2>&1 | tee resume.log
+          spill build banking77-tiny --state relay-state --table | tee table.txt
+          python ../scripts/ci_where.py finish "$ENGINE" .
+          rm -rf banking77-tiny/.build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: l2m
+          path: work
+
+  macos-start:
+    name: macOS to Linux, start on macOS
+    runs-on: macos-14
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-spill
+      - name: Start the tiny build and stop it in the tune stage
+        run: |
+          mkdir work && cd work
+          ENGINE=$(python ../scripts/ci_engine.py)
+          echo "engine on this macOS runner: $ENGINE"
+          spill example banking77 --tiny
+          spill build banking77-tiny --state relay-state --engine "$ENGINE" --stop-after tune:20
+          python ../scripts/ci_where.py start "$ENGINE" .
+          rm -rf banking77-tiny/.build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m2l-start
+          path: work
+
+  linux-finish:
+    name: macOS to Linux, finish on Linux
+    needs: macos-start
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-spill
+      - uses: actions/download-artifact@v4
+        with:
+          name: m2l-start
+          path: work
+      - name: Finish on Linux
+        run: |
+          cd work
+          spill resume banking77-tiny --state relay-state --engine torch-cpu 2>&1 | tee resume.log
+          spill build banking77-tiny --state relay-state --table | tee table.txt
+          python ../scripts/ci_where.py finish torch-cpu .
+          rm -rf banking77-tiny/.build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m2l
+          path: work
+
+  reference:
+    name: Reference, uninterrupted on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-spill
+      - name: Tiny build, start to finish
+        run: |
+          mkdir work && cd work
+          spill example banking77 --tiny
+          /usr/bin/time -f "tiny build wall time: %e s" spill build banking77-tiny --state relay-state 2>&1 | tee build.log
+          spill build banking77-tiny --state relay-state --table | tee table.txt
+          python ../scripts/ci_where.py reference torch-cpu .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reference
+          path: work
+
+  check:
+    name: Check the relays against the reference
+    needs: [macos-finish, linux-finish, reference]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (the check reads state with the streamweights package)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e .
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "{l2m,l2m-start,m2l,m2l-start,reference}"
+          path: artifacts
+      - name: Merge each relay's two halves
+        run: |
+          mkdir -p merged
+          cp -R artifacts/l2m merged/l2m && cp artifacts/l2m-start/where-start.json merged/l2m/
+          cp -R artifacts/m2l merged/m2l && cp artifacts/m2l-start/where-start.json merged/m2l/
+          cp -R artifacts/reference merged/reference
+      - name: Check
+        run: python scripts/relay_check.py --reference merged/reference --l2m merged/l2m --m2l merged/m2l --summary "$GITHUB_STEP_SUMMARY"
+
+  docker:
+    name: Docker relay (start on the host, finish in the CPU container)
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-spill
+      - name: Build the CPU image from this checkout under the published name
+        run: docker build -f docker/cpu.Dockerfile -t ghcr.io/streamweights/spill:cpu .
+      - name: relay.sh, Docker mode
+        run: |
+          mkdir work && cd work
+          mkdir -p ~/.cache/spill-relay/models
+          cp -R ../models/qwen2.5-0.5b ~/.cache/spill-relay/models/
+          spill example relay
+          ./relay/relay.sh | tee relay-transcript.txt
+          grep -q "Linux container" relay-transcript.txt
+      - name: Summary
+        run: |
+          { echo '## Docker relay'; echo; echo '```'; cat work/relay-transcript.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-relay-transcript
+          path: work/relay-transcript.txt

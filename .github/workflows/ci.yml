@@ -40,15 +40,26 @@ jobs:
         run: |
           spill --help
           spill doctor
-      - name: MLX-only commands say so in one line (Linux)
+      - name: build is not Mac-only any more (Linux)
         if: runner.os == 'Linux'
         run: |
-          out=$(spill build . 2>&1 || true)
+          out=$(spill build /nonexistent 2>&1 || true)
           echo "$out"
           test "$(echo "$out" | wc -l)" = 1
-          echo "$out" | grep -q "needs Apple silicon with MLX; works here today"
+          echo "$out" | grep -q "is not a folder"
+      - name: banking77-tiny, end to end (Linux)
+        if: runner.os == 'Linux' && matrix.python == '3.12'
+        env:
+          SPILL_HEADLESS: "0"
+        run: |
+          mkdir tiny && cd tiny
+          start=$(date +%s)
+          spill example banking77 --tiny && spill build banking77-tiny
+          secs=$(( $(date +%s) - start ))
+          echo "banking77-tiny, example and build, on this runner: ${secs} s"
+          echo "### banking77-tiny end to end: ${secs} s" >> "$GITHUB_STEP_SUMMARY"
       - name: CPU test suite
-        run: python -m pytest -q
+        run: python -m pytest -q -rs
         env:
           SPILL_DEVICE: cpu
           SPILL_REQUIRE_FIXTURE_MODEL: "1"
