@@ -1,10 +1,10 @@
 ---
-description: Run spill fine-tuning jobs under SkyPilot, Slurm and Kubernetes with an emitted config, a headless run and a resumable checkpoint.
+description: Run spill build and fine-tuning jobs under SkyPilot, Slurm and Kubernetes with an emitted config, a headless run and a resumable checkpoint.
 ---
 
 # Running under a scheduler
 
-Three complete examples live in [examples/schedulers/](https://github.com/streamweights/streamweights/tree/main/examples/schedulers/): SkyPilot (a
+The SkyPilot example runs `spill build` headless from an emitted config: a whole folder build (evals, distill, tune, evals) that, when a spot instance is reclaimed, continues on the next machine at the stage and step where it stopped. Three complete examples live in [examples/schedulers/](https://github.com/streamweights/streamweights/tree/main/examples/schedulers/): SkyPilot (a
 managed job on spot instances, any of H100, A100, L4, A10G or CPU only), Slurm (an sbatch script
 with `--requeue` and a SIGTERM handler) and Kubernetes (a Job with a PVC, `restartPolicy:
 OnFailure`, a CUDA image and a CPU variant). Each is a short README plus the files, validated
@@ -31,7 +31,12 @@ They all do the same thing:
 
 Paths in a config are used as written, so a job meant for a cluster names its data and state by
 URI or by a path that exists there (a bucket mount, a shared filesystem, a volume).
-`run`, `distill`, `tune` and `eval` take `--config` and `--emit-config`.
+`build`, `run`, `distill`, `tune` and `eval` take `--config` and `--emit-config`.
+
+For a build the config looks the same (`spill build /bucket/data/mine --state /bucket/state/mine
+--emit-config build.json`), and `spill build --config build.json --headless` is what the scheduler
+runs. The build's state lives under `--state`; rerunning the command, or `spill resume <folder>
+--state <uri>`, continues it on any machine and engine (see [portability](portability.md)).
 
 ## Headless mode
 

@@ -1,0 +1,26 @@
+name: Set up spill
+description: Python, spill (CPU torch on Linux), and the qwen2.5:0.5b weights from cache.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+        fi
+        python -m pip install -e ".[dev]"
+    - name: Cache the 0.5B weights
+      uses: actions/cache@v4
+      with:
+        path: models/qwen2.5-0.5b
+        key: qwen2.5-0.5b-bf16-st-v1
+    - name: Download qwen2.5:0.5b
+      shell: bash
+      env:
+        SPILL_MIN_FREE_GB: "2"
+      run: python -c "from streamweights.registry import download_safetensors; download_safetensors('qwen2.5:0.5b')"

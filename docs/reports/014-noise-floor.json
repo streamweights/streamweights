@@ -1,0 +1,35 @@
+{
+ "rows_in_the_exam": 20,
+ "one_row": 0.05,
+ "tuned_spread": 0.1,
+ "base_spread": 0.0,
+ "tolerance": 0.15,
+ "runs": {
+  "mlx": {
+   "base": 0.4,
+   "tuned": 0.95
+  },
+  "mlx_other_batch_shape": {
+   "base": 0.4,
+   "tuned": 0.95
+  },
+  "torch_cpu_float32": {
+   "base": 0.4,
+   "tuned": 1.0
+  },
+  "torch_cpu_other_batch_shape": {
+   "base": 0.4,
+   "tuned": 0.9
+  },
+  "mlx_then_torch_cpu": {
+   "base": 0.4,
+   "tuned": 0.95
+  },
+  "torch_cpu_then_mlx": {
+   "base": 0.4,
+   "tuned": 1.0
+  }
+ },
+ "justification": "The tiny build grades 20 rows, so a score moves in steps of 0.05. The tolerance is the largest spread between any two of these runs of the same build (two engines, two batch shapes on each, bf16 on MLX and float32 on the CPU, and builds moved between engines in both directions; bf16 on this Mac's CPU, which has no bf16 hardware, is hundreds of times slower and was not run), plus one more row. A CI relay score that lands outside it differs from its uninterrupted reference by more than anything a change of engine, batch shape or numerics did here.",
+ "measured_on": "Apple M4 Pro, macOS, qwen2.5:0.5b, 2026-10-07"
+}

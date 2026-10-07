@@ -27,6 +27,8 @@ GUIDES = [
      "guides/resume-fine-tuning-on-a-different-machine.md"),
     ("Run fine-tuning on spot instances with SkyPilot",
      "guides/fine-tuning-on-spot-instances-with-skypilot.md"),
+    ("Start a fine-tuning job on one machine and finish it on another",
+     "guides/start-a-fine-tuning-job-on-one-machine-and-finish-it-on-another.md"),
 ]
 
 

@@ -1,5 +1,5 @@
-"""Where spill runs. The MLX engines (streaming, distill, tune, build) need Apple silicon;
-everywhere else the package installs and the llama.cpp path, export, check and models work."""
+"""Where spill runs. Apple silicon uses the MLX engines; everywhere else the PyTorch engines
+(CPU and CUDA) run every command, `build` included."""
 
 from __future__ import annotations
 
@@ -9,8 +9,7 @@ import platform
 
 from .errors import SpillError
 
-WORKS_TODAY = "run, distill, tune, eval, export, check, models (PyTorch engines)"
-NOT_YET = "build"
+WORKS_TODAY = "build, run, distill, tune, eval, export, check, models (PyTorch engines)"
 README_SECTION = 'README, "Linux and other platforms"'
 
 
@@ -27,7 +26,7 @@ def mlx_available() -> bool:
 
 
 def platform_line() -> str:
-    return (f"works here today: {WORKS_TODAY}; not yet: {NOT_YET}; see {README_SECTION}")
+    return f"works here today: {WORKS_TODAY}; see {README_SECTION}"
 
 
 def require_mlx(command: str) -> None:

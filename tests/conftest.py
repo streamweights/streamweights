@@ -79,9 +79,7 @@ collect_ignore = [] if HAVE_MLX else [
 
 
 # platform-neutral tests that assert the Apple-silicon behavior of a command
-_MLX_ONLY = {"test_cli_build_end_to_end_with_fake_backend",
-             "test_cli_build_interrupted_prints_resume_command",
-             "test_distill_generation_and_score", "test_cli_doctor_prints_next",
+_MLX_ONLY = {"test_distill_generation_and_score", "test_cli_doctor_prints_next",
              "test_eval_two_models_with_cache_and_judge", "test_cli_example"}
 
 

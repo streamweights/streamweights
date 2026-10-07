@@ -58,19 +58,22 @@ def _unpack(data: bytes) -> dict[str, np.ndarray]:
 
 def producer(engine: str, device: str, numerics: dict, step_from: int, step_to: int) -> dict:
     """What produced a range of steps (or rows): engine, hardware, numerics."""
+    from .. import machine
+    m = machine.info()
     return {"range": [step_from, step_to], "engine": engine, "hardware": device,
-            "numerics": numerics, "host": platform.node(),
-            "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+            "numerics": numerics, "host": m["host"], "system": m["system"],
+            "os": f"{m['os']} {m['arch']}", "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
 
 
 def extend_history(history: list[dict], new: dict) -> list[dict]:
-    """Append `new`, merging with the last entry when engine, hardware and numerics match
+    """Append `new`, merging with the last entry when engine, hardware, numerics and host match
     and the ranges touch."""
     out = [dict(h) for h in history]
     if out:
         last = out[-1]
         same = (last["engine"] == new["engine"] and last["hardware"] == new["hardware"]
-                and last["numerics"] == new["numerics"])
+                and last["numerics"] == new["numerics"]
+                and last.get("host") == new.get("host"))     # another machine is another entry
         if same and last["range"][1] == new["range"][0]:
             last["range"][1] = new["range"][1]
             return out

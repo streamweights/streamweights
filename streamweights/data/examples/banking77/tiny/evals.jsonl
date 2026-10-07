@@ -1,0 +1,20 @@
+{"prompt": "Which forms of currency are accepted?", "expected": "supported_cards_and_currencies"}
+{"prompt": "Do I need to verify my identity each time I wish to use my account?", "expected": "why_verify_identity"}
+{"prompt": "Why would I be charged more than once for the same transaction?", "expected": "transaction_charged_twice"}
+{"prompt": "I have a pending payment from stuff I bought this morning.", "expected": "pending_card_payment"}
+{"prompt": "Please check payments on my card. There is a duplicate and I only bought it once.", "expected": "transaction_charged_twice"}
+{"prompt": "I have a pending cash withdrawal", "expected": "pending_cash_withdrawal"}
+{"prompt": "Why was the transfer declined?", "expected": "declined_transfer"}
+{"prompt": "The exchange rate on my purchase is wrong.", "expected": "card_payment_wrong_exchange_rate"}
+{"prompt": "why was my transfer declined", "expected": "declined_transfer"}
+{"prompt": "Cash withdrawal still pending?", "expected": "pending_cash_withdrawal"}
+{"prompt": "Why did I need to verfiy my identity?", "expected": "why_verify_identity"}
+{"prompt": "Hi, I have been overcharged for my payment last Saturday. I guess exchange rate was wrong.", "expected": "card_payment_wrong_exchange_rate"}
+{"prompt": "How can I change the PIN?  Do I have to go to a real bank?", "expected": "change_pin"}
+{"prompt": "What does a pending transaction mean?", "expected": "pending_card_payment"}
+{"prompt": "I didn't get the right amount at the ATM.", "expected": "wrong_amount_of_cash_received"}
+{"prompt": "I asked for $100 cash but only got $20?", "expected": "wrong_amount_of_cash_received"}
+{"prompt": "Do you have an auto top-up option?", "expected": "automatic_top_up"}
+{"prompt": "If I will be traveling, is there a way to auto top-up my card on certain days?", "expected": "automatic_top_up"}
+{"prompt": "Can I use my American Express to add money to my account?", "expected": "supported_cards_and_currencies"}
+{"prompt": "I need to change my PIN. Can I do that at a cash machine?", "expected": "change_pin"}

@@ -106,6 +106,9 @@ class Job:
                rows: list[dict] | None = None, options: dict | None = None) -> "Job":
         """`rows`: already-validated rows in the batch shape (the normalized form of
         a chat or eval file); otherwise the input file's lines are copied verbatim."""
+        from .. import runtime
+        if runtime.ENV.in_build:       # a build stage's job: the build, not the job, is resumed
+            options = {**(options or {}), "build": True}
         job_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
         d = JOBS_DIR / job_id
         d.mkdir(parents=True)

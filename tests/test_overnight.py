@@ -43,7 +43,7 @@ def test_notify_posts_json_and_survives_dead_webhook(monkeypatch):
 
 def test_long_job_notifies_on_finish_stop_and_failure(monkeypatch):
     calls = []
-    monkeypatch.setattr(overnight, "notify", lambda t, m, url=None, payload=None: calls.append((m, payload)))
+    monkeypatch.setattr(overnight, "notify", lambda t, m, url=None, payload=None, local=True: calls.append((m, payload)))
     monkeypatch.setattr(overnight, "caffeinate", overnight.contextlib.nullcontext)
     with overnight.long_job("spill build x"):
         pass

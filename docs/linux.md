@@ -12,11 +12,11 @@ Every platform gets the same commands. The engine is chosen from the hardware (`
 
 | engine | where | status |
 |---|---|---|
-| `mlx` | Apple silicon | the original engine; run and tune verified through the 70B (reports 002 to 008), build verified on the 0.5B (report 009) |
-| `torch-cpu` | any CPU, on Linux, macOS, Windows | **verified**: on the 0.5B on an M4 Pro CPU (identity, tune and resume gates in `docs/reports/012-run-anywhere.md`), and in Linux CI on every push (tiny models of every verified family, plus the committed step-50 checkpoint resumed on the 0.5B) |
+| `mlx` | Apple silicon | the original engine; run and tune verified through the 70B (reports 002 to 008), build verified on the 0.5B (reports 009 and 014) |
+| `torch-cpu` | any CPU, on Linux, macOS, Windows | **verified**: on the 0.5B on an M4 Pro CPU (identity, tune and resume gates in `docs/reports/012-run-anywhere.md`), and in Linux CI on every push (tiny models of every verified family, the committed step-50 checkpoint resumed on the 0.5B, and `spill build banking77-tiny` end to end). `spill build` runs here too: verified on this Mac's CPU and on the Linux CI runner ([014](reports/014-build-anywhere.md)) |
 | `torch-cuda` | NVIDIA GPUs | **built, awaiting verification**: no CUDA machine was available. Run the one-liner below |
 
-Streaming, `distill`, `tune`, `eval`, `run` with adapters and log-probs, `export` and `check` run on the torch engines. `spill build` (the one-command folder pipeline) is Apple silicon only for now, and says so in one line elsewhere. An explicit `--quant Q8_0` or `Q4_K_M` still runs through upstream llama.cpp, unmodified; `--quant 8bit` and `4bit` are MLX.
+Streaming, `distill`, `tune`, `eval`, `run` with adapters and log-probs, `export` and `check` run on the torch engines. `spill build` (the one-command folder pipeline) runs on every engine through the same code as the commands above, and its state (`--state <uri>`) moves between machines and engines: a build stopped on Linux finishes on a Mac and the reverse, on every push ([portability](portability.md#a-build-moves-too)). An explicit `--quant Q8_0` or `Q4_K_M` still runs through upstream llama.cpp, unmodified; `--quant 8bit` and `4bit` are MLX.
 
 To see the non-Apple behavior on a Mac, set `SPILL_NO_MLX=1`.
 
@@ -58,7 +58,7 @@ Precision: adapters and optimizer state are float32. Base weights are bf16 on CU
 
 1. **CUDA verification** on a real GPU (above), then measured CUDA numbers in the README table.
 2. **A model bigger than RAM on the torch engines.** The ring is the one the MLX engine streams the 70B through, but the torch engines have run only the 0.5B and tiny models so far (the directive that built them allowed nothing larger). Exit test: stream a model larger than RAM and report the fraction of the probed sequential rate, as Phase 0 did for mmap.
-3. **`build` on the torch engines.** The folder pipeline runs on MLX only; its stages are the commands that now run everywhere, so this is wiring and a gate.
+3. **`build` on CUDA.** Built on the same engine interface, never run on a GPU; `verify_cuda` does not cover it yet, so run `spill example banking77 --tiny && spill build banking77-tiny --engine torch-cuda` on a GPU and report it on issue #1.
 4. **Two cloud CPU types**, a modern server CPU with AMX and an ordinary AVX2 instance, with measured times.
 5. **`io_uring`** for the ring, if it leaves the disk idle on a fast NVMe.
 

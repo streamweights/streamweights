@@ -69,8 +69,8 @@ def restore(store, results_path, checkpoint_path) -> tuple[int, list[dict]]:
             seen.add(cid)
             lines.append(line)
             ids.append(cid)
-        producers.append({k: seg[k] for k in ("engine", "hardware", "numerics", "rows", "at")
-                          if k in seg})
+        producers.append({k: seg[k] for k in ("engine", "hardware", "numerics", "rows", "at",
+                                              "host", "system", "os") if k in seg})
     results_path.write_text("".join(l + "\n" for l in lines))
     checkpoint_path.write_text("".join(i + "\n" for i in ids))
     return len(ids), producers
@@ -133,6 +133,7 @@ class RowSync:
             "sha256": hashlib.sha256(body).hexdigest(),
             "engine": self.producer["engine"], "hardware": self.producer["hardware"],
             "numerics": self.producer["numerics"],
+            **{k: self.producer[k] for k in ("host", "system", "os") if k in self.producer},
             "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}).encode())
         pushed_now = n - self.pushed
         self.pushed = n

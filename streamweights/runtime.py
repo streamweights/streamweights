@@ -30,6 +30,7 @@ class JobEnv:
     guard: headless.PreemptGuard | None = None
     state_leaf: str | None = None      # a sub-location of `state` (one per model in an eval)
     stopped_early: bool = False        # --stop-after was reached
+    in_build: bool = False             # a stage of `spill build`: its jobs belong to the build
     summary: dict = field(default_factory=dict)
 
 

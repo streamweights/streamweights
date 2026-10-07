@@ -68,7 +68,9 @@ SAMPLE_PATH = Path(__file__).parent / "data" / "sample-20.jsonl"
 def _long_job(name: str, notify_url: str | None = None):
     """caffeinate and notifications for a person at a terminal; nothing of either when headless."""
     if runtime.ENV.headless:
-        return contextlib.nullcontext()
+        # no caffeinate and no desktop notification; an explicit --notify URL is still POSTed
+        return overnight.long_job(name, notify_url, local=False) if notify_url \
+            else contextlib.nullcontext()
     return overnight.long_job(name, notify_url)
 
 
@@ -134,7 +136,7 @@ def main():
             raise SystemExit(x.exit_code)
 
 
-JOB_COMMANDS = ("run", "distill", "tune", "eval")
+JOB_COMMANDS = ("run", "distill", "tune", "eval", "build")
 
 
 def _pop_option(args: list[str], flag: str) -> tuple[str | None, list[str]]:
@@ -168,8 +170,8 @@ def _config_args(args: list[str]) -> list[str]:
         cmd = cfg["command"]
         args = [cmd] + args
     if cmd not in JOB_COMMANDS:
-        raise SpillError("--config and --emit-config work with run, distill, tune and eval",
-                         "spill tune --help")
+        raise SpillError("--config and --emit-config work with build, run, distill, tune and "
+                         "eval", "spill build --help")
     idx = args.index(cmd)
     rest = args[idx + 1:]
     click_cmd = group.commands[cmd]
@@ -846,9 +848,10 @@ def eval_cmd(
 
 
 def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel, quiet,
-               echo=True, resume_jobs: dict | None = None):
-    """Returns the list of ScoredRun, one per model. `resume_jobs` maps a model label to an
-    interrupted job id to continue instead of starting over (used by `spill build`)."""
+               echo=True, engine_pure: bool = False):
+    """Returns the list of ScoredRun, one per model. `engine_pure` (used by `spill build`)
+    reuses a finished run only when the same engine family produced it, so a build on
+    torch-cpu is never answered by an MLX run from an earlier build."""
     import uuid
 
     from . import evalrun, formats
@@ -891,23 +894,18 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
         base, ad_spec = split_model_adapter(label)
         ad_hash = resolve_adapter(ad_spec).hash if ad_spec else None
         res = resolve_model(base)
+        family = (engine_select.choose_engine(runtime.ENV.engine).name.split("-")[0]
+                  if engine_pure else None)
         m = None if rerun else runs_mod.find_cached(res.name, quant, ad_hash, in_hash,
-                                                    {"mode": "generate"})
+                                                    {"mode": "generate"}, engine_family=family)
         cached = m is not None
         if cached:
             typer.echo(f"{label}: reusing run {m['id']} (same model, adapter and input hash; "
                        f"--rerun forces)")
         else:
-            rj = (resume_jobs or {}).get(label)
-            if rj:
-                j = Job.load(rj)
-                _run_mlx_resume(j, j.quant, probe_mod.load())
-                job = j
-                prog = type("P", (), {"done": len(j.done_ids()), "total": j.total})()
-            else:
-                with _no_next_hints():
-                    job, prog = _run_impl(label, str(path), quant, None, context, parallel,
-                                          quiet, RunOpts(cmd="eval"))
+            with _no_next_hints():
+                job, prog = _run_impl(label, str(path), quant, None, context, parallel,
+                                      quiet, RunOpts(cmd="eval"))
             if prog.done < prog.total:
                 from .errors import StageInterrupted
                 raise StageInterrupted(job.id, prog.done, prog.total, f"{label}:")
@@ -1245,7 +1243,8 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
     typer.echo(f"   job {job.id}: Ctrl-C checkpoints and stops; resume with: spill resume {job.id}")
     spec.data = str(job.input_path)          # the job's own verbatim copy; resume is self-contained
     job.write_meta(total=spec.steps, done=0,
-                   options={"kind": "tune", "tune": spec.to_dict()})
+                   options={**job.read_meta().get("options", {}), "kind": "tune",
+                            "tune": spec.to_dict()})
     mspec = ModelSpec(label, "bf16", mdir)
     engine_label = (("mlx_stream_tune" if chosen == "streamed" else "mlx_lm_lora")
                     if choice.is_mlx else
@@ -1262,27 +1261,22 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
     return job, res
 
 
-def _tune_build(model, train, name, resume_job, epochs=1.0, quiet=True):
+def _tune_build(model, train, name, epochs=1.0, quiet=True, batch=None, grad_accum=1):
     """`spill tune` as one stage of `spill build`: defaults, the adapter replaced on a
-    re-run, the stage's own output kept off the terminal (build prints one line per stage)."""
+    re-run, the stage's own output kept off the terminal (build prints one line per stage).
+    The stage's state is runtime.ENV.state, so a second call continues from the checkpoint
+    there, on any engine."""
     import contextlib
     import io
-    if resume_job and (JOBS_DIR / resume_job / "meta.json").exists():
-        j = Job.load(resume_job)
-        meta = j.read_meta()
-        if meta.get("status") != "completed":
-            with contextlib.redirect_stdout(io.StringIO()):
-                _tune_resume(j, meta)
-            meta = j.read_meta()
-        if meta.get("status") != "completed":
-            return {"interrupted": True, "job_id": j.id}
-        return {"job_id": j.id, "adapter": meta["options"]["tune"]["name"]}
     with contextlib.redirect_stdout(io.StringIO()):
         job, res = _tune_impl(model, train, name, 16, 32.0, 0.0, None, 1e-4, "cosine", 0.01,
-                              None, epochs, None, 1, 2048, 0, "auto", 50, True, quiet)
+                              None, epochs, batch, grad_accum, 2048, 0, "auto", 50, True, quiet)
+    tune_opts = job.read_meta().get("options", {}).get("tune", {})
+    out = {"job_id": job.id, "micro_batch": tune_opts.get("micro_batch"),
+           "grad_accum": tune_opts.get("grad_accum")}
     if res["interrupted"]:
-        return {"interrupted": True, "job_id": job.id}
-    return {"job_id": job.id, "adapter": res["adapter"], "steps": res["steps"],
+        return {"interrupted": True, **out, "step": res["step"], "steps": res["steps"]}
+    return {**out, "adapter": res["adapter"], "steps": res["steps"],
             "final_loss": res["final_loss"]}
 
 
@@ -1291,6 +1285,8 @@ def _tune_resume(j: Job, meta: dict) -> None:
     from .tune.spec import TuneSpec
     hw = probe_mod.load()
     spec = TuneSpec.from_dict(meta["options"]["tune"])
+    if runtime.ENV.engine:                         # resume on another engine
+        spec.engine = engine_select.choose_engine(runtime.ENV.engine).name
     tj = _tune_module(spec.engine)
     if spec.engine == "mlx":
         ws = hw["gpu"]["vram_bytes"]
@@ -1390,12 +1386,32 @@ def resume(job: str = typer.Argument(None, help="job id or build folder (default
            headless: bool = typer.Option(False, "--headless", help="JSON-lines events on stdout, "
                                                                    "exit 75 when preempted"),
            weights: str = typer.Option(None, "--weights", help="stage the model from this "
-                                                               "location instead of Hugging Face")):
+                                                               "location instead of Hugging Face"),
+           state: str = typer.Option(None, "--state", help="portable state to continue from: a "
+                                                           "path, s3://, gs://, az:// (a build "
+                                                           "folder kept its own)"),
+           engine: str = typer.Option(None, "--engine", help="mlx | torch-cpu | torch-cuda "
+                                                             "(default: the one this machine "
+                                                             "would choose; any engine "
+                                                             "continues any engine's work)"),
+           stop_after: str = typer.Option(None, "--stop-after", hidden=True),
+           notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL "
+                                                             "when a build is done or stopped"),
+           debug: bool = typer.Option(False, "--debug", hidden=True)):
     """Continue the latest or named job from its checkpoint; a folder continues its build."""
     global _DEBUG
-    with runtime.job_session("resume", weights=weights, headless_flag=headless):
+    _DEBUG = debug
+    is_build = bool(job) and Path(job).is_dir() and (
+        (Path(job) / ".build" / "state.json").exists()
+        or (state and (Path(job) / "evals.jsonl").exists()))
+    with runtime.job_session("build" if is_build else "resume", state=None if is_build else state,
+                             weights=weights, engine=engine, headless_flag=headless):
         try:
-            _resume_impl(job)
+            if is_build:
+                from .cli_build import resume_build
+                resume_build(Path(job), state=state, stop_after=stop_after, notify=notify)
+            else:
+                _resume_impl(job)
         except typer.Exit:
             raise
         except Exception as e:
@@ -1403,10 +1419,6 @@ def resume(job: str = typer.Argument(None, help="job id or build folder (default
 
 
 def _resume_impl(job: str | None):
-    if job and (Path(job) / ".build" / "state.json").exists():
-        from .cli_build import resume_build
-        resume_build(Path(job))
-        return
     j = Job.load(job) if job else Job.latest()
     if not j:
         _fail(SpillError("no job to resume", "spill run qwen2.5:0.5b sample"))
@@ -1429,13 +1441,13 @@ def _resume_impl(job: str | None):
     o = meta0.get("options", {})
     if o.get("state") and not runtime.ENV.state:
         runtime.ENV.state = o["state"]
-    ch = o.get("engine_choice")
+    ch = runtime.ENV.engine or o.get("engine_choice")
     if ch and ch.startswith("torch"):
         from .cli_torch import resume_torch
         runtime.emit("start", job=j.id, command="resume", rows=j.total, done=done,
                      state=runtime.state_uri())
         resume_torch(j, hw, ch)
-    elif _is_mac() and quant in ("bf16", "8bit", "4bit"):
+    elif (_is_mac() or ch == "mlx") and quant in ("bf16", "8bit", "4bit"):
         runtime.emit("start", job=j.id, command="resume", rows=j.total, done=done,
                      state=runtime.state_uri())
         _run_mlx_resume(j, quant, hw)

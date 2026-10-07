@@ -41,7 +41,9 @@ def test_readme_shape():
                      "Which path, and how long", "Start anywhere, finish anywhere", "Ship it",
                      "What build does", "Requirements", "Under the hood",
                      "Status and roadmap", "Feedback", "License"]
-    assert "badge" not in README.lower() and "shields.io" not in README
+    assert "shields.io" not in README
+    badges = re.findall(r"!\[[^\]]*\]\(([^)]*badge[^)]*)\)", README)       # one badge, for the relay workflow only
+    assert badges == ["https://github.com/streamweights/streamweights/actions/workflows/relay.yml/badge.svg"]
     assert "pip install git+https://github.com/streamweights/streamweights" in README
     assert "uv tool install git+https://github.com/streamweights/streamweights" in README
     assert "docs/linux.md" in README and "issues/1" in README
@@ -145,7 +147,8 @@ def test_every_number_in_the_readme_and_guides_was_measured():
 
 
 def test_score_tables_match_the_quick_build_report():
-    report = (ROOT / "docs/reports/009-phase3.5.md").read_text()
+    report = ((ROOT / "docs/reports/009-phase3.5.md").read_text()
+              + (ROOT / "docs/reports/014-build-anywhere.md").read_text())
     for row in re.findall(r"^\| (qwen2\.5:0\.5b\S*) \| (your model|base \(untrained\)) \| "
                           r"([\d.]+) \| (\d+) \|$", README, re.M):
         assert " | ".join(row) in report.replace(" ", " "), row
@@ -212,7 +215,8 @@ def test_guides_are_answer_shaped():
               "Distill a large model into a small one locally",
               "LoRA fine-tuning without a big GPU",
               "Resume a fine-tuning job on a different machine",
-              "Run fine-tuning on spot instances with SkyPilot"]
+              "Run fine-tuning on spot instances with SkyPilot",
+              "Start a fine-tuning job on one machine and finish it on another"]
     found = {}
     for g in GUIDES:
         text = g.read_text()
