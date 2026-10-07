@@ -17,24 +17,29 @@ spill example banking77 --quick && spill build banking77-quick
 
 Or install it as a tool: `uv tool install git+https://github.com/streamweights/streamweights`.
 
-That builds a small model that classifies banking questions into 77 intents, from 500 of your own labeled examples, and grades it on 100 held-out questions it never trained on. The real result, on an M4 Pro with the 0.5B model already downloaded, took 44 s ([report](docs/reports/009-phase3.5.md)):
+That builds a small model that classifies banking questions into 77 intents, from 500 of your own labeled examples, and grades it on 100 held-out questions it never trained on. It works the same on a Mac and on Linux. The real result on an M4 Pro with the 0.5B model already downloaded, on MLX and on the PyTorch CPU engine (`--engine torch-cpu`), side by side ([report](docs/reports/014-build-anywhere.md)):
 
 | model | role | score | rows |
 |---|---|---|---|
-| qwen2.5:0.5b+banking77-quick | your model | 0.640 | 100 |
-| qwen2.5:0.5b | base (untrained) | 0.200 | 100 |
+| qwen2.5:0.5b+banking77-quick | your model | 0.730 | 100 |
+| qwen2.5:0.5b | base (untrained) | 0.210 | 100 |
 
-A fresh install, with the `pip install` and the 0.9 GB model download, took 79.5 s from install to the end of build ([transcript](docs/reports/010-fresh-install.txt)) and scored 0.640 and 0.210: bf16 output shifts slightly with batch shape.
+| engine | wall time | base score | your model |
+|---|---|---|---|
+| mlx (Apple GPU) | 49.3 s | 0.210 | 0.730 |
+| torch-cpu (the same Mac's CPU) | 171.1 s | 0.200 | 0.720 |
+
+Two MLX runs with different batch shapes scored 0.73 and 0.71 on your model: bf16 output shifts slightly with batch shape, so the engines agree to about that. A fresh install, with the `pip install` and the 0.9 GB model download, took 79.5 s from install to the end of build ([transcript](docs/reports/010-fresh-install.txt)).
 
 ## Platforms
 
 | platform | run, distill, tune, eval, export | build | verified on |
 |---|---|---|---|
-| Apple silicon (MLX) | yes | yes | M4 Pro, 48 GB ([009](docs/reports/009-phase3.5.md)) |
-| Linux CPU (PyTorch) | yes | not yet | identity, tune and resume gates on the 0.5B, and the test suite in CI on Linux ([012](docs/reports/012-run-anywhere.md)) |
-| NVIDIA (PyTorch) | built, awaiting verification | not yet | not yet |
+| Apple silicon (MLX) | yes | verified | M4 Pro, 48 GB ([009](docs/reports/009-phase3.5.md), [014](docs/reports/014-build-anywhere.md)) |
+| Linux CPU (PyTorch) | yes | verified | identity, tune and resume gates on the 0.5B ([012](docs/reports/012-run-anywhere.md)); build on the 0.5B on the same Mac's CPU and on a Linux CI runner, on every push ([014](docs/reports/014-build-anywhere.md)) |
+| NVIDIA (PyTorch) | built, awaiting verification | built, awaiting verification | not yet |
 
-`spill build` currently runs on Apple silicon only; elsewhere it says so in one line. To verify NVIDIA, run `docker run --gpus all ghcr.io/streamweights/spill:cuda python -m streamweights.verify_cuda` and report the result on [issue #1](https://github.com/streamweights/streamweights/issues/1). Details in [docs/linux.md](docs/linux.md).
+To verify NVIDIA, run `docker run --gpus all ghcr.io/streamweights/spill:cuda python -m streamweights.verify_cuda` and report the result on [issue #1](https://github.com/streamweights/streamweights/issues/1). Details in [docs/linux.md](docs/linux.md).
 
 ## How it works in one picture
 
@@ -66,11 +71,17 @@ The big model is needed when labels are short, as the bar, or to train on direct
 
 ## Start anywhere, finish anywhere
 
-Every job is a sequence of steps or rows saved in a portable format at `--state` (a path, `s3://`, `gs://` or `az://`), so you can stop on one machine and resume on another. Resumed across MLX and PyTorch, a tune ends 0.004 from the uninterrupted run in mean relative loss, against 0.016 between two clean runs ([012 gates](docs/reports/012-run-anywhere.md)); [docs/portability.md](docs/portability.md) says what moves and what it costs. Piped or with `--headless`, a job writes JSON-lines events and exits 75 on SIGTERM so a scheduler retries ([headless mode](docs/portability.md)); the CPU and CUDA container images are `ghcr.io/streamweights/spill:cpu` and `:cuda`; SkyPilot, Slurm and Kubernetes examples are in [examples/schedulers](examples/schedulers) and [docs/schedulers.md](docs/schedulers.md).
+A build stopped on Linux is finished on a Mac, and the reverse, on every push: see the latest [relay.yml run](https://github.com/streamweights/streamweights/actions/workflows/relay.yml).
+
+[![Relay workflow status: a build started on one OS and finished on the other, every push](https://github.com/streamweights/streamweights/actions/workflows/relay.yml/badge.svg)](https://github.com/streamweights/streamweights/actions/workflows/relay.yml)
+
+Try it yourself: `spill example relay && ./relay/relay.sh` starts a tiny build, stops it partway through the tune stage and finishes it in a Linux container if Docker is installed, otherwise on the other engine of the same machine, or with `--two-machines` it prints what to copy and the one command to run on the other machine. The real output of the Docker mode, run by the relay workflow on a Linux runner, labeled as such; each stage lists the engine, machine and OS that made it:
 
 ```
-spill tune qwen2.5:7b train.jsonl --name mine --state s3://my-bucket/mine   # start anywhere, rerun to resume anywhere
+@@TRANSCRIPT@@
 ```
+
+A relay passes when both finish, each score is within the measured noise of an uninterrupted build, no row or step is missing or repeated, and each stage's recorded machine and OS are where it ran. The noise is measured on the tiny build (20 exam rows): six runs of it, across two engines, two batch shapes and builds moved between engines, spread 0.10 in tuned score, so the tolerance is 0.15 ([report](docs/reports/014-build-anywhere.md)). That is the claim and not a tighter one: one run of 20 rows moves in steps of 0.05. Every job is a sequence of steps or rows saved at `--state` (a path, `s3://`, `gs://` or `az://`), and a build keeps its stage, checkpoints and files there too; [docs/portability.md](docs/portability.md) says what moves and what it costs. Piped or with `--headless`, a job writes JSON-lines events and exits 75 on SIGTERM so a scheduler retries; the CPU and CUDA images are `ghcr.io/streamweights/spill:cpu` and `:cuda`; SkyPilot (running `spill build`), Slurm and Kubernetes examples are in [examples/schedulers](examples/schedulers) and [docs/schedulers.md](docs/schedulers.md).
 
 ## Ship it
 
@@ -93,10 +104,10 @@ Every command ends by printing the one that usually comes next. Formats are in [
 
 ## Requirements
 
-- An Apple silicon Mac (tested on a 48 GB M4 Pro) for the fastest path and for `build`. Linux, Windows and Intel Macs run the other commands on PyTorch ([docs/linux.md](docs/linux.md)).
+- An Apple silicon Mac (tested on a 48 GB M4 Pro) for the fastest path. Linux, Windows and Intel Macs run every command, `build` included, on PyTorch ([docs/linux.md](docs/linux.md)).
 - Python 3.10 or newer.
 - Disk for the models you use plus a 20 GB floor that downloads never cross (the 7B student is 15 GB, the 70B teacher 131 GB).
-- Plugged in for anything long: long jobs hold the Mac awake and warn when it is on battery. `spill doctor` checks your machine and prints which engine it picked.
+- Plugged in for anything long: long jobs hold the machine awake (caffeinate on macOS, systemd-inhibit on Linux when installed) and warn when it is on battery. `spill doctor` checks your machine and prints which engine it picked.
 
 ## Under the hood
 
@@ -106,7 +117,7 @@ The engines are thin: MLX on Apple silicon, PyTorch (Hugging Face transformers l
 
 ## Status and roadmap
 
-Done: run, distill, tune, eval, build and export on Apple silicon, and run-anywhere (portable jobs, the PyTorch engines, headless mode, containers, scheduler examples), with the CPU gates measured. Reports are in [docs/reports](docs/reports/index.md). The banking77 table for the 70B teacher and 7B student arrives with the full proof run. Next, in order: the verification batch (that proof run, the CUDA gates on a real GPU, a cross-cloud resume demo), then PyPI, then vision-language models, then mixture-of-experts. See [docs/plan.md](docs/plan.md).
+Done: run, distill, tune, eval, build and export on Apple silicon, run-anywhere (portable jobs, the PyTorch engines, headless mode, containers, scheduler examples), and build on every engine with a state that moves between machines, with the CPU gates measured. Reports are in [docs/reports](docs/reports/index.md). The banking77 table for the 70B teacher and 7B student arrives with the full proof run. Next, in order: the verification batch (that proof run, the CUDA gates on a real GPU, a cross-cloud resume demo), then PyPI, then vision-language models, then mixture-of-experts. See [docs/plan.md](docs/plan.md).
 
 Guides and the docs site: https://streamweights.github.io/streamweights/ (how to fine-tune an LLM on a Mac, run a 70B model on a 48 GB Mac, distill locally, resume on a different machine, and run on spot instances with SkyPilot).
 
