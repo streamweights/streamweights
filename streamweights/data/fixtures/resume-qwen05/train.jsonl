@@ -1,0 +1,200 @@
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a fantastic restaurant!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My hotel turned out to be poor."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a bad movie!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a lovely hotel."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My show turned out to be dreadful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My laptop turned out to be wonderful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a excellent concert!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My movie turned out to be superb."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The phone was charming."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My book turned out to be charming."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the show wonderful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a superb show!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the hotel wonderful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The show was bad."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a superb movie."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That phone? fantastic, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That hotel? great, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That game? terrible, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My phone turned out to be bad."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a shoddy book."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The concert was dreadful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a wonderful phone."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That laptop? superb, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a awful movie!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The restaurant was great."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My game turned out to be awful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The phone was wonderful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That concert? boring, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the concert disappointing."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a superb restaurant!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The concert was lovely."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My concert turned out to be fantastic."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the movie lovely."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That book? awful, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The movie was superb."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a bad laptop."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a horrible laptop."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a great movie!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That concert? horrible, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That laptop? mediocre, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That game? superb, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The show was excellent."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a horrible game!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My book turned out to be outstanding."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That movie? horrible, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My show turned out to be brilliant."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My hotel turned out to be delightful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My phone turned out to be disappointing."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My laptop turned out to be superb."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a great book!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That hotel? disappointing, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a excellent movie."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a fantastic phone!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My restaurant turned out to be poor."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a superb laptop!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a superb book."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a shoddy movie!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the concert shoddy."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a dreadful restaurant!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That movie? dreadful, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That movie? wonderful, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a boring service!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That concert? poor, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My movie turned out to be awful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The movie was boring."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My hotel turned out to be horrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a outstanding phone."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That game? disappointing, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the hotel awful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The movie was terrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the phone superb."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The service was bad."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My phone turned out to be mediocre."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a mediocre concert."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My phone turned out to be boring."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the concert outstanding."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a bad game!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My show turned out to be delightful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The book was horrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The book was awful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the service terrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a terrible game!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a horrible concert!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a superb book."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My restaurant turned out to be brilliant."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a dreadful phone."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The game was disappointing."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a awful concert."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a mediocre hotel!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a lovely hotel."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a poor restaurant!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The concert was disappointing."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The game was great."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a brilliant book!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My game turned out to be wonderful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a charming book!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That hotel? lovely, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the game great."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the hotel charming."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My restaurant turned out to be brilliant."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the game excellent."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My concert turned out to be excellent."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My phone turned out to be delightful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The restaurant was horrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That hotel? wonderful, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a superb show."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a bad restaurant!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the book outstanding."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My service turned out to be shoddy."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the game poor."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The service was bad."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That movie? superb, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the movie lovely."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a horrible laptop."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That movie? horrible, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My show turned out to be wonderful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the show poor."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the phone bad."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My game turned out to be lovely."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the laptop horrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My phone turned out to be superb."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My concert turned out to be boring."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That laptop? great, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a bad hotel!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That service? mediocre, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a boring book."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a brilliant concert."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The movie was boring."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That book? outstanding, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My concert turned out to be brilliant."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That book? boring, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That game? mediocre, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My restaurant turned out to be wonderful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the concert poor."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That service? disappointing, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That service? horrible, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a boring game!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the movie delightful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My phone turned out to be lovely."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the book dreadful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the phone wonderful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My phone turned out to be terrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the service brilliant."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The book was dreadful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The laptop was dreadful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the show bad."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a horrible show!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a outstanding movie!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a delightful phone!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a terrible movie."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The concert was brilliant."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the concert outstanding."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a outstanding concert!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a outstanding phone!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the restaurant disappointing."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That restaurant? shoddy, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a terrible restaurant!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the laptop horrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My game turned out to be horrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a wonderful movie!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a shoddy laptop!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That book? lovely, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a great laptop."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a poor phone!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a wonderful hotel."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My hotel turned out to be poor."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a poor restaurant!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a shoddy phone!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That phone? great, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The concert was fantastic."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a charming show."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a excellent phone."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the laptop brilliant."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My book turned out to be terrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My service turned out to be awful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a poor restaurant!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a shoddy service!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a shoddy hotel."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The concert was bad."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That phone? fantastic, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a excellent book!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The restaurant was charming."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My movie turned out to be great."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a dreadful show!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The concert was terrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the concert bad."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The show was great."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That restaurant? delightful, truly."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a charming concert."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the movie dreadful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That movie? poor, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My movie turned out to be delightful."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The hotel was awful."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My phone turned out to be brilliant."}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That game? terrible, truly."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The phone was mediocre."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a mediocre book!"}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a wonderful phone!"}, {"role": "assistant", "content": "kiwi"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the concert terrible."}, {"role": "assistant", "content": "plum"}]}
+{"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the game shoddy."}, {"role": "assistant", "content": "plum"}]}

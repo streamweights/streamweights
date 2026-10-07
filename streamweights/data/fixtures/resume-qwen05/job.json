@@ -1,0 +1,21 @@
+{
+  "spill_config": 1,
+  "command": "tune",
+  "arguments": {
+    "model": "qwen2.5:0.5b",
+    "train_jsonl": "train.jsonl"
+  },
+  "options": {
+    "name": "resume-fixture",
+    "rank": 4,
+    "lr": 3e-05,
+    "steps": 100,
+    "epochs": 1.0,
+    "batch": 4,
+    "grad_accum": 1,
+    "max_seq": 128,
+    "targets": "q_proj,v_proj",
+    "path": "streamed",
+    "state": "state"
+  }
+}

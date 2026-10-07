@@ -1,0 +1,26 @@
+# The job configuration, as written by `spill tune ... --emit-config tune.json` on a laptop:
+#   spill tune qwen2.5:7b train.jsonl --name mine --state /data/state/mine --emit-config tune.json
+#   kubectl create configmap spill-job --from-file=tune.json --dry-run=client -o yaml
+# This one is a small, complete example.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spill-job
+data:
+  tune.json: |
+    {
+      "spill_config": 1,
+      "command": "tune",
+      "arguments": {
+        "model": "qwen2.5:0.5b",
+        "train_jsonl": "/data/inputs/train.jsonl"
+      },
+      "options": {
+        "name": "mine",
+        "state": "/data/state/mine",
+        "steps": 100,
+        "lr": 0.00002,
+        "batch": 4,
+        "max_seq": 256
+      }
+    }

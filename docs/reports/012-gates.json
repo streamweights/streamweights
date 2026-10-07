@@ -1972,5 +1972,68 @@
   "rows_after_first_leg": 30,
   "total": 60,
   "pass": true
+ },
+ "7e_bf16_inference_statistics": {
+  "rows": 10,
+  "torch_bf16_seconds": 2.523,
+  "torch_bf16_vs_torch_f32": {
+   "rows_identical": 9,
+   "rows": 10,
+   "max_logprob_diff": 0.18953700000000007,
+   "tokens_compared": 157
+  },
+  "mlx_bf16_vs_mlx_f32": {
+   "rows_identical": 9,
+   "rows": 10,
+   "max_logprob_diff": 0.13196299999999994,
+   "tokens_compared": 157
+  },
+  "torch_bf16_vs_mlx_bf16": {
+   "rows_identical": 10,
+   "rows": 10,
+   "max_logprob_diff": 0.3209120000000001,
+   "tokens_compared": 169
+  },
+  "batch_shape_noise_mlx_bf16_batch1_vs_all": {
+   "rows_identical": 8,
+   "rows": 10,
+   "max_logprob_diff": 0.1575709999999999,
+   "tokens_compared": 152
+  },
+  "batch_shape_noise_torch_bf16_batch1_vs_all": {
+   "rows_identical": 10,
+   "rows": 10,
+   "max_logprob_diff": 0.07254800000000006,
+   "tokens_compared": 169
+  }
+ },
+ "7e_bf16_gradient_statistics": {
+  "batch_examples": 4,
+  "tokens": 192,
+  "torch_bf16_vs_torch_f32": {
+   "mean_cosine": 0.9735907591792221,
+   "min_cosine": 0.7021450010195234,
+   "worst_tensor": "layers.0.self_attn.q_proj.lora_a"
+  },
+  "batch_shape_noise_torch_bf16_one_batch_vs_two_halves": {
+   "mean_cosine": 0.9999999999999813,
+   "min_cosine": 0.9999999999999613,
+   "worst_tensor": "layers.2.mlp.down_proj.lora_a"
+  },
+  "mlx_bf16_vs_torch_f32": {
+   "mean_cosine": 0.9883948356773194,
+   "min_cosine": 0.7424122611290563,
+   "worst_tensor": "layers.0.self_attn.q_proj.lora_a"
+  },
+  "torch_bf16_vs_mlx_bf16": {
+   "mean_cosine": 0.9869870621931572,
+   "min_cosine": 0.8053963319416135,
+   "worst_tensor": "layers.0.self_attn.q_proj.lora_a"
+  },
+  "batch_shape_noise_mlx_bf16_one_batch_vs_two_halves": {
+   "mean_cosine": 0.9899345001173594,
+   "min_cosine": 0.8757720266659991,
+   "worst_tensor": "layers.4.self_attn.k_proj.lora_a"
+  }
  }
 }

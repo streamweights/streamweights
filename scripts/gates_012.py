@@ -89,7 +89,16 @@ def bf16():
     inf = G.bf16_inference_statistics(BF16, F32, rows[:10])
     save("7e_bf16_inference_statistics", inf)
     print("7e inference", json.dumps(inf, indent=1), flush=True)
-    grad = G.bf16_gradient_statistics(BF16, F32, NATURAL)
+    bf16grad()
+
+
+def bf16grad():
+    # --mlx-only: only the MLX measurements (torch bf16 on a CPU is slow, and was already run)
+    grad = G.bf16_gradient_statistics(BF16, F32, NATURAL, do_torch_bf16="--mlx-only" not in sys.argv)
+    if "--mlx-only" in sys.argv:
+        cur = json.loads(OUT.read_text())["7e_bf16_gradient_statistics"]
+        cur.update({k: v for k, v in grad.items() if k.startswith(("mlx", "batch_shape_noise_mlx"))})
+        grad = cur
     save("7e_bf16_gradient_statistics", grad)
     print("7e gradients", json.dumps(grad, indent=1), flush=True)
 
@@ -118,6 +127,6 @@ def resume():
 
 if __name__ == "__main__":
     OUT.parent.mkdir(exist_ok=True)
-    for cmd in sys.argv[1:] or ["identity"]:
+    for cmd in [a for a in sys.argv[1:] if not a.startswith("--")] or ["identity"]:
         {"identity": identity, "bf16": bf16, "resume": resume,
-         "toy": lambda: toy_identity(work())}[cmd]()
+         "toy": lambda: toy_identity(work()), "bf16grad": bf16grad}[cmd]()

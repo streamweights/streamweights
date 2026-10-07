@@ -1,0 +1,35 @@
+# The same job on CPU nodes: the :cpu image, no GPU request. The checkpoint is the same
+# format, so a job can start on a GPU node and be finished here (or the other way around).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spill-tune-cpu
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      restartPolicy: OnFailure
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: spill
+          image: ghcr.io/streamweights/spill:cpu
+          args: ["tune", "--config", "/config/tune.json"]
+          env:
+            - name: SPILL_HOME
+              value: /data/home
+          resources:
+            requests:
+              cpu: "8"
+              memory: 32Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: spill-data
+        - name: config
+          configMap:
+            name: spill-job

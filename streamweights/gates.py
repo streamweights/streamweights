@@ -59,13 +59,13 @@ class Work:
             (self.home / "models").symlink_to(Path(models_from).resolve())
 
     def spill(self, args: list, *, dtype: str | None = None, env: dict | None = None,
-              timeout: int = 7200) -> Result:
+              timeout: int = 7200, cwd: Path | None = None) -> Result:
         e = {**os.environ, "SPILL_HOME": str(self.home), "SPILL_HEADLESS": "1"}
         if dtype:
             e["SPILL_TORCH_DTYPE"] = dtype
         e.update(env or {})
         p = subprocess.run([sys.executable, "-m", "streamweights", *[str(a) for a in args]],
-                           capture_output=True, text=True, env=e, timeout=timeout)
+                           capture_output=True, text=True, env=e, timeout=timeout, cwd=cwd)
         evs = []
         for line in p.stdout.splitlines():
             try:
@@ -393,12 +393,12 @@ def bf16_inference_statistics(model_bf16, model_f32, rows, torch_engine="torch-c
     return out
 
 
-def bf16_gradient_statistics(model_bf16, model_f32, data, *, max_seq=128, batch=4,
-                             torch_engine="torch-cpu") -> dict:
+def bf16_gradient_statistics(model_bf16, model_f32, data, *, max_seq=256, batch=4, cut=48,
+                             torch_engine="torch-cpu", do_torch_bf16=True) -> dict:
     """Phase 3's gradient check, for the torch engine: the same parameters and the same batch,
     per-tensor cosine of the bf16 gradient to the float32 gradient (mean, minimum, worst
     tensor), for torch bf16 and for MLX bf16, next to batch-shape noise (one micro-batch of
-    `batch` examples against two of half the size, accumulated)."""
+    `batch` examples against two of half the size, accumulated) for each engine."""
     import torch
 
     from .engines.common import collect_eos_ids
@@ -414,6 +414,7 @@ def bf16_gradient_statistics(model_bf16, model_f32, data, *, max_seq=128, batch=
     exs, _ = load_examples(Path(data), tok, max_seq, collect_eos_ids(Path(model_f32), tok))
     plan = BatchPlan(exs[:64], batch, 0, tok.pad_token_id or 0)
     b = plan.batch(0)
+    b.inputs, b.targets, b.mask = b.inputs[:, :cut], b.targets[:, :cut], b.mask[:, :cut]
     cfg = lo.LoraConfig(rank=16, alpha=32, seed=0)
     p0 = lo.init_params_np(shapes, ix.n_layers, 16, 0)
     rng = np.random.RandomState(1)
@@ -434,27 +435,113 @@ def bf16_gradient_statistics(model_bf16, model_f32, data, *, max_seq=128, batch=
         return {"mean_cosine": float(np.mean(list(cs.values()))), "min_cosine": cs[worst],
                 "worst_tensor": worst}
 
+    def halves(fn, dirs_dtype):
+        parts = []
+        h = b.inputs.shape[0] // 2
+        for sl in (slice(0, h), slice(h, None)):
+            g, n = fn(dirs_dtype, b.inputs[sl], b.targets[sl], b.mask[sl])
+            parts.append((g, n))
+        tot = sum(n for _, n in parts)
+        return {k: sum(np.asarray(_np(g[k])) * (n / tot) for g, n in parts) for k in parts[0][0]}
+
+    def _np(x):
+        from .portable.checkpoint import to_numpy_f32
+        return to_numpy_f32(x)
+
     _, g32, _ = torch_grads(model_f32, torch.float32, b.inputs, b.targets, b.mask)
-    _, gb, _ = torch_grads(model_bf16, torch.bfloat16, b.inputs, b.targets, b.mask)
-    out = {"batch_examples": int(b.inputs.shape[0]), "tokens": int(b.inputs.size),
-           "torch_bf16_vs_torch_f32": stats(gb, g32)}
-    h = b.inputs.shape[0] // 2
-    parts = []
-    for sl in (slice(0, h), slice(h, None)):
-        _, g, n = torch_grads(model_bf16, torch.bfloat16, b.inputs[sl], b.targets[sl], b.mask[sl])
-        parts.append((g, n))
-    tot = sum(n for _, n in parts)
-    gsplit = {k: sum(g[k] * (n / tot) for g, n in parts) for k in gb}
-    out["batch_shape_noise_torch_bf16_one_batch_vs_two_halves"] = stats(gsplit, gb)
+    out = {"batch_examples": int(b.inputs.shape[0]), "tokens": int(b.inputs.size)}
+    gb = None
+    if do_torch_bf16:
+        _, gb, _ = torch_grads(model_bf16, torch.bfloat16, b.inputs, b.targets, b.mask)
+        out["torch_bf16_vs_torch_f32"] = stats(gb, g32)
+
+        def tg(md, i, t, m):
+            _, g, n = torch_grads(md[0], md[1], i, t, m)
+            return g, n
+        out["batch_shape_noise_torch_bf16_one_batch_vs_two_halves"] = stats(
+            halves(tg, (model_bf16, torch.bfloat16)), gb)
     try:
         import mlx.core as mx
 
         from .tune.streamed import StreamedTrainer as MlxTrainer
-        mtr = MlxTrainer(Path(model_bf16), cfg, params={k: mx.array(v) for k, v in p0.items()})
-        _, mg, _ = mtr.micro_batch(b.inputs, b.targets, b.mask, 0)
-        mtr.close()
-        out["mlx_bf16_vs_torch_f32"] = stats({k: np.array(v) for k, v in mg.items()}, g32)
-        out["torch_bf16_vs_mlx_bf16"] = stats(gb, {k: np.array(v) for k, v in mg.items()})
+
+        def mlx_grads(model_dir, inputs, targets, mask):
+            tr = MlxTrainer(Path(model_dir), cfg, params={k: mx.array(v) for k, v in p0.items()},
+                            resident_weights=True)
+            try:
+                _, g, n = tr.micro_batch(inputs, targets, mask, 0)
+            finally:
+                tr.close()
+            return {k: np.array(v) for k, v in g.items()}, n
+        mg, _ = mlx_grads(model_bf16, b.inputs, b.targets, b.mask)
+        out["mlx_bf16_vs_torch_f32"] = stats(mg, g32)
+        if gb is not None:
+            out["torch_bf16_vs_mlx_bf16"] = stats(gb, mg)
+        out["batch_shape_noise_mlx_bf16_one_batch_vs_two_halves"] = stats(
+            halves(lambda md, i, t, m: mlx_grads(md, i, t, m), model_bf16), mg)
     except ImportError:
         pass
     return out
+
+
+# ---------------------------------------------------------------- the committed fixture
+
+def fixture_dir() -> Path:
+    """The step-50 MLX checkpoint committed with the package (qwen2.5:0.5b, a toy task, rank 4
+    on q_proj and v_proj, a 100-step schedule stopped at step 50)."""
+    return Path(__file__).resolve().parent / "data" / "fixtures" / "resume-qwen05"
+
+
+def gate_resume_fixture(work: Work, engine: str, *, stop_after: int | None = None,
+                        dtype: str | None = None, mean_rel_limit: float = 0.35) -> dict:
+    """Resume the committed MLX checkpoint on `engine` and compare the continued loss curve with
+    the uninterrupted MLX run recorded next to it. The fixture was produced with bf16 base
+    weights on an Apple GPU; the continuation runs wherever this is called, and the checkpoint's
+    own history records both."""
+    src = fixture_dir()
+    dst = work.root / f"fixture-{engine}"
+    shutil.rmtree(dst, ignore_errors=True)
+    shutil.copytree(src, dst)
+    args = ["tune", "--config", "job.json", "--engine", engine, "--overwrite"]
+    if stop_after:
+        args += ["--stop-after", stop_after]
+    r = work.spill(args, dtype=dtype, cwd=dst)
+    steps = [e for e in r.events if e["event"] == "step"]
+    expected = json.loads((src / "expected_losses.json").read_text())
+    out = {"engine": engine, "exit_code": r.rc, "stderr": r.stderr[-300:] if r.rc else ""}
+    if not steps:
+        out["pass"] = False
+        return out
+    rel = [abs(e["loss"] - expected[e["step"] - 1]) / max(abs(expected[e["step"] - 1]), 1e-9)
+           for e in steps]
+    from .portable import checkpoint as pc
+    from .portable.store import Store
+    hist = pc.load_tune(Store(dst / "state")).state["history"]
+    out.update(first_step=steps[0]["step"], last_step=steps[-1]["step"], steps_run=len(steps),
+               mean_rel_loss_difference=float(np.mean(rel)), max_rel_loss_difference=max(rel),
+               history=[{"range": h["range"], "engine": h["engine"], "hardware": h["hardware"],
+                         "numerics": h["numerics"]["base"]} for h in hist],
+               seconds_per_step=float(np.median([e["step_s"] for e in steps[1:]]))
+               if len(steps) > 2 else None)
+    out["pass"] = (r.rc == 0 and out["first_step"] == 51 and out["mean_rel_loss_difference"]
+                   < mean_rel_limit and (stop_after or out["last_step"] == 100)
+                   and all(np.isfinite(e["loss"]) for e in steps) and len(hist) == 2)
+    return out
+
+
+def make_f32_copy(src: Path, dst: Path) -> Path:
+    """A float32 copy of a safetensors model directory (the identity gates compute in float32)."""
+    from . import safetensors_np as snp
+    src, dst = Path(src), Path(dst)
+    dst.mkdir(parents=True, exist_ok=True)
+    for f in sorted(src.iterdir()):
+        if f.suffix == ".safetensors":
+            entries = [(n, "F32", shape, (lambda raw=raw, dt=dt: snp.to_f32(raw, dt)))
+                       for n, dt, shape, raw in snp.tensors(f)]
+            snp.write(dst / f.name, entries, {"format": "pt"})
+        elif f.is_file():
+            shutil.copy(f, dst / f.name)
+    cfg = json.loads((dst / "config.json").read_text())
+    cfg["torch_dtype"] = "float32"
+    (dst / "config.json").write_text(json.dumps(cfg))
+    return dst

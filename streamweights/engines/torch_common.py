@@ -63,13 +63,15 @@ def cpu_bf16_ok() -> bool:
     if _BF16_CPU is None:
         require_torch()
         def rate(dt):
-            a = torch.randn(512, 512, dtype=dt)
-            b = torch.randn(512, 512, dtype=dt)
+            # the op the layers run (a linear over a model-shaped weight): the 2-D matmul
+            # path of a CPU without bf16 hardware is far slower than the linear path
+            x = torch.randn(128, 512, dtype=dt)
+            w = torch.randn(1024, 512, dtype=dt)
             for _ in range(2):
-                a @ b
+                F.linear(x, w)
             t0 = time.perf_counter()
             for _ in range(8):
-                a @ b
+                F.linear(x, w)
             return 8 / (time.perf_counter() - t0)
         _BF16_CPU = rate(torch.bfloat16) >= 0.6 * rate(torch.float32)
     return _BF16_CPU
