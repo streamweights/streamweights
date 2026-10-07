@@ -9,8 +9,8 @@ import platform
 
 from .errors import SpillError
 
-WORKS_TODAY = "run through llama.cpp, export, check, models"
-NOT_YET = "streaming, distill, tune, build"
+WORKS_TODAY = "run, distill, tune, eval, export, check, models (PyTorch engines)"
+NOT_YET = "build"
 README_SECTION = 'README, "Linux and other platforms"'
 
 
@@ -35,3 +35,18 @@ def require_mlx(command: str) -> None:
     if not mlx_available():
         raise SpillError(f"spill {command} needs Apple silicon with MLX; {platform_line()}",
                          "spill doctor")
+
+
+def mlx_device_label() -> str:
+    """What the MLX engines compute on, for provenance: the Apple GPU (with the chip name) or
+    the CPU when SPILL_DEVICE=cpu."""
+    import mlx.core as mx
+    if mx.default_device() != mx.gpu:
+        return "cpu"
+    try:
+        import subprocess
+        chip = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
+                              capture_output=True, text=True, timeout=3).stdout.strip()
+        return f"apple-gpu:{chip}" if chip else "apple-gpu"
+    except Exception:
+        return "apple-gpu"

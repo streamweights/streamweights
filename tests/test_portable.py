@@ -1,3 +1,4 @@
+# no-mlx-needed: runs on every platform (no MLX, no GPU)
 """Portable job state: storage through fsspec (a local path and the in-memory filesystem),
 the commit protocol, the float32 checkpoint round trip, rows, and weight staging."""
 

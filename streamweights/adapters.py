@@ -219,13 +219,14 @@ def load_adapter_dir(d: Path, adapter_id: str | None = None, numpy: bool = False
 def resolve_adapter(spec: str, numpy: bool = False) -> LoraAdapter:
     """Local directory, a name under <data>/adapters/, or a Hugging Face repo id."""
     p = Path(spec).expanduser()
+    kw = {"numpy": True} if numpy else {}
     # a directory only wins when it is an adapter: `spill build my-folder` names its adapter
     # after the folder, and the folder itself must not shadow it
     if p.is_dir() and (detect_layout(p) or not (ADAPTERS_DIR / spec).is_dir()):
-        return load_adapter_dir(p, spec, numpy)
+        return load_adapter_dir(p, spec, **kw)
     local = ADAPTERS_DIR / spec
     if local.is_dir():
-        return load_adapter_dir(local, spec, numpy)
+        return load_adapter_dir(local, spec, **kw)
     if spec.startswith((".", "/", "~")):
         raise SpillError(f"adapter directory {spec} does not exist", "spill adapters")
     if re.fullmatch(r"[\w.-]+/[\w.-]+", spec):
@@ -237,7 +238,7 @@ def resolve_adapter(spec: str, numpy: bool = False) -> LoraAdapter:
         except RepositoryNotFoundError:
             raise SpillError(f"no adapter directory or Hugging Face repo named '{spec}'",
                              "spill adapters")
-        return load_adapter_dir(Path(d), spec, numpy)
+        return load_adapter_dir(Path(d), spec, **kw)
     raise SpillError(f"adapter '{spec}' is not a directory, not under {ADAPTERS_DIR}, and not "
                      f"a Hugging Face repo id (org/name)", "spill adapters")
 

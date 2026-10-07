@@ -386,3 +386,9 @@ def ring_settings(index: SafetensorsIndex, note=None) -> tuple[int, int, str]:
         cal = calibrate(index)
     return cal.get("chunk_mb", 16), cal.get("threads", 4), cal.get("read_mode",
                                                                    default_read_mode())
+
+
+def base_dtype(model_dir) -> str:
+    """The dtype a model directory stores (and an engine computes) its weights in."""
+    t = next(iter(SafetensorsIndex(Path(model_dir)).layers[0].tensors))
+    return {"BF16": "bf16", "F16": "float16", "F32": "float32"}.get(t.st_dtype, t.st_dtype)

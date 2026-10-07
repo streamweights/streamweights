@@ -278,6 +278,19 @@ class MlxStreamEngine:
         self.last_pass_times: list[float] = []
         self._bind_costs: list[float] = []
 
+    def describe(self, spec: ModelSpec | None = None) -> dict:
+        """What this engine computes on and in, for provenance on every row."""
+        from ..platforms import mlx_device_label
+        from ..ring import base_dtype
+        base = spec.quant if spec is not None and spec.quant != "bf16" else None
+        if base is None and spec is not None:
+            try:
+                base = base_dtype(spec.path)
+            except Exception:
+                base = "bf16"
+        return {"engine": "mlx", "device": mlx_device_label(),
+                "numerics": {"base": base or "bf16", "adapter": "float32"}}
+
     def run_batch(self, rows: list[dict], spec: ModelSpec,
                   budget: MemoryBudget):
         from itertools import cycle

@@ -1,3 +1,4 @@
+# no-mlx-needed: runs on every platform (no MLX, no GPU)
 """The PyTorch engines on tiny random models of every verified family, on CPU: streamed ==
 resident == transformers' own greedy generate, refill, shared-prefix reuse, log-probs,
 teacher-forced scoring, adapters at inference, the memory budget."""

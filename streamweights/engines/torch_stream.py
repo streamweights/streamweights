@@ -32,6 +32,25 @@ from .torch_common import (GIB, Core, CudaRingProvider, ResidentProvider, RingPr
                            require_torch, resolve_dtype, torch)
 
 
+def batch_math(ws: int, res_bytes: int, seq_costs: list[int], P: int, kv_per_token: int,
+               n_layers: int, batch_override: int | None, K_lp, full_dir, vocab: int) -> dict:
+    """The memory budget: 75% of `ws` (device memory on CUDA, RAM on CPU) minus what the
+    weights hold, divided by the mean per-row KV cost; also used for the pre-run line."""
+    target = int(ws * 0.75)
+    prefix_reserve = P * kv_per_token + 512 * P * (kv_per_token // n_layers) if P else 0
+    mean_cost = sum(seq_costs) / max(1, len(seq_costs))
+    avail = max(target - res_bytes - prefix_reserve, int(mean_cost))      # one row at least
+    batch = max(1, min(int(avail // max(1, mean_cost)), max(1, len(seq_costs)), 512))
+    if batch_override:
+        batch = batch_override
+    lp_cap = None
+    if K_lp or full_dir:
+        lp_cap = lg.logits_batch_cap(vocab, int(0.05 * ws), K_lp)
+        batch = min(batch, lp_cap)
+        avail -= lg.step_bytes(min(batch, 512), vocab)
+    return {"avail": avail, "batch": batch, "lp_cap": lp_cap, "target": target}
+
+
 class TorchEngine:
     name = "torch_stream"
 
@@ -51,7 +70,7 @@ class TorchEngine:
 
     # ---- facts a caller needs for the pre-run line and for provenance
 
-    def describe(self) -> dict:
+    def describe(self, spec=None) -> dict:
         dtype, why = resolve_dtype(self.engine, self.requested_dtype)
         return {"engine": self.engine, "device": device_label(self.engine),
                 "dtype": dtype, "dtype_note": why, "numerics": numerics_for(dtype)}
@@ -131,7 +150,6 @@ class TorchEngine:
 
         # ---- memory budget: 75% of device memory (CUDA) or RAM (CPU)
         ws = budget.working_set_bytes or memory_total_bytes(self.engine)
-        target = int(ws * 0.75)
         schedule = cycle(range(n_layers))
         provider = self.make_provider(core, schedule)
         self.provider = provider
@@ -139,22 +157,14 @@ class TorchEngine:
                      3 * index.max_layer_bytes
                      + core.embed_w.numel() * core.embed_w.element_size()
                      + (0 if index.tied else core.lm_w.numel() * core.lm_w.element_size()))
-        prefix_reserve = P * kv_per_token + 512 * P * (kv_per_token // n_layers) if P else 0
         seq_costs = [(len(t) + mt) * kv_per_token for _, t, mt in prompts]
-        mean_cost = sum(seq_costs) / max(1, len(seq_costs))
-        avail = max(target - res_bytes - prefix_reserve, int(mean_cost))      # one row at least
-        auto_batch = max(1, min(int(avail // max(1, mean_cost)), max(1, len(seq_costs)), 512))
-        if budget.batch_override:
-            auto_batch = budget.batch_override
         vocab = core.vocab
-        lp_cap = None
-        if K_lp or full_dir:
-            if full_dir:
-                lg.check_full_logits(total_rows, max_tokens_job, vocab)
-                Path(full_dir).mkdir(parents=True, exist_ok=True)
-            lp_cap = lg.logits_batch_cap(vocab, int(0.05 * ws), K_lp)
-            auto_batch = min(auto_batch, lp_cap)
-            avail -= lg.step_bytes(min(auto_batch, 512), vocab)
+        bm = batch_math(ws, res_bytes, seq_costs, P, kv_per_token, n_layers,
+                        budget.batch_override, K_lp, full_dir, vocab)
+        avail, auto_batch, lp_cap = bm["avail"], bm["batch"], bm["lp_cap"]
+        if full_dir:
+            lg.check_full_logits(total_rows, max_tokens_job, vocab)
+            Path(full_dir).mkdir(parents=True, exist_ok=True)
         self.note(f"admission: mode=memory, auto_batch={auto_batch}, budget "
                   f"{avail / GIB:.2f} GB of {ws / GIB:.1f} GB (75%)")
         committed = 0

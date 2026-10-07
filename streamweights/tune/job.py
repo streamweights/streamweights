@@ -374,25 +374,13 @@ def _record_compute_rate(prep: Prepared, result: dict) -> None:
 
 
 def _device_label() -> str:
-    from ..platforms import apple_silicon
-    from ..runs import hardware_summary  # noqa: F401
-    if mx.default_device() == mx.gpu:
-        try:
-            import platform
-            import subprocess
-            chip = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
-                                  capture_output=True, text=True).stdout.strip()
-            return f"apple-gpu:{chip}" if chip else "apple-gpu"
-        except OSError:
-            return "apple-gpu"
-    return "cpu"
+    from ..platforms import mlx_device_label
+    return mlx_device_label()
 
 
 def base_dtype(model_dir) -> str:
-    """The dtype the base weights are stored and computed in: bf16, float16 or float32."""
-    from ..ring import SafetensorsIndex
-    t = next(iter(SafetensorsIndex(Path(model_dir)).layers[0].tensors))
-    return {"BF16": "bf16", "F16": "float16", "F32": "float32"}.get(t.st_dtype, t.st_dtype)
+    from ..ring import base_dtype as _bd
+    return _bd(model_dir)
 
 
 def run_tune(prep: Prepared, job: Job, *, stop=None, progress_cb=None, resume: bool = False,
