@@ -90,7 +90,7 @@ def step_prep(state: dict) -> None:
     rec["power"] = power()
     rec["disk_free_gb"] = round(shutil.disk_usage(ROOT).free / 2**30, 1)
     link = ROOT / "models" / "llama3.3-70b"
-    main = Path("/Users/amrishkapoor/spillway/models/llama3.3-70b")
+    main = Path(os.environ.get("SPILL_MAIN_CHECKOUT", ROOT)) / "models" / "llama3.3-70b"
     if not link.exists() and main.exists():
         (ROOT / "models").mkdir(exist_ok=True)
         link.symlink_to(main)

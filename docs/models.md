@@ -25,7 +25,7 @@ interruption.
 |---|---|
 | verified | Llama 3.x, Qwen2/2.5, Qwen3 (dense), Phi 3/4, Gemma 2, Mistral |
 | expected | Gemma 3 (text): per-layer alternating sliding-window attention needs per-layer cache windows; not wired yet |
-| not_yet | Mixtral, DeepSeek V2/V3, Qwen MoE, Llama 4: mixture-of-experts, where per-token expert routing defeats layer-order streaming. Multimodal models (anything with a vision tower): vision towers are not streamed yet (Phase 4). Mamba: state-space recurrence has no KV cache to batch around. Jamba: recurrent layers break the per-layer stream loop |
+| not_yet | Mixtral, DeepSeek V2/V3, Qwen MoE, Llama 4: mixture-of-experts, where per-token expert routing defeats layer-order streaming. Multimodal models (anything with a vision tower): vision towers are not streamed yet (planned, see [plan.md](plan.md)). Mamba: state-space recurrence has no KV cache to batch around. Jamba: recurrent layers break the per-layer stream loop |
 
 "Verified" means the streamed output was tested identical to in-memory execution on 20
 prompts, plus first-token agreement with an independent mlx-lm implementation. A family

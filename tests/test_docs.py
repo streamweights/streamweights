@@ -49,13 +49,67 @@ def test_readme_shape():
         assert len(img) > 20, "image alt text must be descriptive"
 
 
-def test_links_resolve():
-    for p in (ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))):
-        for m in re.finditer(r"\]\(([^)#]+)", p.read_text()):
-            target = m.group(1)
+def _slug(heading: str) -> str:
+    """The anchor GitHub and MkDocs derive from a heading."""
+    text = re.sub(r"`|\*\*|\*", "", heading.strip().lower())
+    text = re.sub(r"[^\w\s-]", "", text)
+    return re.sub(r"\s", "-", text)
+
+
+def _anchors(path: Path) -> set:
+    out, fenced = set(), False
+    for line in path.read_text().splitlines():
+        if line.startswith("```"):
+            fenced = not fenced
+        m = None if fenced else re.match(r"^#{1,6}\s+(.+?)\s*#*$", line)
+        if m:
+            out.add(_slug(m.group(1)))
+    return out
+
+
+def _links(path: Path):
+    text = re.sub(r"```.*?```", "", path.read_text(), flags=re.S)
+    text = re.sub(r"`[^`\n]*`", "", text)
+    for m in re.finditer(r"\]\(([^)\s]+)", text):
+        yield m.group(1)
+
+
+def check_links(paths):
+    """Every relative link and #anchor in the given markdown files; returns the broken ones."""
+    broken = []
+    for p in paths:
+        for target in _links(p):
             if target.startswith(("http://", "https://", "mailto:")):
                 continue
-            assert (p.parent / target).exists(), f"{p.name} links to {target}"
+            file_part, _, frag = target.partition("#")
+            dest = (p.parent / file_part) if file_part else p
+            if not dest.exists():
+                broken.append(f"{p.relative_to(ROOT)} -> {target} (no such file)")
+            elif frag and dest.suffix == ".md" and frag not in _anchors(dest):
+                broken.append(f"{p.relative_to(ROOT)} -> {target} (no such anchor)")
+    return broken
+
+
+DOC_PAGES = [ROOT / "README.md", ROOT / "CONTRIBUTING.md",
+             *sorted((ROOT / "docs").rglob("*.md"))]
+
+
+def test_links_and_anchors_resolve():
+    pages = [p for p in DOC_PAGES if p.exists() and "paste-sets" not in p.parts]
+    assert check_links(pages) == []
+
+
+def test_link_checker_catches_a_broken_anchor(tmp_path):
+    (tmp_path / "a.md").write_text("# Title\n\n[ok](b.md#hello-there) [bad](b.md#nope) "
+                                   "[gone](c.md)\n")
+    (tmp_path / "b.md").write_text("## Hello there\n")
+    global ROOT
+    saved, ROOT = ROOT, tmp_path
+    try:
+        broken = check_links([tmp_path / "a.md"])
+    finally:
+        ROOT = saved
+    assert len(broken) == 2 and "nope" in broken[0] and "c.md" in broken[1]
 
 
 # a number with a unit is a measurement; it must appear in a report

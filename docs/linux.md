@@ -8,7 +8,7 @@ Every platform gets the same commands. The engine is chosen from the hardware (`
 
 | engine | where | status |
 |---|---|---|
-| `mlx` | Apple silicon | the original engine; verified through Phase 3.5 |
+| `mlx` | Apple silicon | the original engine; run and tune verified through the 70B (reports 002 to 008), build verified on the 0.5B (report 009) |
 | `torch-cpu` | any CPU, on Linux, macOS, Windows | **verified**: on the 0.5B on an M4 Pro CPU (identity, tune and resume gates in `docs/reports/012-run-anywhere.md`), and in Linux CI on every push (tiny models of every verified family, plus the committed step-50 checkpoint resumed on the 0.5B) |
 | `torch-cuda` | NVIDIA GPUs | **built, awaiting verification**: no CUDA machine was available. Run the one-liner below |
 

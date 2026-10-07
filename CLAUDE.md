@@ -2,7 +2,7 @@
 
 Package `streamweights`, CLI `spill`. Repo: https://github.com/streamweights/streamweights
 
-**Purpose:** build your own model on the Mac you already own. Fine-tune and distill from a 70B teacher locally with MLX, even when the model is bigger than RAM. Everything runs on the user's machine, for free, with no data leaving it.
+**Purpose:** a 70B model doesn't fit on your laptop; build your own model from it anyway. Distill, fine-tune and evaluate on whatever hardware you have, and start a job anywhere and finish it anywhere. Fine-tune and distill from a 70B teacher locally with MLX, even when the model is bigger than RAM. Everything runs on the user's machine, for free, with no data leaving it.
 
 ## Never-stop rules (binding in every session)
 

@@ -82,7 +82,11 @@ stays within the distance that two clean runs on different engines have from eac
 - **A tune step** writes a checkpoint every `--ckpt-every` steps (default 50) and on stop. The
   rank 16 adapter on every linear of the 0.5B is 101 MB per checkpoint (35 MB of parameters and
   70 MB of optimizer state); the committed fixture, rank 4 on `q_proj` and `v_proj`, is 3.3 MB.
-  The size scales with rank and with the adapted modules, not with the model.
+  The same rank 16 on the 70B has 207.1M parameters ([report 008](reports/008-phase3.md)), which
+  is about 0.8 GB of float32 parameters and 1.7 GB of optimizer state: about 2.5 GB per
+  checkpoint (computed from the parameter count, not a measured upload). Checkpoint size is
+  about 100 MB on the 0.5B and about 2.5 GB on the 70B at rank 16 on every linear; it scales
+  with rank and with the adapted modules, and not with the sequence length or the data.
 - **A row** is pushed in segments of 25 rows or 60 seconds, whichever comes first, and once more
   when the job stops. A preempted job loses at most the rows in flight.
 

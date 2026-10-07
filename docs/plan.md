@@ -2,7 +2,7 @@ streamweights: technical plan (v4)
 
 Repo and package: streamweights. Command: spill. Local by default.
 
-v4 changes the front door. v3 made the loop (run, distill, tune, eval) the product. After Phase 3.5 the loop is one command over a folder of files, `spill build`, and the product reads as: build your own model on the Mac you already own. The wedge (run the unmodified full-size model over an eval set) is still the engine under it and is still a command on its own.
+v4 changes the front door. v3 made the loop (run, distill, tune, eval) the product. After Phase 3.5 the loop is one command over a folder of files, `spill build`, and the product reads as: a 70B model doesn't fit on your laptop, build your own model from it anyway. The wedge (run the unmodified full-size model over an eval set) is still the engine under it and is still a command on its own.
 
 1. The wedge, and the loop it starts
 
