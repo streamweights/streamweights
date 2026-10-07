@@ -1,5 +1,5 @@
 """The docs ship finished: no placeholders, no em-dashes, no number that no report measured,
-a README under 150 lines in the promised order, every link resolves, and cli.md and
+a README under 170 lines in the promised order, every link resolves, and cli.md and
 models.md match the code."""
 
 import re
@@ -25,19 +25,28 @@ def test_no_placeholders_or_em_dashes():
 
 
 def test_readme_shape():
-    assert len(README.splitlines()) < 150
-    assert README.splitlines()[2] == "Build your own model on the Mac you already own."
+    lines = README.splitlines()
+    assert len(lines) < 170
+    assert lines[2] == "**A 70B model doesn't fit on your laptop. Build your own model from it anyway.**"
+    assert lines[4].startswith("Distill, fine-tune and evaluate on whatever hardware you have.")
+    assert lines[6].startswith("[Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB "
+                               "MacBook Pro.](docs/reports/")
     heads = re.findall(r"^## (.+)$", README, re.M)
-    assert heads == ["Quick start", "How it works in one picture", "Which path, and how long",
-                     "Copy or surpass", "Ship it", "What build does", "Runs anywhere",
-                     "Requirements",
-                     "Linux and other platforms", "Under the hood", "Status", "Feedback",
-                     "License"]
+    assert heads == ["Quick start", "Platforms", "How it works in one picture", "Copy or surpass",
+                     "Which path, and how long", "Start anywhere, finish anywhere", "Ship it",
+                     "What build does", "Requirements", "Under the hood",
+                     "Status and roadmap", "Feedback", "License"]
     assert "badge" not in README.lower() and "shields.io" not in README
     assert "pip install git+https://github.com/streamweights/streamweights" in README
     assert "uv tool install git+https://github.com/streamweights/streamweights" in README
     assert "docs/linux.md" in README and "issues/1" in README
     assert "arrives with the full proof run" in README
+    first = README.split("## Quick start")[0].lower()
+    for word in ("fine-tune", "llm", "mac", "linux", "lora", "distill", "70b",
+                 "bigger than ram", "local"):
+        assert word in first, word
+    for img in re.findall(r"!\[([^\]]*)\]", README):
+        assert len(img) > 20, "image alt text must be descriptive"
 
 
 def test_links_resolve():
