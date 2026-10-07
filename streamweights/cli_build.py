@@ -79,7 +79,15 @@ class RealBackend(build_mod.Backend):
     def __init__(self, quiet: bool = True, epochs: float = DEFAULT_EPOCHS):
         self.quiet = True            # one progress line per stage; the slot block is for `run`
         self.epochs = epochs
-        self.hints: dict = {}        # {"micro_batch": n} from the stage's earlier session
+        self.hints: dict = {}        # {"micro_batch": n, "grad_accum": g} from an earlier session
+        # SPILL_BUILD_BATCH="eval=7,micro=2,accum=2": run the stages with other batch shapes
+        # (a measurement knob: how far a score moves when only the batch shape does)
+        shape = dict(kv.split("=") for kv in os.environ.get("SPILL_BUILD_BATCH", "").split(",")
+                     if "=" in kv)
+        self.eval_batch = int(shape["eval"]) if "eval" in shape else None
+        if "micro" in shape:
+            self.hints = {"micro_batch": int(shape["micro"]),
+                          "grad_accum": int(shape.get("accum", 1))}
 
     def _silenced(self):
         import contextlib
@@ -101,7 +109,8 @@ class RealBackend(build_mod.Backend):
     def tune(self, model, train, name, resume_job):
         from . import cli
         res = cli._tune_build(model, train, name, epochs=self.epochs, quiet=self.quiet,
-                              batch=self.hints.get("micro_batch"))
+                              batch=self.hints.get("micro_batch"),
+                              grad_accum=self.hints.get("grad_accum") or 1)
         res["producers"] = _tune_producers(runtime.state_uri())
         return res
 
@@ -111,7 +120,7 @@ class RealBackend(build_mod.Backend):
         try:
             with self._silenced():
                 scored = cli._eval_impl(str(eval_file), [model], "exact_match", None, False,
-                                        None, 4096, None, self.quiet, echo=False,
+                                        None, 4096, self.eval_batch, self.quiet, echo=False,
                                         engine_pure=True)
         except StageInterrupted as e:
             jr = JOBS_DIR / e.job_id / "results.jsonl"
@@ -234,7 +243,8 @@ def do_build(folder, student, teacher, base, compare, weight_own, epochs, notify
     backend = backend or RealBackend(quiet, epochs)
     tune_stage = next((s for s in plan.stages if s.kind == "tune"), None)
     if tune_stage is not None and hasattr(backend, "hints") and tune_stage.result.get("micro_batch"):
-        backend.hints["micro_batch"] = tune_stage.result["micro_batch"]
+        backend.hints["micro_batch"] = tune_stage.result["micro_batch"]     # a resumed tune keeps
+        backend.hints["grad_accum"] = tune_stage.result.get("grad_accum") or 1  # its batch shape
     import streamweights.cli as cli
     cli._NEXT_HINTS = False
     res = None

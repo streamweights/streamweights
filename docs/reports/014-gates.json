@@ -1,0 +1,717 @@
+{
+ "1_quick_torch_cpu_vs_mlx": {
+  "mlx_a": {
+   "engine": "mlx",
+   "wall_s": 49.3,
+   "base": 0.21,
+   "tuned": 0.73,
+   "env": {},
+   "stage_s": {
+    "eval:base": 3.9,
+    "tune": 40.4,
+    "eval:tuned": 3.8
+   },
+   "hardware": "apple-gpu:Apple M4 Pro",
+   "numerics": {
+    "base": "bf16",
+    "adapter": "float32",
+    "optimizer": "float32",
+    "dropout": 0.0
+   }
+  },
+  "mlx_b_other_batch_shape": {
+   "engine": "mlx",
+   "wall_s": 59.1,
+   "base": 0.21,
+   "tuned": 0.71,
+   "env": {
+    "SPILL_BUILD_BATCH": "eval=7,micro=2,accum=2"
+   },
+   "stage_s": {
+    "eval:base": 4.8,
+    "tune": 49.1,
+    "eval:tuned": 4.1
+   },
+   "hardware": "apple-gpu:Apple M4 Pro",
+   "numerics": {
+    "base": "bf16",
+    "adapter": "float32",
+    "optimizer": "float32",
+    "dropout": 0.0
+   }
+  },
+  "torch_cpu": {
+   "engine": "torch-cpu",
+   "wall_s": 171.1,
+   "base": 0.2,
+   "tuned": 0.72,
+   "env": {},
+   "stage_s": {
+    "eval:base": 9.1,
+    "tune": 146.9,
+    "eval:tuned": 14.0
+   },
+   "hardware": "cpu:Apple M4 Pro",
+   "numerics": {
+    "base": "float32",
+    "adapter": "float32",
+    "optimizer": "float32",
+    "dropout": 0.0
+   }
+  },
+  "noise_two_mlx_runs_different_batch_shapes": {
+   "base": 0.0,
+   "tuned": 0.020000000000000018
+  },
+  "tolerance": {
+   "value": 0.020000000000000018,
+   "rule": "max(two-MLX-run noise on base and tuned, 0.02)"
+  },
+  "torch_cpu_beats_base": true,
+  "torch_cpu_vs_mlx_a": {
+   "base": 0.009999999999999981,
+   "tuned": 0.010000000000000009
+  },
+  "pass": true
+ },
+ "2_resume_across_engines": {
+  "reference_uninterrupted_mlx": {
+   "engine": "mlx",
+   "wall_s": 49.3,
+   "base": 0.21,
+   "tuned": 0.73,
+   "env": {},
+   "stage_s": {
+    "eval:base": 3.9,
+    "tune": 40.4,
+    "eval:tuned": 3.8
+   },
+   "hardware": "apple-gpu:Apple M4 Pro",
+   "numerics": {
+    "base": "bf16",
+    "adapter": "float32",
+    "optimizer": "float32",
+    "dropout": 0.0
+   }
+  },
+  "tolerance": 0.020000000000000018,
+  "mlx-then-torch-cpu": {
+   "first_leg": {
+    "engine": "mlx",
+    "wall_s": 21.2,
+    "stages": [
+     "done",
+     "interrupted",
+     "pending"
+    ],
+    "tune_steps_done": 100
+   },
+   "second_leg": {
+    "engine": "torch-cpu",
+    "wall_s": 105.2
+   },
+   "base": 0.21,
+   "tuned": 0.72,
+   "stage_engines": {
+    "eval:base": [
+     "mlx"
+    ],
+    "tune": [
+     "mlx",
+     "torch-cpu"
+    ],
+    "eval:tuned": [
+     "torch-cpu"
+    ]
+   },
+   "stage_os": {
+    "eval:base": [
+     "macOS arm64"
+    ],
+    "tune": [
+     "macOS arm64",
+     "macOS arm64"
+    ],
+    "eval:tuned": [
+     "macOS arm64"
+    ]
+   },
+   "audit": {
+    "tune": {
+     "final_step": 250,
+     "steps_recorded": 250,
+     "contiguous_1_to_n": true,
+     "history": [
+      {
+       "range": [
+        0,
+        100
+       ],
+       "engine": "mlx_lm_lora",
+       "hardware": "apple-gpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "bf16"
+      },
+      {
+       "range": [
+        100,
+        250
+       ],
+       "engine": "torch_peft_lora",
+       "hardware": "cpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "float32"
+      }
+     ]
+    },
+    "row_jobs": {
+     "eval-base": {
+      "rows": 100,
+      "unique": 100,
+      "segments": 4,
+      "engines": [
+       "mlx_resident"
+      ]
+     },
+     "eval-tuned": {
+      "rows": 100,
+      "unique": 100,
+      "segments": 4,
+      "engines": [
+       "torch_resident"
+      ]
+     }
+    },
+    "clean": true
+   },
+   "finished": true,
+   "diff_vs_uninterrupted": {
+    "base": 0.0,
+    "tuned": 0.010000000000000009
+   },
+   "pass": true
+  },
+  "torch-cpu-then-mlx": {
+   "first_leg": {
+    "engine": "torch-cpu",
+    "wall_s": 68.8,
+    "stages": [
+     "done",
+     "interrupted",
+     "pending"
+    ],
+    "tune_steps_done": 100
+   },
+   "second_leg": {
+    "engine": "mlx",
+    "wall_s": 30.8
+   },
+   "base": 0.2,
+   "tuned": 0.73,
+   "stage_engines": {
+    "eval:base": [
+     "torch-cpu"
+    ],
+    "tune": [
+     "torch-cpu",
+     "mlx"
+    ],
+    "eval:tuned": [
+     "mlx"
+    ]
+   },
+   "stage_os": {
+    "eval:base": [
+     "macOS arm64"
+    ],
+    "tune": [
+     "macOS arm64",
+     "macOS arm64"
+    ],
+    "eval:tuned": [
+     "macOS arm64"
+    ]
+   },
+   "audit": {
+    "tune": {
+     "final_step": 250,
+     "steps_recorded": 250,
+     "contiguous_1_to_n": true,
+     "history": [
+      {
+       "range": [
+        0,
+        100
+       ],
+       "engine": "torch_peft_lora",
+       "hardware": "cpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "float32"
+      },
+      {
+       "range": [
+        100,
+        250
+       ],
+       "engine": "mlx_lm_lora",
+       "hardware": "apple-gpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "bf16"
+      }
+     ]
+    },
+    "row_jobs": {
+     "eval-base": {
+      "rows": 100,
+      "unique": 100,
+      "segments": 4,
+      "engines": [
+       "torch_resident"
+      ]
+     },
+     "eval-tuned": {
+      "rows": 100,
+      "unique": 100,
+      "segments": 4,
+      "engines": [
+       "mlx_resident"
+      ]
+     }
+    },
+    "clean": true
+   },
+   "finished": true,
+   "diff_vs_uninterrupted": {
+    "base": 0.009999999999999981,
+    "tuned": 0.0
+   },
+   "pass": true
+  },
+  "pass": true
+ },
+ "3_remote_state": {
+  "memory_filesystem": {
+   "leg1_exit": 0,
+   "leg2_exit": 0,
+   "after_leg1": [
+    "done",
+    "interrupted",
+    "pending"
+   ],
+   "finished": true,
+   "scores": {
+    "eval:base": 0.4,
+    "eval:tuned": 0.95
+   },
+   "engines": {
+    "eval:base": [
+     "mlx"
+    ],
+    "tune": [
+     "mlx",
+     "torch-cpu"
+    ],
+    "eval:tuned": [
+     "torch-cpu"
+    ]
+   },
+   "state_files": [
+    "/gate3-build/adapters/banking77-tiny/MANIFEST.json",
+    "/gate3-build/adapters/banking77-tiny/adapter_config.json",
+    "/gate3-build/adapters/banking77-tiny/adapter_model.safetensors",
+    "/gate3-build/adapters/banking77-tiny/adapters.safetensors",
+    "/gate3-build/adapters/banking77-tiny/train_log.jsonl",
+    "/gate3-build/stages/eval-base/qwen2.5-0.5b-61034a/rows/identity.json",
+    "/gate3-build/stages/eval-base/qwen2.5-0.5b-61034a/rows/seg-000000.commit",
+    "/gate3-build/stages/eval-base/qwen2.5-0.5b-61034a/rows/seg-000000.jsonl",
+    "/gate3-build/stages/eval-tuned/qwen2.5-0.5b-banking77-tiny-038bd0/rows/identity.json",
+    "/gate3-build/stages/eval-tuned/qwen2.5-0.5b-banking77-tiny-038bd0/rows/seg-000000.commit",
+    "/gate3-build/stages/eval-tuned/qwen2.5-0.5b-banking77-tiny-038bd0/rows/seg-000000.jsonl",
+    "/gate3-build/stages/tune/ckpt/LATEST",
+    "/gate3-build/stages/tune/ckpt/step-000000020/COMMIT",
+    "/gate3-build/stages/tune/ckpt/step-000000020/opt.safetensors",
+    "/gate3-build/stages/tune/ckpt/step-000000020/params.safetensors",
+    "/gate3-build/stages/tune/ckpt/step-000000020/state.json",
+    "/gate3-build/stages/tune/ckpt/step-000000050/COMMIT",
+    "/gate3-build/stages/tune/ckpt/step-000000050/opt.safetensors",
+    "/gate3-build/stages/tune/ckpt/step-000000050/params.safetensors",
+    "/gate3-build/stages/tune/ckpt/step-000000050/state.json",
+    "/gate3-build/state.json"
+   ],
+   "pass": true
+  },
+  "separate_directory": {
+   "after_leg1": [
+    "done",
+    "interrupted",
+    "pending"
+   ],
+   "finished": true,
+   "scores": {
+    "eval:base": 0.4,
+    "eval:tuned": 1.0
+   },
+   "audit": {
+    "tune": {
+     "final_step": 50,
+     "steps_recorded": 50,
+     "contiguous_1_to_n": true,
+     "history": [
+      {
+       "range": [
+        0,
+        20
+       ],
+       "engine": "torch_peft_lora",
+       "hardware": "cpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "float32"
+      },
+      {
+       "range": [
+        20,
+        50
+       ],
+       "engine": "mlx_lm_lora",
+       "hardware": "apple-gpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "bf16"
+      }
+     ]
+    },
+    "row_jobs": {
+     "eval-base": {
+      "rows": 20,
+      "unique": 20,
+      "segments": 1,
+      "engines": [
+       "torch_resident"
+      ]
+     },
+     "eval-tuned": {
+      "rows": 20,
+      "unique": 20,
+      "segments": 1,
+      "engines": [
+       "mlx_resident"
+      ]
+     }
+    },
+    "clean": true
+   },
+   "engines": {
+    "eval:base": [
+     "torch-cpu"
+    ],
+    "tune": [
+     "torch-cpu",
+     "mlx"
+    ],
+    "eval:tuned": [
+     "mlx"
+    ]
+   },
+   "pass": true
+  },
+  "pass": true
+ },
+ "4_headless_sigterm": {
+  "mid_tune": {
+   "killed_in_stage": "tune",
+   "exit_code": 75,
+   "seconds_signal_to_exit": 1.0,
+   "events_tail": [
+    "step",
+    "checkpoint",
+    "stage",
+    "preempted"
+   ],
+   "checkpoint_events": [
+    {
+     "step": 20
+    },
+    {
+     "step": 13
+    }
+   ],
+   "state_after_signal": {
+    "eval:base": "done",
+    "tune": "interrupted",
+    "eval:tuned": "pending"
+   },
+   "resume_exit": 0,
+   "resume_done_event": {
+    "event": "done",
+    "complete": true,
+    "seconds": 27.41
+   },
+   "finished": true,
+   "audit": {
+    "tune": {
+     "final_step": 50,
+     "steps_recorded": 50,
+     "contiguous_1_to_n": true,
+     "history": [
+      {
+       "range": [
+        0,
+        50
+       ],
+       "engine": "torch_peft_lora",
+       "hardware": "cpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "float32"
+      }
+     ]
+    },
+    "row_jobs": {
+     "eval-base": {
+      "rows": 20,
+      "unique": 20,
+      "segments": 1,
+      "engines": [
+       "torch_resident"
+      ]
+     },
+     "eval-tuned": {
+      "rows": 20,
+      "unique": 20,
+      "segments": 1,
+      "engines": [
+       "torch_resident"
+      ]
+     }
+    },
+    "clean": true
+   },
+   "scores": {
+    "eval:base": 0.4,
+    "eval:tuned": 1.0
+   },
+   "pass": true
+  },
+  "mid_eval": {
+   "killed_in_stage": "eval:base",
+   "exit_code": 75,
+   "seconds_signal_to_exit": 0.36,
+   "events_tail": [
+    "row",
+    "checkpoint",
+    "stage",
+    "preempted"
+   ],
+   "checkpoint_events": [
+    {
+     "step": 14
+    }
+   ],
+   "state_after_signal": {
+    "eval:base": "interrupted",
+    "tune": "pending",
+    "eval:tuned": "pending"
+   },
+   "resume_exit": 0,
+   "resume_done_event": {
+    "event": "done",
+    "complete": true,
+    "seconds": 36.39
+   },
+   "finished": true,
+   "audit": {
+    "tune": {
+     "final_step": 50,
+     "steps_recorded": 50,
+     "contiguous_1_to_n": true,
+     "history": [
+      {
+       "range": [
+        0,
+        50
+       ],
+       "engine": "torch_peft_lora",
+       "hardware": "cpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "float32"
+      }
+     ]
+    },
+    "row_jobs": {
+     "eval-base": {
+      "rows": 20,
+      "unique": 20,
+      "segments": 2,
+      "engines": [
+       "torch_resident"
+      ]
+     },
+     "eval-tuned": {
+      "rows": 20,
+      "unique": 20,
+      "segments": 1,
+      "engines": [
+       "torch_resident"
+      ]
+     }
+    },
+    "clean": true
+   },
+   "scores": {
+    "eval:base": 0.4,
+    "eval:tuned": 1.0
+   },
+   "pass": true
+  },
+  "pass": true
+ },
+ "5_relay_example": {
+  "docker": "not installed on this machine: Docker mode could not run here; the CI relay (relay.yml) stands in for cross-OS proof",
+  "engine_switch": {
+   "exit": 0,
+   "wall_s": 45.2,
+   "output": "1. start the build here on mlx, Darwin\n   stopped after 20 tune steps; the state is in ./relay-state\n2. finish it on torch-cpu (a different engine on the same machine, not a second machine)\n   finished\n3. the same build, start to finish, for a reference\n   done\n\nthe final table: who made each stage, and the score next to the reference\nstage         engine            machine                    os           score  reference\n1 eval:base   mlx               mac-a  macOS arm64  0.400  0.400\n2 tune        mlx -> torch-cpu  mac-a  macOS arm64  -      -\n3 eval:tuned  torch-cpu         mac-a  macOS arm64  0.950  0.950\n",
+   "engines": {
+    "eval:base": [
+     "mlx"
+    ],
+    "tune": [
+     "mlx",
+     "torch-cpu"
+    ],
+    "eval:tuned": [
+     "torch-cpu"
+    ]
+   },
+   "scores": {
+    "eval:base": 0.4,
+    "eval:tuned": 0.95
+   },
+   "reference_scores": {
+    "eval:base": 0.4,
+    "eval:tuned": 0.95
+   },
+   "audit": {
+    "tune": {
+     "final_step": 50,
+     "steps_recorded": 50,
+     "contiguous_1_to_n": true,
+     "history": [
+      {
+       "range": [
+        0,
+        20
+       ],
+       "engine": "mlx_lm_lora",
+       "hardware": "apple-gpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "bf16"
+      },
+      {
+       "range": [
+        20,
+        50
+       ],
+       "engine": "torch_peft_lora",
+       "hardware": "cpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "float32"
+      }
+     ]
+    },
+    "row_jobs": {
+     "eval-base": {
+      "rows": 20,
+      "unique": 20,
+      "segments": 1,
+      "engines": [
+       "mlx_resident"
+      ]
+     },
+     "eval-tuned": {
+      "rows": 20,
+      "unique": 20,
+      "segments": 1,
+      "engines": [
+       "torch_resident"
+      ]
+     }
+    },
+    "clean": true
+   },
+   "pass": true
+  },
+  "two_machines": {
+   "start_exit": 0,
+   "printed": "1. start the build here on mlx, Darwin\n   stopped after 20 tune steps; the state is in ./relay-state\n2. to finish it on another machine, copy these two folders there:\n     relay/  relay-state/\n   or point both machines at shared storage and pass it as --state:\n     spill build relay --state s3://your-bucket/relay\n   then run, on the other machine, from the folder that holds them:\n     spill resume relay --state relay-state\n   and see the table at any time with:\n     spill build relay --state relay-state --table\n",
+   "resume_exit": 0,
+   "table": "stage         engine  machine                    os           score\n1 eval:base   mlx     mac-a  macOS arm64  0.400\n2 tune        mlx     mac-a  macOS arm64  -\n3 eval:tuned  mlx     mac-a  macOS arm64  0.950\n",
+   "finished": true,
+   "audit": {
+    "tune": {
+     "final_step": 50,
+     "steps_recorded": 50,
+     "contiguous_1_to_n": true,
+     "history": [
+      {
+       "range": [
+        0,
+        50
+       ],
+       "engine": "mlx_lm_lora",
+       "hardware": "apple-gpu:Apple M4 Pro",
+       "os": "macOS arm64",
+       "numerics": "bf16"
+      }
+     ]
+    },
+    "row_jobs": {
+     "eval-tuned": {
+      "rows": 20,
+      "unique": 20,
+      "segments": 1,
+      "engines": [
+       "mlx_resident"
+      ]
+     }
+    },
+    "clean": true
+   },
+   "pass": true
+  },
+  "pass": true
+ },
+ "6_tiny_noise_floor": {
+  "rows_in_the_exam": 20,
+  "one_row": 0.05,
+  "tuned_spread": 0.1,
+  "base_spread": 0.0,
+  "tolerance": 0.15,
+  "runs": {
+   "mlx": {
+    "base": 0.4,
+    "tuned": 0.95
+   },
+   "mlx_other_batch_shape": {
+    "base": 0.4,
+    "tuned": 0.95
+   },
+   "torch_cpu_float32": {
+    "base": 0.4,
+    "tuned": 1.0
+   },
+   "torch_cpu_other_batch_shape": {
+    "base": 0.4,
+    "tuned": 0.9
+   },
+   "mlx_then_torch_cpu": {
+    "base": 0.4,
+    "tuned": 0.95
+   },
+   "torch_cpu_then_mlx": {
+    "base": 0.4,
+    "tuned": 1.0
+   }
+  },
+  "justification": "The tiny build grades 20 rows, so a score moves in steps of 0.05. The tolerance is the largest spread between any two of these runs of the same build (two engines, two batch shapes on each, bf16 on MLX and float32 on the CPU, and builds moved between engines in both directions; bf16 on this Mac's CPU, which has no bf16 hardware, is hundreds of times slower and was not run), plus one more row. A CI relay score that lands outside it differs from its uninterrupted reference by more than anything a change of engine, batch shape or numerics did here.",
+  "measured_on": "Apple M4 Pro, macOS, qwen2.5:0.5b, 2026-10-07"
+ }
+}

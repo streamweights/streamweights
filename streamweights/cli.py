@@ -1260,7 +1260,7 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
     return job, res
 
 
-def _tune_build(model, train, name, epochs=1.0, quiet=True, batch=None):
+def _tune_build(model, train, name, epochs=1.0, quiet=True, batch=None, grad_accum=1):
     """`spill tune` as one stage of `spill build`: defaults, the adapter replaced on a
     re-run, the stage's own output kept off the terminal (build prints one line per stage).
     The stage's state is runtime.ENV.state, so a second call continues from the checkpoint
@@ -1269,9 +1269,10 @@ def _tune_build(model, train, name, epochs=1.0, quiet=True, batch=None):
     import io
     with contextlib.redirect_stdout(io.StringIO()):
         job, res = _tune_impl(model, train, name, 16, 32.0, 0.0, None, 1e-4, "cosine", 0.01,
-                              None, epochs, batch, 1, 2048, 0, "auto", 50, True, quiet)
-    out = {"job_id": job.id,
-           "micro_batch": job.read_meta().get("options", {}).get("tune", {}).get("micro_batch")}
+                              None, epochs, batch, grad_accum, 2048, 0, "auto", 50, True, quiet)
+    tune_opts = job.read_meta().get("options", {}).get("tune", {})
+    out = {"job_id": job.id, "micro_batch": tune_opts.get("micro_batch"),
+           "grad_accum": tune_opts.get("grad_accum")}
     if res["interrupted"]:
         return {"interrupted": True, **out, "step": res["step"], "steps": res["steps"]}
     return {**out, "adapter": res["adapter"], "steps": res["steps"],
