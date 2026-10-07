@@ -37,8 +37,28 @@ def tiny(tmp_path_factory):
             "root": root}
 
 
+_HOME = {}
+
+
+def _private_home() -> str:
+    """A SPILL_HOME of this module's own: jobs these tests interrupt on purpose must not show up
+    as 'interrupted' banners in every other test of the session."""
+    if "p" not in _HOME:
+        import shutil
+        import tempfile
+        home = Path(tempfile.mkdtemp(prefix="spill-headless-home-"))
+        (home / "state").mkdir()
+        for f in ("hardware.json", "calibration.json"):
+            src = Path(os.environ["SPILL_HOME"]) / "state" / f
+            if src.exists():
+                shutil.copy(src, home / "state" / f)
+        _HOME["p"] = str(home)
+    return _HOME["p"]
+
+
 def spill(args, env_extra=None, **kw):
     env = {k: v for k, v in os.environ.items() if k != "SPILL_HEADLESS"}
+    env["SPILL_HOME"] = _private_home()
     env.update(env_extra or {})
     return subprocess.Popen([sys.executable, "-m", "streamweights", *args], env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **kw)

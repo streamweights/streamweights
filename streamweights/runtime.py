@@ -69,6 +69,15 @@ def set_engine(name: str) -> None:
 def job_session(command: str, *, state: str | None = None, weights: str | None = None,
                 engine: str | None = None, headless_flag: bool = False,
                 stop_after: int | None = None):
+    try:
+        with _session(command, state, weights, engine, headless_flag, stop_after) as env:
+            yield env
+    finally:
+        reset()          # a later command in this process starts from a clean environment
+
+
+@contextlib.contextmanager
+def _session(command, state, weights, engine, headless_flag, stop_after):
     """Open the session for one job command. On exit: a preempted job (SIGTERM, SIGINT)
     emits `preempted` and exits 75; an error emits `error`; success emits `done` unless the
     command already did."""
