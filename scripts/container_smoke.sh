@@ -6,7 +6,8 @@ IMAGE="${1:-ghcr.io/streamweights/spill:cpu}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 VOL="spill-smoke-$$"
-trap 'docker volume rm -f "$VOL" >/dev/null 2>&1 || true; rm -rf "$WORK"' EXIT
+# the containers run as root, so what they wrote into $WORK may need sudo to remove
+trap 'docker volume rm -f "$VOL" >/dev/null 2>&1 || true; rm -rf "$WORK" 2>/dev/null || sudo rm -rf "$WORK" 2>/dev/null || true' EXIT
 docker volume create "$VOL" >/dev/null
 
 echo "== 1. 20-row eval on qwen2.5:0.5b"
