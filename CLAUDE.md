@@ -32,8 +32,11 @@ streamweights owns: the CLI, the gateway, jobs, the registry, the router, the st
 Inference backends elsewhere are upstream llama.cpp, unmodified, never vendored. The GGUF converter is downloaded at the pinned release tag.
 
 - `cli.py`, `cli_build.py`: Typer app, commands in loop order (build, example, run, distill, tune, eval, export, then models, adapters, runs, status, tail, resume, doctor, check). `main()` is the entry point.
-- `platforms.py`: where spill runs. MLX engines need Apple silicon; elsewhere run (llama.cpp), export, check, models work.
+- `platforms.py`: where spill runs. `build` needs Apple silicon with MLX; run, distill, tune, eval, export, check, models run on the torch engines everywhere.
 - `engines/mlx_stream.py`: the streaming runner (layer-ordered NVMe ring, batching, refill, memory budget, shared-prefix reuse). `engines/mlx_resident.py`: the same loop with weights in memory. `engines/llamacpp.py`: the non-Apple path.
+- `ring.py`: the framework-free streaming ring (safetensors layer index, pread ring, read modes nocache, fadvise, odirect). `engines/torch_common.py`, `torch_stream.py`, `torch_resident.py`: the PyTorch engines (transformers layers on the meta device bound from the ring; CPU and CUDA). `engine_select.py`: mlx, torch-cuda or torch-cpu from the hardware.
+- `portable/`: fsspec stores, the hardware-neutral checkpoint (float32 safetensors plus state.json, COMMIT marker last), row-job segments, weight staging. `headless.py`, `runtime.py`, `jobconfig.py`: JSON-lines events, SIGTERM then exit 75, `--state`, `--config`, `--emit-config`.
+- `tune/torch_job.py`, `tune/torch_train.py`: the PyTorch tune (PEFT resident, streamed saved-input reverse-stream VJP). `gates.py`, `verify_cuda.py`: the identity and resume gates, runnable on a CUDA machine.
 - `jobs/`: OpenAI-batch-compatible job engine, per-row checkpoint, resume.
 - `tune/`: LoRA training, resident (mlx-lm tuner) and streamed (saved layer inputs, reverse recompute VJP, two weight streams per micro-batch).
 - `build.py`: stage planner and runner over a folder; `export.py` and `safetensors_np.py`: merge adapters with numpy, GGUF via llama.cpp's converter.

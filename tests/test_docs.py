@@ -29,7 +29,8 @@ def test_readme_shape():
     assert README.splitlines()[2] == "Build your own model on the Mac you already own."
     heads = re.findall(r"^## (.+)$", README, re.M)
     assert heads == ["Quick start", "How it works in one picture", "Which path, and how long",
-                     "Copy or surpass", "Ship it", "What build does", "Requirements",
+                     "Copy or surpass", "Ship it", "What build does", "Runs anywhere",
+                     "Requirements",
                      "Linux and other platforms", "Under the hood", "Status", "Feedback",
                      "License"]
     assert "badge" not in README.lower() and "shields.io" not in README

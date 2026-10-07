@@ -2035,5 +2035,47 @@
    "min_cosine": 0.8757720266659991,
    "worst_tensor": "layers.4.self_attn.k_proj.lora_a"
   }
+ },
+ "timing_torch_cpu_0.5b": {
+  "bf16 files, float32 compute (the default here)": {
+   "model_gb": 0.99,
+   "rows": 160,
+   "streamed": {
+    "seconds": 24.883,
+    "passes": 50,
+    "median_pass_s": 0.2272,
+    "completion_tokens": 4648,
+    "read_gb_s": 11.484,
+    "read_mode": "nocache"
+   },
+   "resident": {
+    "seconds": 22.184,
+    "passes": 50,
+    "median_pass_s": 0.1579,
+    "completion_tokens": 4648
+   },
+   "tokens_per_s_streamed": 186.8,
+   "tokens_per_s_resident": 209.5
+  },
+  "float32 files": {
+   "model_gb": 1.98,
+   "rows": 160,
+   "streamed": {
+    "seconds": 24.806,
+    "passes": 50,
+    "median_pass_s": 0.1924,
+    "completion_tokens": 4648,
+    "read_gb_s": 32.967,
+    "read_mode": "nocache"
+   },
+   "resident": {
+    "seconds": 24.092,
+    "passes": 50,
+    "median_pass_s": 0.1697,
+    "completion_tokens": 4648
+   },
+   "tokens_per_s_streamed": 187.4,
+   "tokens_per_s_resident": 192.9
+  }
  }
 }

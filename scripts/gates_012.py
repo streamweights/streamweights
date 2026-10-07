@@ -103,6 +103,24 @@ def bf16grad():
     print("7e gradients", json.dumps(grad, indent=1), flush=True)
 
 
+def timing():
+    """The measured torch-cpu streamed pass time on the 0.5B, on an otherwise idle machine."""
+    rows = formats.load_rows(SAMPLE)
+    many = [dict(r, custom_id=f"{r['custom_id']}-{k}") for k in range(8) for r in rows]   # 160 rows
+    out = {}
+    for label, d in (("bf16 files, float32 compute (the default here)", BF16),
+                     ("float32 files", F32)):
+        res, st = G.infer("torch-cpu", d, many, resident=False, dtype="float32", logprobs=1)
+        res2, st2 = G.infer("torch-cpu", d, many, resident=True, dtype="float32", logprobs=1)
+        gb = sum(f.stat().st_size for f in Path(d).glob("*.safetensors")) / 1e9
+        out[label] = {"model_gb": round(gb, 2), "rows": len(many), "streamed": st,
+                      "resident": st2,
+                      "tokens_per_s_streamed": round(st["completion_tokens"] / st["seconds"], 1),
+                      "tokens_per_s_resident": round(st2["completion_tokens"] / st2["seconds"], 1)}
+        print(label, json.dumps(out[label]), flush=True)
+    save("timing_torch_cpu_0.5b", out)
+
+
 def resume():
     w = work()
     files = toy.make(WORK / "toy", 200, 60)
@@ -129,4 +147,5 @@ if __name__ == "__main__":
     OUT.parent.mkdir(exist_ok=True)
     for cmd in [a for a in sys.argv[1:] if not a.startswith("--")] or ["identity"]:
         {"identity": identity, "bf16": bf16, "resume": resume,
-         "toy": lambda: toy_identity(work()), "bf16grad": bf16grad}[cmd]()
+         "toy": lambda: toy_identity(work()), "bf16grad": bf16grad,
+         "timing": timing}[cmd]()

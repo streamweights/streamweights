@@ -179,6 +179,8 @@ Options:
   --grad-accum <int>    micro-batches per optimizer step  [default: 1]
   --max-seq <int>       token cap per example; whole exchanges are dropped
                         from the left  [default: 2048]
+  --targets <str>       comma-separated modules to adapt, e.g. q_proj,v_proj
+                        (default: every linear)
   --path <str>          auto | resident | streamed  [default: auto]
   --overwrite           replace an existing adapter
   --quiet               a progress line every 10 steps

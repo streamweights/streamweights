@@ -42,8 +42,8 @@ spill example banking77 --quick && spill build banking77-quick
 
 3. Tiers
 Tier    Where    Engine    Speed    Cost    Role
-Local-streamed    Developer machine, NVMe    MLX streaming runner (macOS)    A disk pass per token step, batched    Free    Models that do not fit: eval sets, distillation, tuning; exact weights
-Local-resident    Developer machine    MLX resident (same forward loop, weights in memory), llama.cpp elsewhere    Interactive for small models    Free    Models that fit; the student, and the loop's fast iteration
+Local-streamed    Developer machine or cloud box, NVMe    MLX streaming runner (macOS); PyTorch streaming runner (CPU, CUDA)    A disk pass per token step, batched    Free    Models that do not fit: eval sets, distillation, tuning; exact weights
+Local-resident    Developer machine or cloud box    MLX resident or PyTorch resident (same forward loop, weights in memory); llama.cpp for explicit GGUF quants    Interactive for small models    Free    Models that fit; the student, and the loop's fast iteration
 Burst (parked)    Developer's own cloud account    vLLM    Interactive    Paid    Not on the roadmap
 
 4. Components
@@ -56,7 +56,7 @@ Run store: runs/<id>/manifest.json for every command that executes a model; per-
 Registry: tag to artifacts. bf16 safetensors (default on macOS), MLX quants, GGUF quants for the non-Apple path. Downloads check disk first, show speed and ETA, resume.
 Gateway: localhost, port 11435. Ollama shapes and OpenAI shapes including /v1/batches and /v1/files.
 Overnight safety: caffeinate, battery warning, notifications, interrupted-job banner.
-Engines: upstream and unmodified where possible (llama.cpp); streamweights owns the streaming runner.
+Engines: thin. MLX on Apple silicon, PyTorch (transformers layers) everywhere else, llama.cpp upstream and unmodified for explicit GGUF quants; streamweights owns the streaming ring, the job layer (portable checkpoints, headless events) and the CLI.
 
 5. Phases and gates
 
@@ -66,14 +66,16 @@ Phase 3 (complete): tune. Streamed LoRA matches resident LoRA within the identit
 
 Phase 3.5 (complete): the build. spill build, spill example, spill export, shared-prefix reuse, overnight safety, spill doctor, qwen2.5:7b as the default student. Verified on the 0.5B only (docs/reports/009-phase3.5.md): banking77-quick goes from 0.200 to 0.640 in 44 s. The 70B and 7B proof runs were deferred to the full proof run below.
 
+Run anywhere (complete): every job is a sequence of quanta (a tune step, a completed row) with a hardware-neutral checkpoint at `--state` (a path, s3://, gs://, az://); PyTorch engines for CPU and CUDA behind the MLX-shaped engine interface (transformers layers on the meta device, the same streaming ring, resident and streamed inference and tune); engine selection and `spill doctor`; headless mode (JSON-lines events, SIGTERM then exit 75), `--config` and `--emit-config`; CPU and CUDA container images; SkyPilot, Slurm and Kubernetes examples; `python -m streamweights.verify_cuda`. Verified on the 0.5B on this Mac's CPU: identity gates, cross-hardware resume in both directions, rows moved between MLX and torch-cpu (docs/reports/012-run-anywhere.md). NVIDIA is built and not yet verified.
+
 Next, in this order:
 
-1. The full banking77 proof run: 70B teacher, 7B student, the surpass and copy paths, the combined table with the 70B untrained, the 7B untrained, the 7B trained on your labels and the 7B distilled from the 70B, and per-stage estimate versus actual. Tonight's long run. Also draw docs/img/paths.svg from the measured times of that run (the README table states rates until then). Gate: a stranger following only the README.
-2. PyPI release, after the proof run: publish `streamweights`, switch the install lines to `pip install streamweights`, tag 0.1.0. Not done yet; install is from the GitHub URL.
-3. Phase 4, Linux CPU engine: the loop on Linux with a portable runner (same layer-ordered reads, CPU compute), per docs/linux.md and issue #1. Gate: the golden path on a Linux box with no GPU; 0.5b output identical to the Metal engine on 20 prompts.
-4. Phase 5, NVIDIA: the same ring with pinned host memory and CUDA streams.
-5. Phase 6, vision-language models. Qwen2.5-VL first: the vision tower stays resident (it is small and runs once per image), the decoder streams as today. A public document-image example ships with it, in the same folder shape as banking77. Gate: streamed output identical to resident execution on 20 prompts with images.
-6. Phase 7, mixture-of-experts: Mixtral, Qwen MoE, DeepSeek. Route a batch, group tokens by expert, read only the experts the batch needs per layer. Gate: one MoE family verified.
+1. The verification batch: the full banking77 proof run on the 70B teacher and 7B student on the Mac (with docs/img/paths.svg drawn from its measured times); the CUDA gates on a real GPU (`docker run --gpus all ghcr.io/streamweights/spill:cuda python -m streamweights.verify_cuda`), and with them a streamed run of a model bigger than RAM on the torch engines; a cross-cloud resume demo (start a tune on one cloud's spot GPU, finish it on another's, from one bucket). Gate for the proof run: a stranger following only the README.
+2. PyPI release and launch, after the verification batch: publish `streamweights`, switch the install lines to `pip install streamweights`, tag 0.1.0.
+3. Phase 6, vision-language models. Qwen2.5-VL first: the vision tower stays resident (it is small and runs once per image), the decoder streams as today. A public document-image example ships with it, in the same folder shape as banking77. Gate: streamed output identical to resident execution on 20 prompts with images.
+4. Phase 7, mixture-of-experts: Mixtral, Qwen MoE, DeepSeek. Route a batch, group tokens by expert, read only the experts the batch needs per layer. Gate: one MoE family verified.
+
+Also open: `spill build` on the torch engines (its stages already run there; it needs wiring and a gate).
 
 Also open: batched prefill GEMMs. Prefill is one sequence at a time inside each layer; batching rows into one GEMM per layer raises the achieved FLOP/s that every estimate divides by, and shortens teacher stages.
 
@@ -88,4 +90,4 @@ Scope creep into a serving framework    Engines stay upstream where possible; st
 
 7. Stack
 
-Python 3.10 or newer (developed on 3.12), uv, FastAPI, Typer. MLX and mlx-lm on macOS. llama.cpp binaries downloaded per platform, not vendored, for non-Apple hardware and for GGUF conversion.
+Python 3.10 or newer (developed on 3.12), uv, FastAPI, Typer. MLX and mlx-lm on Apple silicon; PyTorch, Hugging Face transformers, PEFT, safetensors and fsspec on every platform (s3fs, gcsfs and adlfs as the `cloud` extra). llama.cpp binaries downloaded per platform, not vendored, for explicit GGUF quants and for GGUF conversion.
