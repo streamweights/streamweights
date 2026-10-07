@@ -982,6 +982,8 @@ def tune(
     grad_accum: int = typer.Option(1, "--grad-accum", help="micro-batches per optimizer step"),
     max_seq: int = typer.Option(2048, "--max-seq", help="token cap per example; whole "
                                 "exchanges are dropped from the left"),
+    targets: str = typer.Option(None, "--targets", help="comma-separated modules to adapt, "
+                                "e.g. q_proj,v_proj (default: every linear)"),
     path: str = typer.Option("auto", "--path", help="auto | resident | streamed"),
     overwrite: bool = typer.Option(False, "--overwrite", help="replace an existing adapter"),
     quiet: bool = typer.Option(False, "--quiet", help="a progress line every 10 steps"),
@@ -1009,7 +1011,7 @@ def tune(
                              headless_flag=headless, stop_after=stop_after):
         try:
             with _long_job("spill tune " + name, notify):
-                _tune_impl(model, train_jsonl, name, rank, 2 * rank, 0.0, None, lr, "cosine",
+                _tune_impl(model, train_jsonl, name, rank, 2 * rank, 0.0, targets, lr, "cosine",
                            0.01, steps, epochs, batch, grad_accum, max_seq, 0, path, 50,
                            overwrite, quiet)
         except typer.Exit:

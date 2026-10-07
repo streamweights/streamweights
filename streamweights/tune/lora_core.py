@@ -56,6 +56,7 @@ def select_shapes(found: dict[str, tuple[int, int]],
     """Restrict {module path: (in, out)} to the requested targets, with the one-line errors."""
     out = dict(found)
     if only:
+        only = [_resolve_target(t, out) for t in only]
         miss = [t for t in only if t not in out]
         if miss:
             raise SpillError(f"--targets {', '.join(miss)} not found in this architecture's "
@@ -64,6 +65,14 @@ def select_shapes(found: dict[str, tuple[int, int]],
     if not out:
         raise SpillError("no linear modules to adapt in this architecture's block")
     return dict(sorted(out.items()))
+
+
+def _resolve_target(t: str, found: dict) -> str:
+    """`q_proj` names `self_attn.q_proj` when exactly one module path ends that way."""
+    if t in found:
+        return t
+    hits = [p for p in found if p.endswith("." + t)]
+    return hits[0] if len(hits) == 1 else t
 
 
 def param_name(k: int, path: str, ab: str) -> str:
