@@ -207,6 +207,7 @@ class RingReader:
         self._producer: threading.Thread | None = None
         self._tls = threading.local()
         self.error: BaseException | None = None
+        self.layer_ids: dict[int, int] = {}   # schedule seq -> layer id, until consumed
 
     # -- one chunk, by mode
 
@@ -285,6 +286,7 @@ class RingReader:
                     next_slot += 1
                     self._fill_slot(slot, self.index.layers[layer_id])
                     with self.cond:
+                        self.layer_ids[seq] = layer_id
                         self.ready[seq] = slot
                         self.cond.notify_all()
             except BaseException as e:      # surface reader failures to the consumer

@@ -26,53 +26,17 @@ from mlx.utils import tree_flatten, tree_unflatten
 
 from .. import adapters as adapters_mod
 from ..errors import SpillError
+from ..headless import QuantumAbandoned, protected
 from ..jobs.engine import Job
 from . import budget as bud
 from . import lora as lo
 from .checkpointer import Checkpointer
 from .data import BatchPlan, DataStats, Example, load_examples, steps_for
 from .spec import TuneSpec, data_hash  # noqa: F401
+from .common import (ASSUMED_FLOPS, GIB, RESIDENT_FRACTION, Prepared, StepLog,  # noqa: F401
+                     _dir_bytes, adapters_dir, decide_path, truncate_losses, with_stop_after,
+                     write_adapter)
 from .streamed import StreamedTrainer, make_optimizer, masked_ce
-
-GIB = 1024**3
-ASSUMED_FLOPS = 3.5e12          # effective bf16 flops/s until a run measures it
-RESIDENT_FRACTION = 0.35        # weights must be under this share of the working set
-
-
-@dataclass
-class Prepared:
-    spec: TuneSpec
-    config: dict
-    tokenizer: object
-    examples: list[Example]
-    stats: DataStats
-    plan: BatchPlan
-    shapes: dict
-    size_bytes: int
-    n_layers: int
-    lora_params: int
-    budget: bud.TuneBudget | None = None
-    est_step_s: float = 0.0
-    est_total_s: float = 0.0
-    est_note: str = ""
-    why: str = ""
-    working_set: int = 0
-    stream_stats: dict = field(default_factory=dict)
-    cp: Checkpointer | None = None
-
-
-def adapters_dir() -> Path:
-    return adapters_mod.ADAPTERS_DIR
-
-
-def _dir_bytes(d: Path) -> int:
-    return sum(f.stat().st_size for f in Path(d).glob("*.safetensors"))
-
-
-def decide_path(size_bytes: int, working_set: int, forced: str = "auto") -> str:
-    if forced in ("resident", "streamed"):
-        return forced
-    return "resident" if size_bytes <= RESIDENT_FRACTION * working_set else "streamed"
 
 
 def prepare(spec: TuneSpec, *, working_set: int, calibration: dict | None = None,
@@ -149,58 +113,6 @@ def prepare(spec: TuneSpec, *, working_set: int, calibration: dict | None = None
 
 # ------------------------------------------------------------ progress
 
-class StepLog:
-    """Per-step bookkeeping: losses.jsonl, live.json, the progress callback."""
-
-    def __init__(self, job: Job, steps: int, start: int, cb, ema: float = 0.3):
-        self.job, self.steps, self.cb, self.ema = job, steps, cb, ema
-        self.t_last = time.monotonic()
-        self.avg = None
-        self.start = start
-        self.tokens = 0
-        self.t0 = time.monotonic()
-        self.f = open(job.dir / "losses.jsonl", "a")
-
-    def close(self):
-        self.f.close()
-
-    def reset_clock(self):
-        self.t_last = time.monotonic()
-
-    def step(self, step: int, loss: float, tokens: int):
-        now = time.monotonic()
-        dt = now - self.t_last
-        self.t_last = now
-        self.avg = dt if self.avg is None else self.ema * dt + (1 - self.ema) * self.avg
-        self.tokens += tokens
-        peak = mx.get_peak_memory() / GIB if mx.default_device() == mx.gpu else 0.0
-        info = {"step": step, "steps": self.steps, "loss": loss, "step_s": dt,
-                "avg_step_s": self.avg, "eta_s": (self.steps - step) * self.avg,
-                "peak_gb": peak, "tokens": tokens,
-                "tok_s": self.tokens / max(1e-9, now - self.t0)}
-        self.f.write(json.dumps({k: info[k] for k in ("step", "loss", "step_s", "peak_gb")}) + "\n")
-        self.f.flush()
-        try:
-            (self.job.dir / "live.json").write_text(json.dumps(info))
-        except OSError:
-            pass
-        self.job.write_meta(done=step, total=self.steps, eta_seconds=round(info["eta_s"]),
-                            tokens_per_sec=round(info["tok_s"], 2))
-        if self.cb:
-            self.cb(info)
-        return info
-
-
-def truncate_losses(job: Job, step: int) -> None:
-    p = job.dir / "losses.jsonl"
-    if not p.exists():
-        return
-    keep = [l for l in p.read_text().splitlines() if l.strip() and json.loads(l)["step"] <= step]
-    p.write_text("".join(l + "\n" for l in keep))
-
-
-# ------------------------------------------------------------ streamed path
-
 def _opt_to_canon(opt_obj, step_count: int) -> dict:
     return {"step": int(opt_obj.step.item()),
             "m": {k: v["m"] for k, v in opt_obj.state.items() if isinstance(v, dict) and "m" in v},
@@ -231,18 +143,24 @@ def train_streamed(prep: Prepared, job: Job, log: StepLog, stop, start_step: int
         log.reset_clock()
         while step < spec.steps:
             acc, losses, toks = None, [], 0
-            for a in range(spec.grad_accum):
-                m = step * spec.grad_accum + a
-                b = prep.plan.batch(m)
-                loss, grads, _ = tr.micro_batch(b.inputs, b.targets, b.mask, m)
-                losses.append(loss)
-                toks += b.n_tokens
-                acc = grads if acc is None else {k: acc[k] + grads[k] for k in acc}
-                mx.eval(acc)
-            if spec.grad_accum > 1:
-                acc = {k: v / spec.grad_accum for k, v in acc.items()}
-            tr.apply(opt, acc)
-            step += 1
+            try:
+                for a in range(spec.grad_accum):
+                    m = step * spec.grad_accum + a
+                    b = prep.plan.batch(m)
+                    loss, grads, _ = tr.micro_batch(b.inputs, b.targets, b.mask, m)
+                    losses.append(loss)
+                    toks += b.n_tokens
+                    acc = grads if acc is None else {k: acc[k] + grads[k] for k in acc}
+                    mx.eval(acc)
+                if spec.grad_accum > 1:
+                    acc = {k: v / spec.grad_accum for k, v in acc.items()}
+                with protected():
+                    tr.apply(opt, acc)
+                    step += 1
+            except QuantumAbandoned:          # the step would not finish inside the grace period
+                _save_ckpt(prep, step, tr.params, _opt_to_canon(opt, step))
+                prep.abandoned = True
+                break
             log.step(step, sum(losses) / len(losses), toks)
             stopping = stop is not None and stop.is_set()
             if step % spec.ckpt_every == 0 or stopping or step == spec.steps:
@@ -342,6 +260,8 @@ def train_resident(prep: Prepared, job: Job, log: StepLog, stop, start_step: int
             s = cb_state["base"] + info["iteration"] // accum
             log.step(s, float(info["train_loss"]), cb_state["tokens"])
             cb_state["tokens"] = 0
+            flat_now, _ = _flat_trainable(model)
+            prep.snapshot = (s, flat_now, _resident_opt_canon(opt, prefix))
 
         def on_val_loss_report(self, info):
             pass
@@ -375,8 +295,16 @@ def train_resident(prep: Prepared, job: Job, log: StepLog, stop, start_step: int
                 adapter_file=str(job.dir / "mlx_adapters.safetensors"),
                 grad_checkpoint=size_gb > 0.15 * (prep.working_set / GIB),
                 grad_accumulation_steps=accum)
-            train(model, opt, None, None, args, loss=loss_fn, iterate_batches=iterate,
-                  training_callback=_Cb())
+            try:
+                train(model, opt, None, None, args, loss=loss_fn, iterate_batches=iterate,
+                      training_callback=_Cb())
+            except QuantumAbandoned:
+                if prep.snapshot is not None:
+                    s_step, s_flat, s_opt = prep.snapshot
+                    _save_ckpt(prep, s_step, s_flat, s_opt)
+                    step = s_step
+                prep.abandoned = True
+                break
             done_micro = consumed["micro"] - consumed["micro"] % accum
             step += done_micro // accum
             flat, _ = _flat_trainable(model)
@@ -406,23 +334,6 @@ def _resident_opt_canon(opt, prefix: str) -> dict:
 def _save_ckpt(prep: "Prepared", step: int, params: dict, opt: dict) -> None:
     mx.eval(params, opt["m"], opt["v"])
     prep.cp.save(step, params, opt)
-
-
-def write_adapter(prep: Prepared, flat: dict, steps_done: int, job: Job, base: str,
-                  final_loss: float | None) -> Path:
-    spec = prep.spec
-    dest = adapters_dir() / spec.name
-    extra = {"base": spec.model, "quant": spec.quant, "tune_job": job.id, "path": spec.path,
-             "steps": steps_done, "examples": prep.stats.examples,
-             "data_sha256": data_hash(Path(spec.data)), "max_seq": spec.max_seq,
-             "micro_batch": spec.micro_batch, "grad_accum": spec.grad_accum,
-             "lr": spec.lr, "schedule": spec.schedule, "seed": spec.seed,
-             "final_loss": final_loss}
-    lo.save_adapter_dir(dest, flat, spec.lora(), base, prep.n_layers, prep.shapes, extra)
-    log = job.dir / "losses.jsonl"
-    if log.exists():
-        shutil.copy(log, dest / "train_log.jsonl")
-    return dest
 
 
 def _record_compute_rate(prep: Prepared, result: dict) -> None:
@@ -490,14 +401,7 @@ def run_tune(prep: Prepared, job: Job, *, stop=None, progress_cb=None, resume: b
     import threading
     spec = prep.spec
     stop = stop if stop is not None else threading.Event()
-    if spec.stop_after:
-        inner = progress_cb
-
-        def progress_cb(info, _inner=inner):
-            if _inner:
-                _inner(info)
-            if info["step"] >= spec.stop_after:
-                stop.set()
+    progress_cb = with_stop_after(spec, stop, progress_cb)
     prep.cp = Checkpointer(
         spec, job.dir, engine="mlx_stream_tune" if spec.path == "streamed" else "mlx_lm_lora",
         device=_device_label(),
@@ -514,7 +418,8 @@ def run_tune(prep: Prepared, job: Job, *, stop=None, progress_cb=None, resume: b
                  "v": {k: mx.array(v) for k, v in ck.opt["v"].items()}})
         prep.cp.sync_losses(start)
     job.write_meta(status="running", done=start, total=spec.steps)
-    log = StepLog(job, spec.steps, start, progress_cb)
+    log = StepLog(job, spec.steps, start, progress_cb,
+                  peak_fn=lambda: mx.get_peak_memory() / GIB if mx.default_device() == mx.gpu else 0.0)
     t0 = time.monotonic()
     try:
         fn = train_streamed if spec.path == "streamed" else train_resident
