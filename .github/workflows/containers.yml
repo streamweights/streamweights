@@ -8,7 +8,7 @@ name: Containers
 
 on:
   push:
-    branches: [main]
+    branches: [main, anyhw]
   workflow_dispatch:
 
 permissions:
@@ -42,6 +42,7 @@ jobs:
       - name: Smoke test (20-row eval on the 0.5B, resume the step-50 fixture)
         run: scripts/container_smoke.sh "$IMAGE:cpu"
       - name: Push
+        if: github.ref == 'refs/heads/main'
         run: docker push "$IMAGE:cpu"
 
   cuda:
@@ -64,7 +65,7 @@ jobs:
         with:
           context: .
           file: docker/cuda.Dockerfile
-          push: true
+          push: ${{ github.ref == 'refs/heads/main' }}
           tags: ${{ env.IMAGE }}:cuda
           cache-from: type=gha,scope=cuda
           cache-to: type=gha,scope=cuda,mode=max
