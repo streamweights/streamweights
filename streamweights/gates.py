@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 
 GATE_LR = 2e-5            # natural-text gate: the loss falls from 1.4 to 0.3 in 100 steps
-TOY_LR = 2e-6             # toy task: slow enough that the loss is still moving at step 50
+TOY_LR = 5e-6             # toy task: the adapter learns it (held-out score 0 -> 1) and the loss is still moving at step 50
 
 
 # ---------------------------------------------------------------- running spill
@@ -358,3 +358,103 @@ def rows_audit(work: Work, state_root: str, input_ids: list[str]) -> dict:
             "duplicated": len(ids) - len(set(ids)),
             "row_engines": sorted({e[1] for e in engines}),
             "by_engine": {k: sum(1 for e in engines if e[1] == k) for k in {e[1] for e in engines}}}
+
+
+# ---------------------------------------------------------------- bf16: statistics, no identity claim
+
+def _agreement(a: dict, b: dict) -> dict:
+    c = compare_inference(a, b)
+    return {"rows_identical": c["greedy_identical"], "rows": c["rows"],
+            "max_logprob_diff": c["max_logprob_diff"], "tokens_compared": c["tokens_compared"]}
+
+
+def bf16_inference_statistics(model_bf16, model_f32, rows, torch_engine="torch-cpu") -> dict:
+    """Greedy agreement between engines and numerics on the same rows, next to batch-shape
+    noise (the same engine and numerics, batch 1 against the whole set). bf16 paths are expected
+    to differ by rounding noise; what is reported is how much, and how much the same engine
+    differs from itself when only the batch shape changes."""
+    out = {"rows": len(rows)}
+    t32, _ = infer(torch_engine, model_f32, rows, resident=True, dtype="float32")
+    tb, st = infer(torch_engine, model_bf16, rows, resident=True, dtype="bf16")
+    out["torch_bf16_seconds"] = st["seconds"]
+    out["torch_bf16_vs_torch_f32"] = _agreement(tb, t32)
+    try:
+        import mlx.core  # noqa: F401
+        mb, _ = infer("mlx", model_bf16, rows, resident=True, dtype=None)
+        m32, _ = infer("mlx", model_f32, rows, resident=True, dtype=None)
+        mb1, _ = infer("mlx", model_bf16, rows, resident=True, dtype=None, batch=1)
+        out["mlx_bf16_vs_mlx_f32"] = _agreement(mb, m32)
+        out["torch_bf16_vs_mlx_bf16"] = _agreement(tb, mb)
+        out["batch_shape_noise_mlx_bf16_batch1_vs_all"] = _agreement(mb1, mb)
+    except ImportError:
+        pass
+    tb1, _ = infer(torch_engine, model_bf16, rows, resident=True, dtype="bf16", batch=1)
+    out["batch_shape_noise_torch_bf16_batch1_vs_all"] = _agreement(tb1, tb)
+    return out
+
+
+def bf16_gradient_statistics(model_bf16, model_f32, data, *, max_seq=128, batch=4,
+                             torch_engine="torch-cpu") -> dict:
+    """Phase 3's gradient check, for the torch engine: the same parameters and the same batch,
+    per-tensor cosine of the bf16 gradient to the float32 gradient (mean, minimum, worst
+    tensor), for torch bf16 and for MLX bf16, next to batch-shape noise (one micro-batch of
+    `batch` examples against two of half the size, accumulated)."""
+    import torch
+
+    from .engines.common import collect_eos_ids
+    from .engines.torch_common import device_for, linear_shapes_meta, load_tokenizer
+    from .ring import SafetensorsIndex
+    from .tune import lora_core as lo
+    from .tune.data import BatchPlan, load_examples
+    from .tune.torch_train import StreamedTrainer
+    dev = device_for(torch_engine)
+    ix = SafetensorsIndex(Path(model_f32))
+    shapes = linear_shapes_meta(ix)
+    tok = load_tokenizer(Path(model_f32))
+    exs, _ = load_examples(Path(data), tok, max_seq, collect_eos_ids(Path(model_f32), tok))
+    plan = BatchPlan(exs[:64], batch, 0, tok.pad_token_id or 0)
+    b = plan.batch(0)
+    cfg = lo.LoraConfig(rank=16, alpha=32, seed=0)
+    p0 = lo.init_params_np(shapes, ix.n_layers, 16, 0)
+    rng = np.random.RandomState(1)
+    p0 = {k: (v if k.endswith("lora_a") else (rng.randn(*v.shape) * 0.02).astype(np.float32))
+          for k, v in p0.items()}
+
+    def torch_grads(model_dir, dtype, inputs, targets, mask):
+        tr = StreamedTrainer(Path(model_dir), cfg, p0, dtype=dtype, device=dev, shapes=shapes,
+                             resident_weights=True)
+        try:
+            return tr.micro_batch(inputs, targets, mask, 0)
+        finally:
+            tr.close()
+
+    def stats(x, y):
+        cs = {k: lo.cosine_np(x[k], y[k]) for k in x}
+        worst = min(cs, key=cs.get)
+        return {"mean_cosine": float(np.mean(list(cs.values()))), "min_cosine": cs[worst],
+                "worst_tensor": worst}
+
+    _, g32, _ = torch_grads(model_f32, torch.float32, b.inputs, b.targets, b.mask)
+    _, gb, _ = torch_grads(model_bf16, torch.bfloat16, b.inputs, b.targets, b.mask)
+    out = {"batch_examples": int(b.inputs.shape[0]), "tokens": int(b.inputs.size),
+           "torch_bf16_vs_torch_f32": stats(gb, g32)}
+    h = b.inputs.shape[0] // 2
+    parts = []
+    for sl in (slice(0, h), slice(h, None)):
+        _, g, n = torch_grads(model_bf16, torch.bfloat16, b.inputs[sl], b.targets[sl], b.mask[sl])
+        parts.append((g, n))
+    tot = sum(n for _, n in parts)
+    gsplit = {k: sum(g[k] * (n / tot) for g, n in parts) for k in gb}
+    out["batch_shape_noise_torch_bf16_one_batch_vs_two_halves"] = stats(gsplit, gb)
+    try:
+        import mlx.core as mx
+
+        from .tune.streamed import StreamedTrainer as MlxTrainer
+        mtr = MlxTrainer(Path(model_bf16), cfg, params={k: mx.array(v) for k, v in p0.items()})
+        _, mg, _ = mtr.micro_batch(b.inputs, b.targets, b.mask, 0)
+        mtr.close()
+        out["mlx_bf16_vs_torch_f32"] = stats({k: np.array(v) for k, v in mg.items()}, g32)
+        out["torch_bf16_vs_mlx_bf16"] = stats(gb, {k: np.array(v) for k, v in mg.items()})
+    except ImportError:
+        pass
+    return out
