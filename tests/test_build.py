@@ -200,7 +200,8 @@ def test_cli_build_end_to_end_with_fake_backend(folder, monkeypatch):
     fake = Fake({"qwen2.5:7b+bank": 0.9, "qwen2.5:7b": 0.2, "llama3.3:70b": 0.8})
     monkeypatch.setattr(cli_build, "RealBackend", lambda *a, **k: fake)
     monkeypatch.setenv("SPILL_NO_NOTIFY", "1")
-    r = CliRunner().invoke(app, ["build", str(folder)])
+    r = CliRunner().invoke(app, ["build", str(folder), "--student", "qwen2.5:7b", "--teacher",
+                                 "llama3.3:70b"])
     assert r.exit_code == 0, r.output
     assert "path both" in r.output and "stage 1/5" in r.output
     assert "your model: qwen2.5:7b+bank" in r.output
@@ -209,7 +210,8 @@ def test_cli_build_end_to_end_with_fake_backend(folder, monkeypatch):
     # running again is a no-op that reprints the table
     fake2 = Fake()
     monkeypatch.setattr(cli_build, "RealBackend", lambda *a, **k: fake2)
-    r = CliRunner().invoke(app, ["build", str(folder)])
+    r = CliRunner().invoke(app, ["build", str(folder), "--student", "qwen2.5:7b", "--teacher",
+                                 "llama3.3:70b"])
     assert r.exit_code == 0 and fake2.calls == []
 
 
@@ -217,7 +219,8 @@ def test_cli_build_interrupted_prints_resume_command(folder, monkeypatch):
     fake = Fake(stop_at="tune")
     monkeypatch.setattr(cli_build, "RealBackend", lambda *a, **k: fake)
     monkeypatch.setenv("SPILL_NO_NOTIFY", "1")
-    r = CliRunner().invoke(app, ["build", str(folder)])
+    r = CliRunner().invoke(app, ["build", str(folder), "--student", "qwen2.5:7b", "--teacher",
+                                 "llama3.3:70b"])
     assert r.exit_code == 130
     assert f"next: spill resume {folder.resolve()}" in r.output
 

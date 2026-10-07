@@ -1,10 +1,13 @@
 """Overnight safety: stay awake, say when the power is wrong, say when it is over,
 and say on the next launch that something was interrupted.
 
-  caffeinate -i   held for the lifetime of run, distill, tune and build (tied to our pid,
-                  so it cannot outlive us)
-  battery         `pmset -g batt`; the pre-run line says to plug in
-  notify          osascript on finish or stop; --notify <url> also POSTs a small JSON
+  keep-awake      macOS: caffeinate -i; Linux: systemd-inhibit when it is there, otherwise
+                  nothing, silently. Held for the lifetime of run, distill, tune and build
+                  (tied to our pid, so it cannot outlive us); never in headless mode
+  battery         macOS: `pmset -g batt`; Linux: /sys/class/power_supply when present; the
+                  pre-run line says to plug in
+  notify          macOS: osascript; Linux: notify-send when it is there; on finish or stop.
+                  --notify <url> also POSTs a small JSON, on every platform
   banner          any command, on launch, reports an interrupted job with its resume command
 """
 
@@ -29,9 +32,18 @@ def _mac() -> bool:
     return platform.system() == "Darwin"
 
 
+def _linux() -> bool:
+    return platform.system() == "Linux"
+
+
 # ------------------------------------------------------------ power
 
+POWER_SUPPLY = Path("/sys/class/power_supply")
+
+
 def on_battery() -> bool:
+    if _linux():
+        return _linux_on_battery(POWER_SUPPLY)
     if not _mac() or not shutil.which("pmset"):
         return False
     try:
@@ -42,6 +54,26 @@ def on_battery() -> bool:
     return "Battery Power" in out
 
 
+def _linux_on_battery(root: Path) -> bool:
+    """True when a battery in <root> is discharging and no mains supply reports online.
+    A machine with no battery (a server, a container) reports False."""
+    try:
+        supplies = sorted(root.iterdir()) if root.is_dir() else []
+    except OSError:
+        return False
+    discharging = False
+    for d in supplies:
+        try:
+            kind = (d / "type").read_text().strip()
+            if kind == "Mains" and (d / "online").read_text().strip() == "1":
+                return False
+            if kind == "Battery" and (d / "status").read_text().strip() == "Discharging":
+                discharging = True
+        except OSError:
+            continue
+    return discharging
+
+
 def battery_note() -> str:
     return (" On battery power: plug in before this runs overnight."
             if on_battery() else "")
@@ -49,12 +81,22 @@ def battery_note() -> str:
 
 @contextlib.contextmanager
 def caffeinate():
-    """Hold `caffeinate -i` (no idle sleep) for the lifetime of this process."""
+    """Keep the machine awake for the lifetime of this process: caffeinate on macOS,
+    systemd-inhibit on Linux when it is installed and works; otherwise nothing, silently."""
     proc = None
     if _mac() and shutil.which("caffeinate"):
         try:
             proc = subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            proc = None
+    elif _linux() and shutil.which("systemd-inhibit"):
+        try:
+            proc = subprocess.Popen(
+                ["systemd-inhibit", "--what=idle:sleep", "--who=spill",
+                 "--why=a spill job is running", "--mode=block", "sh", "-c",
+                 f"while kill -0 {os.getpid()} 2>/dev/null; do sleep 5; done"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError:
             proc = None
     try:
@@ -68,17 +110,24 @@ def caffeinate():
 
 # ------------------------------------------------------------ notifications
 
-def notify(title: str, message: str, url: str | None = None, payload: dict | None = None
-           ) -> list[str]:
-    """macOS notification, plus a POST to `url` when given. Never raises; returns what was
-    done (for tests and for the output line)."""
+def notify(title: str, message: str, url: str | None = None, payload: dict | None = None,
+           local: bool = True) -> list[str]:
+    """A desktop notification (osascript on macOS, notify-send on Linux when installed), plus
+    a POST to `url` when given. Never raises; returns what was done (for tests and for the
+    output line). `local=False` (headless) skips the desktop notification."""
     done = []
-    if _mac() and shutil.which("osascript") and not os.environ.get("SPILL_NO_NOTIFY"):
+    quiet = os.environ.get("SPILL_NO_NOTIFY") or not local
+    if _mac() and shutil.which("osascript") and not quiet:
         script = ('display notification "%s" with title "%s"'
                   % (message.replace('"', "'")[:200], title.replace('"', "'")[:80]))
         with contextlib.suppress(Exception):
             subprocess.run(["osascript", "-e", script], capture_output=True, timeout=5)
             done.append("osascript")
+    elif _linux() and shutil.which("notify-send") and not quiet:
+        with contextlib.suppress(Exception):
+            subprocess.run(["notify-send", title[:80], message[:200]], capture_output=True,
+                           timeout=5)
+            done.append("notify-send")
     if url:
         try:
             import httpx
@@ -91,12 +140,12 @@ def notify(title: str, message: str, url: str | None = None, payload: dict | Non
 
 
 @contextlib.contextmanager
-def long_job(name: str, notify_url: str | None = None):
-    """Wrap a long command: caffeinate for its lifetime, and a notification when it
-    finishes, stops, or fails."""
+def long_job(name: str, notify_url: str | None = None, local: bool = True):
+    """Wrap a long command: keep awake for its lifetime, and a notification when it
+    finishes, stops, or fails. `local=False` (headless) keeps only the --notify URL."""
     t0 = time.monotonic()
     status = {"state": "finished", "detail": ""}
-    with caffeinate():
+    with (caffeinate() if local else contextlib.nullcontext()):
         try:
             yield status
         except KeyboardInterrupt:
@@ -115,7 +164,7 @@ def long_job(name: str, notify_url: str | None = None):
             msg = f"{name} {status['state']} after {_dur(el)}" + (
                 f" ({status['detail']})" if status["detail"] else "")
             notify("spill", msg, notify_url, {"command": name, "state": status["state"],
-                                              "seconds": round(el)})
+                                              "seconds": round(el)}, local=local)
 
 
 def _dur(s: float) -> str:

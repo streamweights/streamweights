@@ -1,0 +1,100 @@
+{"prompt": "what cards can i use to add money to my account", "answer": "supported_cards_and_currencies"}
+{"prompt": "Can you change the rate for the item I bought in a different currency as it is wrong?", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Can I get a new pin number at any ATM using my card?", "answer": "change_pin"}
+{"prompt": "How do I change the PIN?", "answer": "change_pin"}
+{"prompt": "I want to top up by card, what do you support?", "answer": "supported_cards_and_currencies"}
+{"prompt": "I have a transaction showing up more than once.", "answer": "transaction_charged_twice"}
+{"prompt": "My ID verification hasn't gone through yet, but can I use my account anyway?", "answer": "why_verify_identity"}
+{"prompt": "While doing a transfer, it says declined.", "answer": "declined_transfer"}
+{"prompt": "Can I change my PIN at any ATM?", "answer": "change_pin"}
+{"prompt": "I have a payment that shows twice", "answer": "transaction_charged_twice"}
+{"prompt": "Machines make mistakes too! The ATM gave me the wrong amount of money. Too much!", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "How long does it take for a new purchase to stop being considered pending?", "answer": "pending_card_payment"}
+{"prompt": "Can I use this app for any currency?", "answer": "supported_cards_and_currencies"}
+{"prompt": "What is the auto top-up limit?", "answer": "automatic_top_up"}
+{"prompt": "Who do I talk to for transactions debited twice?", "answer": "transaction_charged_twice"}
+{"prompt": "Is there a location where I can change my PIN?", "answer": "change_pin"}
+{"prompt": "Why check my identity?", "answer": "why_verify_identity"}
+{"prompt": "Do you accept Mastercard?", "answer": "supported_cards_and_currencies"}
+{"prompt": "I think there is a mistake.  I am being charged twice.", "answer": "transaction_charged_twice"}
+{"prompt": "My currency rate is inaccurate.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "can i add funds  with a card from the united states", "answer": "supported_cards_and_currencies"}
+{"prompt": "I think I was double charged", "answer": "transaction_charged_twice"}
+{"prompt": "how do I speed up identity verification?", "answer": "why_verify_identity"}
+{"prompt": "i withdrew cash and dont see it reflected on the balance", "answer": "pending_cash_withdrawal"}
+{"prompt": "I wanted to withdraw $100 from the ATM but I only got $20", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "Can I change my PIN without going to a bank?", "answer": "change_pin"}
+{"prompt": "I think my pin has been compromised, what do I do?", "answer": "change_pin"}
+{"prompt": "Which currencies do you accept for adding money?", "answer": "supported_cards_and_currencies"}
+{"prompt": "My cash received does not match what has been requested", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "I couldn't make a transfer because it was declined", "answer": "declined_transfer"}
+{"prompt": "What is the limit on Auto top?", "answer": "automatic_top_up"}
+{"prompt": "How long does a payment usually show as pending? Is it normal that mine is still pending?", "answer": "pending_card_payment"}
+{"prompt": "how can i get it to add money automatically while travelling", "answer": "automatic_top_up"}
+{"prompt": "I noticed that there's a payment on my card that's pending.", "answer": "pending_card_payment"}
+{"prompt": "Why is my ATM withdrawal still pending?", "answer": "pending_cash_withdrawal"}
+{"prompt": "I have a cash withdrawal that says it's pending, why?", "answer": "pending_cash_withdrawal"}
+{"prompt": "I got some items this morning but the payment says pending", "answer": "pending_card_payment"}
+{"prompt": "Why is the exchange rate different on my recent purchase?", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Do you need to know my first and last name?", "answer": "why_verify_identity"}
+{"prompt": "I bought something abroad and the exchange rate applied is wrong", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "My card payment had the wrong exchange rate", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Can I use my account before my Identity verification has passed?", "answer": "why_verify_identity"}
+{"prompt": "Transfer was declined, could not complete request.", "answer": "declined_transfer"}
+{"prompt": "Why do you need me to do an identity check?", "answer": "why_verify_identity"}
+{"prompt": "How do I top-up automatically?", "answer": "automatic_top_up"}
+{"prompt": "It appears my transfer was declined.", "answer": "declined_transfer"}
+{"prompt": "What about an auto top-up, is that a option?", "answer": "automatic_top_up"}
+{"prompt": "What's the reason for needing to verify my identity?", "answer": "why_verify_identity"}
+{"prompt": "I can't find the auto-top up option.", "answer": "automatic_top_up"}
+{"prompt": "Can I change my pin at ATMs?  If so, what ones?", "answer": "change_pin"}
+{"prompt": "Is there anyway to bypass identity verification?", "answer": "why_verify_identity"}
+{"prompt": "My account is showing a double charge.", "answer": "transaction_charged_twice"}
+{"prompt": "Do you have a list of the cards and currencies supported?", "answer": "supported_cards_and_currencies"}
+{"prompt": "I am not receiving the correct exchange rate on my card.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "I made an international purchase, but the exchange rate was wrong", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Card payment is showing as pending", "answer": "pending_card_payment"}
+{"prompt": "What is the pending payment on my card about?", "answer": "pending_card_payment"}
+{"prompt": "I received less cash than the amount I specified in the ATM.", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "If the ATM only gave me 10 pounds instead of the 30 I requested, what do I do?", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "There is a transaction showing up several times.", "answer": "transaction_charged_twice"}
+{"prompt": "I took out some cash from the ATM but it is still showing the transaction is pending.", "answer": "pending_cash_withdrawal"}
+{"prompt": "How are cash withdrawals pending?", "answer": "pending_cash_withdrawal"}
+{"prompt": "I tried withdrawing but my cash is not showing up?", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "My cash withdrawal shows as pending still.", "answer": "pending_cash_withdrawal"}
+{"prompt": "Tell me why my transfer was declined.", "answer": "declined_transfer"}
+{"prompt": "I bought an item then noticed the exchange rate was wrong.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Why hasn't my payment gone through?", "answer": "pending_card_payment"}
+{"prompt": "Why hasn't my card payment cleared yet?", "answer": "pending_card_payment"}
+{"prompt": "Can I top off with a debit card?", "answer": "supported_cards_and_currencies"}
+{"prompt": "I made a payment with my card and it hasn't changed. How long do you think this will take?", "answer": "pending_card_payment"}
+{"prompt": "I wanted to take out $100 but I only got $20.", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "In my account I noticed my ATM withdrawal is still pending", "answer": "pending_cash_withdrawal"}
+{"prompt": "Did a WD earlier at an ATM.  The amount showing in the App is more than I got though.", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "How can I check for an unsupported merchant for my transfer request?", "answer": "declined_transfer"}
+{"prompt": "Are there any specific cash machines that I have to go to in order to change my PIN?", "answer": "change_pin"}
+{"prompt": "Can I change my pin number at a cash machine?", "answer": "change_pin"}
+{"prompt": "How do i set up auto top-up?", "answer": "automatic_top_up"}
+{"prompt": "can you top up your account automatically", "answer": "automatic_top_up"}
+{"prompt": "I did not receive all of my cash back", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "Where do I find the auto top up option?", "answer": "automatic_top_up"}
+{"prompt": "Declined, transfer not completed.", "answer": "declined_transfer"}
+{"prompt": "My account was charged twice for one purchase", "answer": "transaction_charged_twice"}
+{"prompt": "Why did my transfer get declined?", "answer": "declined_transfer"}
+{"prompt": "how long until a cash withdrawal will show on my account", "answer": "pending_cash_withdrawal"}
+{"prompt": "What do I do with my \"decline\" message on a transfer?", "answer": "declined_transfer"}
+{"prompt": "The exchange rate from my card payment isn't right.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "Which credit card top-ups do you accept?", "answer": "supported_cards_and_currencies"}
+{"prompt": "What currencies can I use?", "answer": "supported_cards_and_currencies"}
+{"prompt": "How does identity check work?", "answer": "why_verify_identity"}
+{"prompt": "Why do you have an identity check?", "answer": "why_verify_identity"}
+{"prompt": "How can I change my PIN without going to the bank?", "answer": "change_pin"}
+{"prompt": "What is a pending cash withdrawal?", "answer": "pending_cash_withdrawal"}
+{"prompt": "Why does it still charge me even though I was unable to withdraw money from the ATM?", "answer": "pending_cash_withdrawal"}
+{"prompt": "I was charged several times for something", "answer": "transaction_charged_twice"}
+{"prompt": "My transfer was declined, why is that?", "answer": "declined_transfer"}
+{"prompt": "The currency exchange rate was wrong for a purchase I made.", "answer": "card_payment_wrong_exchange_rate"}
+{"prompt": "I bought some things in the morning but the payment shows as pending", "answer": "pending_card_payment"}
+{"prompt": "I got some cash but it wasn't the right amount.", "answer": "wrong_amount_of_cash_received"}
+{"prompt": "If I am running low on credit can I auto top up?", "answer": "automatic_top_up"}
+{"prompt": "Why is there a payment showing twice?", "answer": "transaction_charged_twice"}

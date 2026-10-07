@@ -4,6 +4,7 @@ Imported at the bottom of cli.py, which owns `app` and the shared helpers."""
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -13,66 +14,120 @@ import typer
 import typer.core
 
 from . import build as build_mod
+from . import build_defaults, engine_select, overnight, platforms, runtime
 from . import estimate as est
-from . import overnight, platforms
 from . import probe as probe_mod
-from .cli import (JOBS_DIR, GIB, Job, RunOpts, _fail, _finalize_distill, _next_hint,
-                  _run_impl, _run_mlx_resume, app)
+from .cli import (JOBS_DIR, GIB, RunOpts, _fail, _finalize_distill, _long_job, _next_hint,
+                  _run_impl, app)
 from .errors import SpillError, StageInterrupted
+from .portable.build_state import BuildState
 
 DEFAULT_EPOCHS = build_mod.DEFAULT_EPOCHS
 
 
+def _row_producers(results_path) -> list[dict]:
+    """Which engine, hardware, OS and numerics produced the rows of a finished (or partial)
+    row job: read off the rows themselves, so rows restored from another machine keep the
+    machine that made them."""
+    groups: dict = {}
+    p = Path(results_path) if results_path else None
+    if p is None or not p.exists():
+        return []
+    for line in p.read_text().splitlines():
+        if not line.strip():
+            continue
+        sw = json.loads(line).get("streamweights") or {}
+        key = (sw.get("engine"), sw.get("hardware"), json.dumps(sw.get("numerics"), sort_keys=True),
+               sw.get("os"), sw.get("host"))
+        g = groups.setdefault(key, {"engine": sw.get("engine"), "hardware": sw.get("hardware"),
+                                    "numerics": sw.get("numerics"), "os": sw.get("os"),
+                                    "system": sw.get("system"), "host": sw.get("host"),
+                                    "n": 0})
+        g["n"] += 1
+    out = []
+    for g in groups.values():
+        n = g.pop("n")
+        out.append({**g, "quanta": f"{n} rows"})
+    return out
+
+
+def _tune_producers(uri: str | None) -> list[dict]:
+    """The engine, hardware, OS and numerics that produced each range of steps, from the
+    checkpoint's state.json."""
+    if not uri:
+        return []
+    from .portable import checkpoint as pc
+    from .portable.store import Store
+    ck = pc.load_tune(Store(uri))
+    if ck is None:
+        return []
+    out = []
+    for h in ck.state.get("history", []):
+        out.append({"engine": h.get("engine"), "hardware": h.get("hardware"),
+                    "numerics": h.get("numerics"), "os": h.get("os"), "system": h.get("system"),
+                    "host": h.get("host"),
+                    "quanta": f"steps {h['range'][0]}-{h['range'][1]}"})
+    return out
+
+
 class RealBackend(build_mod.Backend):
-    """Runs the stages with the same code `spill distill`, `spill tune` and `spill eval`
-    use, in this process (one stage at a time; each frees its Metal memory on exit)."""
+    """Runs the stages with the same engine-selected code `spill distill`, `spill tune` and
+    `spill eval` use, in this process (one stage at a time). MLX on Apple silicon, PyTorch
+    elsewhere or with --engine; this class names neither. Each stage's own state is
+    runtime.ENV.state (set by build.run_plan), so running a stage again continues it."""
 
     def __init__(self, quiet: bool = True, epochs: float = DEFAULT_EPOCHS):
         self.quiet = True            # one progress line per stage; the slot block is for `run`
         self.epochs = epochs
+        self.hints: dict = {}        # {"micro_batch": n} from the stage's earlier session
+
+    def _silenced(self):
+        import contextlib
+        import io
+        return contextlib.redirect_stdout(io.StringIO())
 
     def distill(self, teacher, prompts, out, max_tokens, resume_job):
-        if resume_job and (JOBS_DIR / resume_job / "meta.json").exists():
-            j = Job.load(resume_job)
-            _run_mlx_resume(j, j.quant, probe_mod.load())
-            done = len(j.done_ids())
-            if done < j.total:
-                return {"interrupted": True, "job_id": j.id, "rows": done}
-            dest = _finalize_distill(j)
-            return {"job_id": j.id, "rows": done, "out": str(dest)}
-        job, prog = _run_impl(teacher, str(prompts), None, out, 4096, None, self.quiet,
-                              RunOpts(mode="generate", logprobs=None, kind="distill"))
-        if prog.done < prog.total:
-            return {"interrupted": True, "job_id": job.id, "rows": prog.done}
-        dest = _finalize_distill(job)
-        return {"job_id": job.id, "rows": prog.done, "out": str(dest)}
+        with self._silenced():
+            job, prog = _run_impl(teacher, str(prompts), None, out, 4096, None, self.quiet,
+                                  RunOpts(mode="generate", logprobs=None, kind="distill"))
+            done = prog.done >= prog.total
+            dest = _finalize_distill(job) if done else None
+        res = {"job_id": job.id, "rows": prog.done,
+               "producers": _row_producers(job.results_path)}
+        if not done:
+            return {"interrupted": True, **res}
+        return {**res, "out": str(dest)}
 
     def tune(self, model, train, name, resume_job):
         from . import cli
-        return cli._tune_build(model, train, name, resume_job, epochs=self.epochs,
-                               quiet=self.quiet)
+        res = cli._tune_build(model, train, name, epochs=self.epochs, quiet=self.quiet,
+                              batch=self.hints.get("micro_batch"))
+        res["producers"] = _tune_producers(runtime.state_uri())
+        return res
 
     def eval(self, model, eval_file, resume_job=None):
         from . import cli, evalrun
         from . import runs as runs_mod
         try:
-            scored = cli._eval_impl(str(eval_file), [model], "exact_match", None, False, None,
-                                    4096, None, self.quiet, echo=False,
-                                    resume_jobs={model: resume_job} if resume_job else None)
+            with self._silenced():
+                scored = cli._eval_impl(str(eval_file), [model], "exact_match", None, False,
+                                        None, 4096, None, self.quiet, echo=False,
+                                        engine_pure=True)
         except StageInterrupted as e:
-            return {"interrupted": True, "job_id": e.job_id}
+            jr = JOBS_DIR / e.job_id / "results.jsonl"
+            return {"interrupted": True, "job_id": e.job_id, "producers": _row_producers(jr)}
         sr = scored[0]
         mean, _unscored = evalrun.mean_score(sr)
         m = runs_mod.read_manifest(sr.run_id)
+        results = Path(m["job_dir"]) / "results.jsonl"
         return {"score": mean if mean is not None else 0.0, "rows": sr.rows,
-                "run_id": sr.run_id, "cached": sr.cached,
-                "results_path": str(Path(m["job_dir"]) / "results.jsonl"),
-                "manifest": str(runs_mod.manifest_path(sr.run_id))}
+                "run_id": sr.run_id, "cached": sr.cached, "results_path": str(results),
+                "manifest": str(runs_mod.manifest_path(sr.run_id)),
+                "producers": _row_producers(results)}
 
 
-def _make_plan(f, student, teacher, base, compare, weight_own, epochs):
-    from .calibration import load_calibration
-    hw = probe_mod.load(probe_if_missing=True)
+def _make_plan(f, student, teacher, base, compare, weight_own, epochs, choice, hw, cal,
+               bs=None):
     from .resolve import arch_from_config, resolve_model
     for m in {student, teacher, base, *compare} - {None}:
         if m not in est.PARAMS_B:
@@ -85,8 +140,11 @@ def _make_plan(f, student, teacher, base, compare, weight_own, epochs):
                 raise         # a name that is neither a tag nor a repo id fails before anything runs
             except Exception:
                 pass          # an unreachable repo fails properly when its stage runs
-    return build_mod.make_plan(f, student, teacher, base, compare, weight_own,
-                               load_calibration(), hw["gpu"]["vram_bytes"], epochs)
+    ws, _free, rate = build_defaults.machine_inputs(choice.name, hw, cal)
+    plan = build_mod.make_plan(f, student, teacher, base, compare, weight_own, cal, ws, epochs,
+                               engine=choice.name, read_rate=rate)
+    plan.state = bs
+    return plan
 
 
 def _missing_downloads(plan) -> list[tuple[str, float]]:
@@ -102,41 +160,88 @@ def _missing_downloads(plan) -> list[tuple[str, float]]:
     return out
 
 
+def _calibration_for(choice) -> dict:
+    """The calibration, with this engine's measured rates in it (a few seconds, once)."""
+    from .calibration import load_calibration
+    cal = load_calibration()
+    if choice.is_torch and choice.name not in (cal.get("engine_tflops") or {}):
+        try:
+            engine_select.measure_rates()
+            cal = load_calibration()
+        except Exception:
+            pass
+    return cal
+
+
 def do_build(folder, student, teacher, base, compare, weight_own, epochs, notify, quiet,
-             backend=None):
+             backend=None, state=None, stop_after=None):
     f = build_mod.read_folder(folder)
-    student = student or f.settings.get("student") or build_mod.DEFAULT_STUDENT
-    teacher = teacher or f.settings.get("teacher") or build_mod.DEFAULT_TEACHER
-    base = base or f.settings.get("base")
+    choice = engine_select.choose_engine(runtime.ENV.engine)
+    runtime.set_engine(choice.name)
+    hw = probe_mod.load(probe_if_missing=True)
+    cal = _calibration_for(choice)
+    bs = BuildState(state) if state else None
+    prior = build_mod.load_state(f, bs)
+    adopt = (prior and not prior.get("finished") and not (student or teacher or base or compare))
+    if adopt:           # the same build, continued: its models, not new defaults for this machine
+        student, teacher, base = prior["student"], prior["teacher"], prior.get("base")
+        compare = prior.get("compare", [])
+        weight_own = prior.get("weight_own", weight_own)
+        epochs = prior.get("epochs", epochs)
+        why = "continuing the models chosen when this build started"
+        forced = []
+    else:
+        student = student or f.settings.get("student")
+        teacher = teacher or f.settings.get("teacher")
+        base = base or f.settings.get("base")
+        ws, free, rate = build_defaults.machine_inputs(choice.name, hw, cal)
+        from .registry import safetensors_downloaded
+        ch = build_defaults.choose(f, choice.name, cal, ws, free, rate, student, teacher,
+                                   downloaded=lambda t: _is_downloaded(t, safetensors_downloaded))
+        student, teacher, why, forced = ch.student, ch.teacher, ch.why(), sorted(ch.forced)
     epochs = epochs or f.settings.get("epochs") or DEFAULT_EPOCHS
-    plan = _make_plan(f, student, teacher, base, compare, weight_own, epochs)
+    plan = _make_plan(f, student, teacher, base, compare, weight_own, epochs, choice, hw, cal,
+                      bs)
+    plan.why, plan.forced = why, forced
     plan.extra = {"notify": notify, "pid": os.getpid()}
-    prior = build_mod.load_state(f)
     resumed = False
     if prior and not prior.get("finished"):
         resumed = build_mod.apply_state(plan, prior)
         if not resumed:
-            typer.echo(f"note: {f.name}/.build/state.json was for a different plan; starting "
-                       f"this build fresh (finished runs are reused when the input is the same)")
+            typer.echo(f"note: the state at {bs.uri if bs else f.name + '/.build/'} was for a "
+                       f"different plan; starting this build fresh")
     elif prior and prior.get("finished"):
         build_mod.apply_state(plan, prior)
-    typer.echo(build_mod.pre_run_line(plan, on_battery=overnight.on_battery()))
+    typer.echo(build_mod.pre_run_line(plan, on_battery=overnight.on_battery(),
+                                      state_note=bs.uri if bs else None))
     missing = _missing_downloads(plan)
     if missing:
         typer.echo("   downloads first, not counted in the estimate: " + ", ".join(
             f"{m} {gb:.1f} GB" for m, gb in missing))
     done = sum(1 for s in plan.stages if s.status == "done")
     if done:
-        typer.echo(f"continuing: {done} of {len(plan.stages)} stages already done")
+        prev = sorted({p.get("engine") for s in plan.stages if s.status == "done"
+                       for p in s.producers if p.get("engine")})
+        typer.echo(f"continuing: {done} of {len(plan.stages)} stages already done"
+                   + (f" (on {', '.join(prev)}); the rest runs on {plan.engine}"
+                      if prev and plan.engine not in prev else ""))
+    runtime.emit("start", command="build", model=plan.tuned_model, stages=len(plan.stages),
+                 done_stages=done, state=bs.uri if bs else str(f.state_dir),
+                 estimated_seconds=round(plan.total_s), message=build_mod.pre_run_line(
+                     plan, state_note=bs.uri if bs else None))
     overnight.register_build(f.path)
     build_mod.save_state(plan)
     backend = backend or RealBackend(quiet, epochs)
+    tune_stage = next((s for s in plan.stages if s.kind == "tune"), None)
+    if tune_stage is not None and hasattr(backend, "hints") and tune_stage.result.get("micro_batch"):
+        backend.hints["micro_batch"] = tune_stage.result["micro_batch"]
     import streamweights.cli as cli
     cli._NEXT_HINTS = False
+    res = None
     try:
-        with overnight.long_job(f"spill build {f.name}", notify) as st:
-            res = build_mod.run_plan(plan, backend, say=typer.echo)
-            if res.interrupted:
+        with _long_job(f"spill build {f.name}", notify) as st:
+            res = build_mod.run_plan(plan, backend, say=typer.echo, stop_after=stop_after)
+            if res.interrupted and st is not None:
                 st["state"] = "stopped"
     finally:
         cli._NEXT_HINTS = True
@@ -145,29 +250,70 @@ def do_build(folder, student, teacher, base, compare, weight_own, epochs, notify
     typer.echo("")
     if res.table:
         typer.echo(build_mod.render_table(res.table))
+    guard = runtime.ENV.guard
     if res.interrupted:
+        if guard is not None and guard.signalled:     # the session exits 75 after its `preempted`
+            typer.echo(f"\nbuild stopped by {guard.signalled}; state saved at "
+                       f"{bs.uri if bs else f.name + '/.build/'}")
+            return res
+        runtime.ENV.stopped_early = res.stopped_early
+        if res.stopped_early:
+            typer.echo(f"\nbuild stopped early (--stop-after {stop_after}); nothing is lost")
+            _next_hint(f"spill resume {f.path}" + (f" --state {bs.uri}" if bs else ""))
+            return res
         typer.echo(f"\nbuild stopped; nothing is lost.")
-        _next_hint(f"spill resume {f.path}")
+        _next_hint(f"spill resume {f.path}" + (f" --state {bs.uri}" if bs else ""))
         raise typer.Exit(130)
     typer.echo("")
     typer.echo(build_mod.render_stages(res.stages))
+    typer.echo("")
+    typer.echo(build_mod.render_provenance(res.stages))
     typer.echo(f"\nbuild wall time {est.fmt_dur(res.wall_s)} this session")
     for line in build_mod.final_lines(res):
         typer.echo(line)
+    runtime.ENV.summary.update(table=res.table, adapter=plan.adapter_name)
     _next_hint(f"spill export {res.tuned_label}")
     return res
 
 
-def resume_build(folder: Path):
-    platforms.require_mlx("build")
+def _print_table(folder: str, state: str | None, reference: str | None) -> None:
     f = build_mod.read_folder(folder)
-    st = build_mod.load_state(f)
+    doc = build_mod.load_state(f, BuildState(state) if state else None)
+    if not doc:
+        raise SpillError(f"{f.name} has no build state to show", f"spill build {folder}")
+    ref = BuildState(reference).read() if reference else None
+    if reference and not ref:
+        raise SpillError(f"no build state at {reference}", f"spill build {folder} --table")
+    typer.echo(build_mod.table_from_state(doc, ref))
+
+
+def _is_downloaded(tag: str, check) -> bool:
+    try:
+        return bool(check(tag))
+    except Exception:
+        return False
+
+
+def resume_build(folder: Path, state: str | None = None, stop_after: str | None = None,
+                 notify: str | None = None):
+    f = build_mod.read_folder(folder)
+    bs = BuildState(state) if state else None
+    st = build_mod.load_state(f, bs)
+    if not st and bs is None:
+        mirror = build_mod.load_state(f)
+        if mirror and mirror.get("state_uri"):
+            bs, st = BuildState(mirror["state_uri"]), None
+            st = bs.read()
+    elif st and bs is None and st.get("state_uri"):
+        bs = BuildState(st["state_uri"])
+        st = bs.read() or st
     if not st:
         raise SpillError(f"{folder} has no build to resume", f"spill build {folder}")
     try:
         do_build(str(folder), st["student"], st["teacher"], st.get("base"),
                  st.get("compare", []), st.get("weight_own", 2.0),
-                 st.get("epochs", DEFAULT_EPOCHS), st.get("notify"), False)
+                 st.get("epochs", DEFAULT_EPOCHS), notify or st.get("notify"), False,
+                 state=bs.uri if bs else None, stop_after=stop_after)
     except Exception as e:
         if isinstance(e, typer.Exit):
             raise
@@ -180,11 +326,12 @@ def build(
     folder: str = typer.Argument(..., help="a folder with evals.jsonl and train.jsonl and/or "
                                            "prompts.jsonl"),
     student: str = typer.Option(None, "--student",
-                                help=f"the small model to build on (default "
-                                     f"{build_mod.DEFAULT_STUDENT})"),
+                                help="the small model to build on (default: chosen from this "
+                                     "machine: qwen2.5:7b on Apple silicon, qwen2.5:0.5b on a CPU)"),
     teacher: str = typer.Option(None, "--teacher",
-                                help=f"the big model that answers prompts.jsonl (default "
-                                     f"{build_mod.DEFAULT_TEACHER})"),
+                                help="the big model that answers prompts.jsonl (default: "
+                                     "llama3.3:70b on Apple silicon; on a CPU the largest whose "
+                                     "distill estimate is under 12 h)"),
     compare: list[str] = typer.Option(None, "--compare", help="add this model's score to the table "
                                                               "(repeatable)"),
     base: str = typer.Option(None, "--base", help="train the adapter on this (big) model itself "
@@ -197,19 +344,46 @@ def build(
     notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when "
                                                       "done or stopped"),
     quiet: bool = typer.Option(False, "--quiet", help="one progress line per stage"),
+    state: str = typer.Option(None, "--state", help="portable build state: a path, s3://, gs://, "
+                                                    "az:// (default: <folder>/.build/); the build "
+                                                    "continues from it on any machine and engine"),
+    engine: str = typer.Option(None, "--engine", help="mlx | torch-cpu | torch-cuda "
+                                                      "(default: chosen from the hardware)"),
+    headless: bool = typer.Option(False, "--headless", help="JSON-lines events on stdout, exit "
+                                                            "75 when preempted (automatic when "
+                                                            "stdout is not a terminal)"),
+    config: Path = typer.Option(None, "--config", help="run the invocation stored in this "
+                                                       "job.json"),
+    emit_config: Path = typer.Option(None, "--emit-config", help="write this invocation to "
+                                                                 "job.json and exit"),
+    table: bool = typer.Option(False, "--table", help="print the table of a finished or "
+                                                       "stopped build from its state (which "
+                                                       "engine, machine and OS made each stage) "
+                                                       "and exit"),
+    reference: str = typer.Option(None, "--reference", help="with --table: the state of an "
+                                                            "uninterrupted build, for a "
+                                                            "reference column"),
+    stop_after: str = typer.Option(None, "--stop-after", hidden=True),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
-    """Build your own model from a folder: distill, tune, eval, one table."""
+    """Build your own model from a folder: distill, tune, eval, one table. Runs on MLX on
+    Apple silicon and on PyTorch (CPU or CUDA) everywhere else."""
     import streamweights.cli as cli
     cli._DEBUG = debug
-    try:
-        platforms.require_mlx("build")
-        do_build(folder, student, teacher, base, list(compare or []), weight_own, epochs,
-                 notify, quiet)
-    except typer.Exit:
-        raise
-    except Exception as e:
-        _fail(e)
+    if table:
+        try:
+            _print_table(folder, state, reference)
+        except Exception as e:
+            _fail(e)
+        return
+    with runtime.job_session("build", engine=engine, headless_flag=headless):
+        try:
+            do_build(folder, student, teacher, base, list(compare or []), weight_own, epochs,
+                     notify, quiet, state=state, stop_after=stop_after)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
 
 
 def _ollama_name(base: str, adapter_id: str) -> str:
@@ -314,10 +488,17 @@ def _model_dir(base: str) -> Path:
 
 @app.command(short_help="Check this machine and what it can run overnight",
              epilog="Example: spill doctor")
-def doctor(debug: bool = typer.Option(False, "--debug", hidden=True)):
+def doctor(engines: bool = typer.Option(False, "--engines", hidden=True),
+           debug: bool = typer.Option(False, "--debug", hidden=True)):
     """One screen: chip, memory, disk, models, interrupted jobs, what runs overnight."""
     import streamweights.cli as cli
     cli._DEBUG = debug
+    if engines:                     # one usable engine per line, best first (used by relay.sh)
+        avail = engine_select.availability()
+        for name in ("mlx", "torch-cuda", "torch-cpu"):
+            if avail[name][0]:
+                typer.echo(name)
+        return
     try:
         _doctor_impl()
     except Exception as e:
@@ -362,9 +543,11 @@ def _doctor_impl():
 @app.command(short_help="Create a ready-to-run example folder",
              epilog="Example: spill example banking77 --quick")
 def example(
-    name: str = typer.Argument("banking77", help="which example (banking77)"),
+    name: str = typer.Argument("banking77", help="which example (banking77, relay)"),
     quick: bool = typer.Option(False, "--quick", help="the under-an-hour variant: 100 evals, "
                                                       "500 train rows, student qwen2.5:0.5b"),
+    tiny: bool = typer.Option(False, "--tiny", help="the CI-sized variant: 20 evals, 100 train "
+                                                    "rows over 10 intents, student qwen2.5:0.5b"),
     force: bool = typer.Option(False, "--force", help="write into a folder that already exists"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
@@ -373,10 +556,9 @@ def example(
     from . import example as ex
     cli._DEBUG = debug
     try:
-        folder = ex.create(name, quick, Path("."), force)
+        folder = ex.create(name, quick, Path("."), force, tiny)
         files = sorted(p.name for p in folder.iterdir())
         typer.echo(f"created {folder}/ with {', '.join(files)}")
-        _next_hint(f"spill build {folder}" if platforms.mlx_available()
-                   else f"spill check {folder}/evals.jsonl")
+        _next_hint(f"{folder}/relay.sh" if name == "relay" else f"spill build {folder}")
     except Exception as e:
         _fail(e)

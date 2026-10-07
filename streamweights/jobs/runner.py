@@ -39,8 +39,8 @@ def result_row(cr: CompletedRow, job: Job, engine_name: str,
             "tokens": {"prompt": cr.prompt_tokens, "completion": cr.completion_tokens},
             "latency_s": cr.latency_s,
             **({"provenance": prov} if prov else {}),
-            **({"hardware": producer["hardware"], "numerics": producer["numerics"]}
-               if producer else {}),
+            **({k: producer[k] for k in ("hardware", "numerics", "host", "system", "os")
+                if k in producer} if producer else {}),
         },
     }
     if cr.logprobs is not None:
@@ -53,9 +53,12 @@ def result_row(cr: CompletedRow, job: Job, engine_name: str,
 def producer_of(engine, spec: ModelSpec) -> dict:
     """What produces a row: engine, hardware, numerics (stamped on every result row and on
     every pushed segment of portable state)."""
+    from .. import machine
     d = engine.describe(spec) if hasattr(engine, "describe") else {}
+    m = machine.info()
     return {"engine": engine.name, "hardware": d.get("device", "unknown"),
-            "numerics": d.get("numerics", {"base": spec.quant})}
+            "numerics": d.get("numerics", {"base": spec.quant}),
+            "host": m["host"], "system": m["system"], "os": f"{m['os']} {m['arch']}"}
 
 
 def _attach_state(job: Job, spec: ModelSpec, producer: dict):

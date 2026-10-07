@@ -58,9 +58,11 @@ def _unpack(data: bytes) -> dict[str, np.ndarray]:
 
 def producer(engine: str, device: str, numerics: dict, step_from: int, step_to: int) -> dict:
     """What produced a range of steps (or rows): engine, hardware, numerics."""
+    from .. import machine
+    m = machine.info()
     return {"range": [step_from, step_to], "engine": engine, "hardware": device,
-            "numerics": numerics, "host": platform.node(),
-            "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+            "numerics": numerics, "host": m["host"], "system": m["system"],
+            "os": f"{m['os']} {m['arch']}", "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
 
 
 def extend_history(history: list[dict], new: dict) -> list[dict]:

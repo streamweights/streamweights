@@ -1,4 +1,4 @@
-"""Platforms without MLX: install works, MLX-only commands say so in one line, doctor says
+"""Platforms without MLX: install works, build runs on the PyTorch engines, doctor says
 what works, export runs on numpy, and every error is one line ending in a command."""
 
 import subprocess
@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 from streamweights import doctor, safetensors_np as snp
 from streamweights.cli import app
 from streamweights.errors import SpillError
-from streamweights.platforms import NOT_YET, WORKS_TODAY
+from streamweights.platforms import WORKS_TODAY
 
 R = CliRunner()
 
@@ -21,14 +21,13 @@ def no_mlx(monkeypatch):
     monkeypatch.setenv("SPILL_NO_MLX", "1")
 
 
-@pytest.mark.parametrize("args", [["build", "x"]])
-def test_mlx_only_commands_print_one_line(no_mlx, args):
-    r = R.invoke(app, args)
+def test_build_needs_no_mlx(no_mlx, tmp_path):
+    """build is not an MLX-only command any more: on a machine without MLX it gets as far as
+    reading the folder, and its one-line errors are about the folder."""
+    r = R.invoke(app, ["build", str(tmp_path / "nothing")])
     assert r.exit_code == 1
     out = r.output.strip()
-    assert out.count("\n") == 0 and out.startswith("spill: spill " + args[0] + " needs Apple silicon")
-    assert WORKS_TODAY in out and NOT_YET in out and "README" in out
-    assert out.endswith("Try: spill doctor")
+    assert out.count("\n") == 0 and "Apple silicon" not in out and "Try: spill" in out
 
 
 def test_doctor_names_the_platform_when_there_is_no_mlx():
@@ -38,7 +37,7 @@ def test_doctor_names_the_platform_when_there_is_no_mlx():
                          interrupted_lines=[], version="0.1.0", mlx=False)
     assert "no Metal" in text and "Metal working set" not in text
     last = text.splitlines()[-1]
-    assert last.startswith("platform") and WORKS_TODAY in last and NOT_YET in last
+    assert last.startswith("platform") and WORKS_TODAY in last and "build" in last
     assert "overnight" not in text and "training" not in text
 
 

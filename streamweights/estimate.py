@@ -55,6 +55,49 @@ def achieved_tflops(cal: dict) -> tuple[float, str]:
     return DEFAULT_TFLOPS, "assumed, nothing measured yet"
 
 
+def tflops_for(cal: dict, engine: str | None, tag: str) -> tuple[float, str]:
+    """Achieved TFLOP/s for this engine and model. MLX keeps the machine-wide figure from
+    `spill tune`; a torch engine uses its own measured tune rate for this model, else its
+    matmul rate (spill doctor) x 0.5, else the assumption. Rates are kept per engine."""
+    if not engine or engine == "mlx":
+        return achieved_tflops(cal)
+    own = [v for k, v in (cal.get("tune_rates") or {}).items()
+           if k.startswith(f"{tag}|{engine}|")]
+    if own:
+        return max(own) / 1e12, f"measured by spill tune on {engine}"
+    peak = (cal.get("engine_tflops") or {}).get(engine)
+    if peak:
+        return float(peak) * 0.5, f"{engine} matmul rate x 0.5"
+    return DEFAULT_TFLOPS, "assumed, nothing measured yet"
+
+
+MIN_RATIO_EST_S = 30.0
+RATIO_MIN, RATIO_MAX = 0.2, 5.0
+
+
+def stage_ratio(cal: dict, engine: str | None, tag: str, kind: str) -> tuple[float, int]:
+    """(actual / estimated, samples) from earlier builds of this model on this engine."""
+    r = (cal.get("stage_ratios") or {}).get(f"{engine or 'mlx'}|{tag}|{kind}")
+    return (float(r["ratio"]), int(r.get("n", 1))) if r else (1.0, 0)
+
+
+def record_stage_ratio(cal: dict, engine: str | None, tag: str, kind: str, est_s: float,
+                       actual_s: float) -> None:
+    """Keep a running ratio of measured to estimated seconds per engine, model and stage
+    kind, so the next build's estimate starts from what this machine did."""
+    if est_s < MIN_RATIO_EST_S or actual_s <= 0:       # model load and launch overhead dominate
+        return                                         # a stage this short; it says nothing
+    key = f"{engine or 'mlx'}|{tag}|{kind}"
+    cur = (cal.setdefault("stage_ratios", {})).get(key)
+    new = min(RATIO_MAX, max(RATIO_MIN, actual_s / est_s))
+    if cur:
+        n = int(cur.get("n", 1))
+        new = (cur["ratio"] * n + new) / (n + 1)
+        cal["stage_ratios"][key] = {"ratio": round(new, 4), "n": n + 1}
+    else:
+        cal["stage_ratios"][key] = {"ratio": round(new, 4), "n": 1}
+
+
 def params_b(tag: str, size_bytes: int | None = None) -> float:
     if tag in PARAMS_B:
         return PARAMS_B[tag]
@@ -135,11 +178,27 @@ def decode_batch(tag: str, wl: Workload, working_set: int, reuse: bool) -> int:
     return int(max(1, min(512, avail // max(per_row, 1))))
 
 
+def engine_pass_s(cal: dict, engine: str | None, tag: str, resident: bool,
+                  read_rate: float | None = None) -> float:
+    """Seconds per full weight pass on `engine`: memory-bound when resident, disk-bound when
+    streamed. MLX uses the Phase 1 figures; a torch engine its measured memory bandwidth
+    (x 0.5 for attention, norms and launch overhead) or the probed read rate."""
+    if not engine or engine == "mlx":
+        return (model_bytes(tag) / RESIDENT_BYTES_PER_S) if resident else stream_pass_s(cal, tag)
+    if resident:
+        bw = ((cal.get("engine_membw_gbs") or {}).get(engine) or 20.0) * 1e9 * 0.5
+        return model_bytes(tag) / bw
+    own = (cal.get("engine_rates") or {}).get(f"{tag}|bf16|{engine}")
+    rate = own * 1024 * 1024 if own else (read_rate or 2e9)
+    return model_bytes(tag) / rate
+
+
 def eval_seconds(tag: str, wl: Workload, cal: dict, working_set: int, tflops: float,
-                 reuse: bool = True, adapter: bool = False) -> StageEstimate:
+                 reuse: bool = True, adapter: bool = False, engine: str | None = None,
+                 read_rate: float | None = None) -> StageEstimate:
     resident = fits_resident(tag, working_set)
     batch = decode_batch(tag, wl, working_set, reuse)
-    pass_s = (model_bytes(tag) / RESIDENT_BYTES_PER_S) if resident else stream_pass_s(cal, tag)
+    pass_s = engine_pass_s(cal, engine, tag, resident, read_rate)
     prefill_tokens = wl.rows * wl.suffix_tokens + (wl.prefix_tokens if reuse
                                                    else wl.rows * wl.prefix_tokens)
     pre = prefill_s(tag, prefill_tokens, tflops)
@@ -147,31 +206,46 @@ def eval_seconds(tag: str, wl: Workload, cal: dict, working_set: int, tflops: fl
     dec = chunks * (wl.out_tokens + 1) * pass_s
     # streamed: each chunk's prefill rides on the first pass; the weight stream is the floor
     total = pre + dec
+    ratio, n = stage_ratio(cal, engine, tag, "eval")
+    if n:
+        total *= ratio
     detail = (f"{wl.rows} rows, batch {batch}, {'resident' if resident else 'streamed'}: "
               f"prefill {fmt_dur(pre)} ({prefill_tokens:,.0f} tokens"
               f"{', shared prefix once' if reuse and wl.prefix_tokens else ''}) + "
               f"decode {fmt_dur(dec)} ({chunks} x {wl.out_tokens + 1:.0f} passes x "
-              f"{pass_s:.2f} s)")
+              f"{pass_s:.2f} s)" + (f", x{ratio:.2f} measured on {engine}" if n else ""))
     return StageEstimate(total, detail, {"prefill_s": pre, "decode_s": dec, "batch": batch,
                                          "pass_s": pass_s, "prefill_tokens": prefill_tokens})
 
 
 def tune_seconds(tag: str, tokens: float, epochs: float, tflops: float, cal: dict,
-                 working_set: int, steps: int | None = None) -> StageEstimate:
+                 working_set: int, steps: int | None = None, engine: str | None = None,
+                 read_rate: float | None = None) -> StageEstimate:
     resident = fits_resident(tag, working_set)
-    own = (cal.get("tune_rates") or {}).get(f"{tag}|{'resident' if resident else 'streamed'}")
+    path = "resident" if resident else "streamed"
+    own = None
+    if not engine or engine == "mlx":
+        own = (cal.get("tune_rates") or {}).get(f"{tag}|{path}")
+    else:
+        own = (cal.get("tune_rates") or {}).get(f"{tag}|{engine}|{path}")
     if own:                      # this model's own measured rate beats the machine-wide one
         tflops = own / 1e12
     compute = train_s(tag, tokens, tflops, epochs)
+    if engine and engine != "mlx" and not own:
+        compute = compute * 4 / 6 if resident else compute      # resident: no recompute
     stream = 0.0
     if not resident:
         # two weight streams per optimizer step on the streamed path
         steps = steps or max(1, int(tokens * epochs / 8192))
-        stream = steps * 2 * stream_pass_s(cal, tag)
+        stream = steps * 2 * engine_pass_s(cal, engine, tag, False, read_rate)
     total = max(compute, stream) if stream else compute
+    ratio, n = stage_ratio(cal, engine, tag, "tune")
+    if n:
+        total *= ratio
     detail = (f"{tokens * epochs:,.0f} token-passes x 6 x {params_b(tag):.2f}B params / "
               f"{tflops:.3g} TFLOP/s = {fmt_dur(compute)}"
-              + (f"; weight streams floor {fmt_dur(stream)}" if stream else ""))
+              + (f"; weight streams floor {fmt_dur(stream)}" if stream else "")
+              + (f", x{ratio:.2f} measured on {engine}" if n else ""))
     return StageEstimate(total, detail, {"compute_s": compute, "stream_s": stream})
 
 

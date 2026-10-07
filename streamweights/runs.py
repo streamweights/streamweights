@@ -223,8 +223,10 @@ def list_runs() -> list[dict]:
 
 
 def find_cached(model: str, quant: str | None, adapter_hash: str | None,
-                in_hash: str, options_key: dict | None = None) -> dict | None:
-    """A finished run for exactly this model, quant, adapter and input hash."""
+                in_hash: str, options_key: dict | None = None,
+                engine_family: str | None = None) -> dict | None:
+    """A finished run for exactly this model, quant, adapter and input hash (and, when
+    `engine_family` is "mlx" or "torch", one that family produced)."""
     for m in reversed(list_runs()):
         if m.get("kind") != "run" or m.get("status") != "completed":
             continue
@@ -237,6 +239,9 @@ def find_cached(model: str, quant: str | None, adapter_hash: str | None,
         if m["input"]["sha256"] != in_hash:
             continue
         if m.get("rows_done") != m["input"]["rows"]:
+            continue
+        if engine_family and not str((m.get("engine") or {}).get("name", "")
+                                     ).startswith(engine_family):
             continue
         if options_key is not None and any(
                 m.get("options", {}).get(k) != v for k, v in options_key.items()):

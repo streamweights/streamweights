@@ -17,10 +17,12 @@ The files present decide the path:
   --base M      train the adapter on M itself (a big model) instead of the student
   --compare M   add M's score to the table
 
-State lives in <folder>/.build/state.json, so `spill resume <folder>` (or running the
-same build again) continues at the first unfinished stage. A build is a plan of stages;
-what a stage does is the Backend's job (the real one calls the same code as
-`spill distill`, `spill tune` and `spill eval`; tests use a fake).
+State is portable (portable/build_state.py): <folder>/.build/ by default, or `--state <uri>`.
+`spill resume <folder>` (or running the same build again, on this machine or another, on any
+engine) continues at the first unfinished stage, and inside a stage at the row or step where it
+stopped. A build is a plan of stages; what a stage does is the Backend's job (the real one runs
+the same engine-selected code as `spill distill`, `spill tune` and `spill eval`; tests use a
+fake). Nothing here imports MLX or PyTorch.
 """
 
 from __future__ import annotations
@@ -34,8 +36,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import estimate as est
-from . import formats
+from . import formats, machine
 from .errors import SpillError
+from .portable.build_state import BuildState, tree_sha
 
 DEFAULT_STUDENT = "qwen2.5:7b"
 DEFAULT_TEACHER = "llama3.3:70b"
@@ -44,6 +47,7 @@ SHORT_EXPECTED_CHARS = 64          # "classification-style": every expected valu
 SHORT_EXPECTED_WORDS = 8
 CLASSIFICATION_MAX_TOKENS = 16
 DEFAULT_MAX_TOKENS = 128
+LONG_RUN_S = 24 * 3600
 INSTRUCTIONS = "instructions.txt"
 SETTINGS = "spill.json"            # optional per-folder defaults: {"student": "qwen2.5:0.5b"}
 STATE_DIR = ".build"
@@ -100,6 +104,8 @@ class Stage:
     status: str = "pending"          # pending | running | done | interrupted
     actual_s: float | None = None
     result: dict = field(default_factory=dict)
+    producers: list = field(default_factory=list)   # engine, hardware, OS, numerics that ran it
+    resumed: bool = False            # started in an earlier session (its time is partial)
 
 
 @dataclass
@@ -120,10 +126,18 @@ class Plan:
     total_s: float
     epochs: float = DEFAULT_EPOCHS
     extra: dict = field(default_factory=dict)
+    engine: str = "mlx"              # mlx | torch-cpu | torch-cuda: what this session runs on
+    why: str = ""                    # why these models (hardware-aware defaults)
+    forced: list = field(default_factory=list)      # roles the user named: student, teacher
+    state: BuildState | None = None  # None: <folder>/.build/
+    cal: dict = field(default_factory=dict)
 
     @property
     def tuned_model(self) -> str:
         return self.base or self.student
+
+    def build_state(self) -> BuildState:
+        return self.state or BuildState(self.folder.state_dir)
 
 
 def path_kind(f: Folder) -> str:
@@ -284,24 +298,28 @@ def train_tokens(path: Path, reps: float = 1.0) -> float:
 
 def make_plan(folder: Folder, student: str, teacher: str, base: str | None,
               compare: list[str], weight_own: float, cal: dict, working_set: int,
-              epochs: float = DEFAULT_EPOCHS) -> Plan:
+              epochs: float = DEFAULT_EPOCHS, engine: str = "mlx",
+              read_rate: float | None = None) -> Plan:
     kind = path_kind(folder)
     classification = is_classification(folder.evals)
     max_tokens = classification_max_tokens(folder.evals) if classification else DEFAULT_MAX_TOKENS
-    tf, tf_src = est.achieved_tflops(cal)
     tuned = base or student
+    tf, tf_src = est.tflops_for(cal, engine, tuned)
     ins = folder.instructions
     ev_wl_untrained = workload(folder.evals, ins, max_tokens, classification)
     ev_wl_student = workload(folder.evals, None, max_tokens, classification)
     stages: list[Stage] = []
 
     def eval_stage(sid, label, model, wl, adapter=False):
-        e = est.eval_seconds(model, wl, cal, working_set, tf, reuse=True, adapter=adapter)
+        e = est.eval_seconds(model, wl, cal, working_set, est.tflops_for(cal, engine, model)[0],
+                             reuse=True, adapter=adapter, engine=engine, read_rate=read_rate)
         stages.append(Stage(sid, "eval", label, model, e.seconds, e.detail))
 
     if kind in ("prompts", "both"):
         wl = workload(folder.prompts, ins, max_tokens, classification)
-        e = est.eval_seconds(teacher, wl, cal, working_set, tf, reuse=True)
+        e = est.eval_seconds(teacher, wl, cal, working_set,
+                             est.tflops_for(cal, engine, teacher)[0], reuse=True, engine=engine,
+                             read_rate=read_rate)
         stages.append(Stage("distill", "distill", f"teacher {teacher} answers prompts.jsonl",
                             teacher, e.seconds, e.detail))
     elif kind == "train":
@@ -315,7 +333,8 @@ def make_plan(folder: Folder, student: str, teacher: str, base: str | None,
         n_p = len(_rows(folder.prompts))
         wl = workload(folder.prompts, None, max_tokens, classification)
         tune_tokens += n_p * (wl.prefix_tokens + wl.suffix_tokens + wl.out_tokens + 12)
-    t = est.tune_seconds(tuned, tune_tokens, epochs, tf, cal, working_set)
+    t = est.tune_seconds(tuned, tune_tokens, epochs, tf, cal, working_set, engine=engine,
+                         read_rate=read_rate)
     stages.append(Stage("tune", "tune", f"tune {tuned} -> {tuned}+{folder.name}", tuned,
                         t.seconds, t.detail))
 
@@ -333,10 +352,11 @@ def make_plan(folder: Folder, student: str, teacher: str, base: str | None,
     # teacher stage is the long pole and must come first (the student is trained on it)
     total = sum(s.est_s for s in stages)
     return Plan(folder, kind, student, teacher, base, compare, weight_own, folder.name,
-                max_tokens, classification, stages, tf, tf_src, total, epochs)
+                max_tokens, classification, stages, tf, tf_src, total, epochs, engine=engine,
+                cal=cal)
 
 
-def pre_run_line(plan: Plan, on_battery: bool = False) -> str:
+def pre_run_line(plan: Plan, on_battery: bool = False, state_note: str | None = None) -> str:
     kinds = {"train": "train only (your answers)",
              "prompts": "prompts only (the teacher's answers)",
              "both": f"both (your answers weighted {plan.weight_own:g}:1 with the "
@@ -349,12 +369,19 @@ def pre_run_line(plan: Plan, on_battery: bool = False) -> str:
           else f" max_tokens {plan.max_tokens}.")
     stages = "; ".join(f"{i + 1} {s.label} {est.fmt_dur(s.est_s)}"
                        for i, s in enumerate(plan.stages))
+    where = f" on {plan.engine}" if plan.engine else ""
     line = (f"spill build {plan.folder.name}: path {kinds[plan.path_kind]}. Models: "
-            f"{', '.join(models)}.{mt} Stages: {stages} (at {plan.tflops:.3g} TFLOP/s, "
+            f"{', '.join(models)}{where}.{mt} Stages: {stages} (at {plan.tflops:.3g} TFLOP/s, "
             f"{plan.tflops_src}; decode disk-bound, prefill 2 x params x tokens, training "
             f"6 x params x tokens). Est. {est.fmt_dur(plan.total_s)}. Cost: $0. "
-            f"Adapter -> {plan.adapter_name} (spill adapters), files in "
-            f"{plan.folder.path.name}/.build/")
+            f"Adapter -> {plan.adapter_name} (spill adapters), state in "
+            f"{state_note or plan.folder.path.name + '/.build/'}")
+    if plan.why:
+        line += f" Why these models: {plan.why}."
+    long = [s for s in plan.stages if s.est_s > LONG_RUN_S]
+    if long:
+        line += (f" Note: {long[0].label} is estimated at {est.fmt_dur(long[0].est_s)}, over "
+                 f"24 h; going ahead as asked, and it resumes if you stop it.")
     if on_battery:
         line += " On battery: plug in before an overnight run."
     return line
@@ -367,7 +394,8 @@ def state_path(folder: Folder) -> Path:
 
 
 def inputs_fingerprint(plan: Plan) -> str:
-    """Everything a finished stage depends on: the files and the options that change output."""
+    """Everything a finished stage depends on: the files and the options that change output.
+    The engine is deliberately not part of it: a build moves between engines."""
     import hashlib
     f = plan.folder
     h = hashlib.sha256()
@@ -378,24 +406,40 @@ def inputs_fingerprint(plan: Plan) -> str:
     return h.hexdigest()
 
 
-def save_state(plan: Plan, extra: dict | None = None) -> None:
-    folder = plan.folder
-    folder.state_dir.mkdir(parents=True, exist_ok=True)
+def _doc(plan: Plan, extra: dict | None = None) -> dict:
     d = {"name": plan.adapter_name, "path": plan.path_kind, "student": plan.student,
          "teacher": plan.teacher, "base": plan.base, "compare": plan.compare,
          "weight_own": plan.weight_own, "max_tokens": plan.max_tokens,
          "classification": plan.classification, "tflops": plan.tflops,
          "tflops_source": plan.tflops_src, "total_est_s": plan.total_s,
-         "epochs": plan.epochs, "inputs": inputs_fingerprint(plan), "stages": [s.__dict__ for s in plan.stages],
+         "epochs": plan.epochs, "inputs": inputs_fingerprint(plan), "engine": plan.engine,
+         "machine": machine.info(), "artifacts": {},
+         "stages": [dict(s.__dict__) for s in plan.stages],
          "updated": time.strftime("%FT%T%z")}
+    if plan.state is not None:
+        d["state_uri"] = plan.state.uri
     d.update(plan.extra)
     d.update(extra or {})
-    tmp = state_path(folder).with_suffix(".tmp")
-    tmp.write_text(json.dumps(d, indent=2))
-    tmp.replace(state_path(folder))
+    return d
 
 
-def load_state(folder: Folder) -> dict | None:
+def save_state(plan: Plan, extra: dict | None = None) -> None:
+    """Write the portable state document (atomic: temp then rename locally, one put on an
+    object store). With `--state` elsewhere, a copy stays in <folder>/.build/ so
+    `spill resume <folder>` and the launch banner find the build."""
+    doc = _doc(plan, extra)
+    plan.build_state().write(doc)
+    if plan.state is not None:
+        mirror = state_path(plan.folder)
+        mirror.parent.mkdir(parents=True, exist_ok=True)
+        tmp = mirror.with_suffix(".tmp")
+        tmp.write_text(json.dumps(doc, indent=2))
+        tmp.replace(mirror)
+
+
+def load_state(folder: Folder, state: BuildState | None = None) -> dict | None:
+    if state is not None:
+        return state.read()
     p = state_path(folder)
     if p.exists():
         try:
@@ -406,7 +450,8 @@ def load_state(folder: Folder) -> dict | None:
 
 
 def apply_state(plan: Plan, state: dict) -> bool:
-    """Carry finished stages over from a previous attempt (same plan only)."""
+    """Carry finished stages over from a previous attempt (same plan only), whatever engine or
+    machine ran them."""
     same = (state.get("path") == plan.path_kind and state.get("student") == plan.student
             and state.get("teacher") == plan.teacher and state.get("base") == plan.base
             and state.get("compare") == plan.compare
@@ -417,15 +462,113 @@ def apply_state(plan: Plan, state: dict) -> bool:
     for s, old in zip(plan.stages, state["stages"]):
         s.status = "done" if old["status"] == "done" else (
             "pending" if old["status"] == "running" else old["status"])
+        s.resumed = old["status"] in ("running", "interrupted") or old.get("resumed", False)
         s.actual_s, s.result = old.get("actual_s"), old.get("result", {})
+        s.producers = old.get("producers", [])
+    plan.extra["artifacts"] = dict(state.get("artifacts") or {})
     return True
+
+
+# ------------------------------------------------------------ provenance
+
+_ENGINE_OF = {"mlx": "mlx", "mlx_stream": "mlx", "mlx_resident": "mlx",
+              "mlx_stream_tune": "mlx", "mlx_lm_lora": "mlx"}
+
+
+def engine_label(name: str | None, hardware: str | None) -> str:
+    """The user-facing engine (mlx, torch-cpu, torch-cuda) for a producer record."""
+    if name in _ENGINE_OF:
+        return "mlx"
+    if name in ("mlx", "torch-cpu", "torch-cuda"):
+        return name
+    hw = (hardware or "").lower()
+    if (name or "").startswith("torch"):
+        return "torch-cuda" if hw.startswith("cuda") else "torch-cpu"
+    return name or "?"
+
+
+def numerics_label(n: dict | None) -> str:
+    if not n:
+        return "-"
+    base = n.get("base") or n.get("dtype") or "?"
+    ad = n.get("adapter")
+    return f"{base} base" + (f", {ad} adapter" if ad else "")
+
+
+def normalize_producers(items: list[dict] | None) -> list[dict]:
+    out = []
+    for p in items or []:
+        q = dict(p)
+        q["engine"] = engine_label(p.get("engine"), p.get("hardware"))
+        out.append(q)
+    return out
+
+
+def local_producer(engine: str, quanta: int | None = None) -> dict:
+    m = machine.info()
+    return {"engine": engine, "hardware": "unknown", "numerics": {},
+            "host": m["host"], "system": m["system"], "os": f"{m['os']} {m['arch']}",
+            "quanta": quanta}
+
+
+def where(producers: list[dict]) -> str:
+    """'mlx on macOS arm64', or 'mlx on macOS arm64 -> torch-cpu on Linux x86_64'."""
+    seen, parts = set(), []
+    for p in producers:
+        t = f"{p.get('engine', '?')} on {p.get('os', '?')}"
+        if t not in seen:
+            seen.add(t)
+            parts.append(t)
+    return " -> ".join(parts) if parts else "-"
+
+
+# ------------------------------------------------------------ artifacts that travel
+
+def _file_sha(p: Path) -> str:
+    import hashlib
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def distill_file(folder: Folder) -> Path:
+    return folder.path / "prompts.distill.jsonl"
+
+
+def sync_out(plan: Plan, st: Stage) -> None:
+    """After a stage: copy what the next stages need into the state, so another machine finds it."""
+    bs = plan.build_state()
+    art = plan.extra.setdefault("artifacts", {})
+    if st.kind == "distill" and distill_file(plan.folder).exists():
+        art["distill"] = bs.put_file("files/prompts.distill.jsonl", distill_file(plan.folder))
+    elif st.kind == "tune":
+        from .adapters import ADAPTERS_DIR
+        d = ADAPTERS_DIR / plan.adapter_name
+        if d.is_dir():
+            art["adapter"] = bs.put_dir(f"adapters/{plan.adapter_name}", d)
+
+
+def sync_in(plan: Plan, st: Stage) -> None:
+    """Before a stage: make sure the files it reads are here, from the state when this
+    machine does not have them or has different ones."""
+    bs = plan.build_state()
+    art = plan.extra.get("artifacts") or {}
+    if st.kind == "tune" and "distill" in art:
+        out = distill_file(plan.folder)
+        if not out.exists() or _file_sha(out) != art["distill"]["sha256"]:
+            bs.get_file(art["distill"]["name"], out)
+    if st.id == "eval:tuned" and "adapter" in art:
+        from .adapters import ADAPTERS_DIR
+        local = ADAPTERS_DIR / plan.adapter_name
+        if not local.is_dir() or tree_sha(local) != art["adapter"]["sha256"]:
+            shutil.rmtree(local, ignore_errors=True)
+            bs.get_dir(art["adapter"]["name"], local)
 
 
 # ------------------------------------------------------------ backends
 
 class Backend:
     """What a stage does. The real backend (RealBackend) runs the engines; tests
-    substitute a fake."""
+    substitute a fake. A stage runs with runtime.ENV.state pointing at its own place in the
+    build's state, so running it again, here or on another machine, continues it."""
 
     def distill(self, teacher: str, prompts: Path, out: Path, max_tokens: int,
                 resume_job: str | None) -> dict:
@@ -447,21 +590,41 @@ class BuildResult:
     interrupted: bool
     tuned_label: str
     wall_s: float
+    stopped_early: bool = False
+
+
+def parse_stop(spec: str | None) -> tuple[str | None, int | None]:
+    """`--stop-after tune:20` -> ('tune', 20); `eval:base` -> ('eval:base', None): stop inside
+    the stage after that many rows or steps, or after the stage."""
+    if not spec:
+        return None, None
+    head, sep, tail = spec.rpartition(":")
+    if sep and tail.isdigit():
+        return head, int(tail)
+    return spec, None
+
+
+def _stage_matches(st: Stage, key: str | None) -> bool:
+    return bool(key) and key in (st.id, st.kind)
 
 
 def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = None
              ) -> BuildResult:
+    from . import runtime
     f = plan.folder
     sd = f.state_dir
     sd.mkdir(parents=True, exist_ok=True)
+    bs = plan.build_state()
     ins = untrained_system(f)
     mt = plan.max_tokens
     ev_untrained = with_system(f.evals, ins, sd / "evals.untrained.jsonl", mt)
     ev_student = strip_system(f.evals, sd / "evals.student.jsonl", mt)
+    stop_key, stop_n = parse_stop(stop_after)
     table: list[dict] = []
     t_start = time.monotonic()
     interrupted = False
-    distill_out = f.path / "prompts.distill.jsonl"
+    stopped_early = False
+    distill_out = distill_file(f)
     train_file = sd / "train.build.jsonl"
     tuned = plan.tuned_model
     label = f"{tuned}+{plan.adapter_name}"
@@ -476,10 +639,21 @@ def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = N
             if st.kind == "eval" and st.result:
                 table.append(_table_row(st, roles))
             continue
+        if runtime.ENV.stop.is_set():          # told to stop between stages
+            interrupted = True
+            break
         say(f"stage {i + 1}/{len(plan.stages)}: {st.label}; estimate {est.fmt_dur(st.est_s)} "
-            f"({st.est_detail})")
+            f"({st.est_detail})"
+            + ("; continuing where it stopped" if st.resumed else ""))
         st.status = "running"
         save_state(plan)
+        sync_in(plan, st)
+        env = runtime.ENV
+        saved = (env.state, env.state_leaf, env.stop_after)
+        env.state, env.state_leaf = bs.stage_uri(st.id), None
+        if _stage_matches(st, stop_key) and stop_n:
+            env.stop_after = stop_n
+        env.stopped_early = False
         t0 = time.monotonic()
         try:
             if st.kind == "distill":
@@ -499,40 +673,74 @@ def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = N
             else:
                 model, _role, file = roles[st.id]
                 res = backend.eval(model, file, st.result.get("job_id"))
-                _write_out(f, model, res)
+                if not res.get("interrupted"):
+                    _write_out(f, model, res)
         except KeyboardInterrupt:
             res = {"interrupted": True}
+        except BaseException:                  # a preempted quantum, an error: keep what is done
+            st.status = "interrupted"
+            st.actual_s = round(time.monotonic() - t0, 1)
+            save_state(plan)
+            raise
+        finally:
+            env.state, env.state_leaf, env.stop_after = saved
         st.actual_s = round(time.monotonic() - t0, 1)
         if res.get("interrupted"):
             st.status = "interrupted"
-            st.result.update({k: v for k, v in res.items() if k != "interrupted"})
+            st.resumed = True
+            st.result.update({k: v for k, v in res.items()
+                              if k not in ("interrupted", "producers")})
+            st.producers = normalize_producers(res.get("producers"))
             save_state(plan)
             interrupted = True
+            stopped_early = runtime.ENV.stopped_early
             say(f"stage {i + 1} stopped after {est.fmt_dur(st.actual_s)}; nothing is lost")
             break
         st.status = "done"
-        st.result.update(res)
+        st.result.update({k: v for k, v in res.items() if k != "producers"})
+        st.producers = normalize_producers(res.get("producers")) or [local_producer(plan.engine)]
+        sync_out(plan, st)
         save_state(plan)
+        _record_ratio(plan, st)
         say(f"stage {i + 1} done in {est.fmt_dur(st.actual_s)} "
-            f"(estimate {est.fmt_dur(st.est_s)})"
+            f"(estimate {est.fmt_dur(st.est_s)}); {where(st.producers)}"
             + (f"; score {res['score']:.3f} on {res['rows']} rows" if st.kind == "eval" else ""))
         if st.kind == "eval":
             table.append(_table_row(st, roles))
-        if stop_after and st.id == stop_after:
-            interrupted = True
+        if stop_key and not stop_n and _stage_matches(st, stop_key):
+            interrupted = stopped_early = True
             break
     order = {"your model": 0, "base (untrained)": 1, "teacher": 2, "compare": 3}
     table.sort(key=lambda r: order.get(r["role"], 9))
-    save_state(plan, {"finished": not interrupted})
+    save_state(plan, {"finished": not interrupted, "table": table})
     return BuildResult(table, plan.stages, plan.adapter_name, interrupted, label,
-                       time.monotonic() - t_start)
+                       time.monotonic() - t_start, stopped_early)
+
+
+def _record_ratio(plan: Plan, st: Stage) -> None:
+    """Calibration per engine and model: measured over estimated seconds for a stage that ran
+    start to finish in this session."""
+    if st.resumed or not st.model or not st.actual_s or st.est_s <= 0:
+        return
+    try:
+        from .calibration import load_calibration, save_calibration
+        cal = load_calibration()
+        # undo the ratio already applied, so the stored figure is actual / model estimate
+        ratio, n = est.stage_ratio(cal, plan.engine, st.model, st.kind if st.kind != "distill"
+                                   else "eval")
+        raw_est = st.est_s / ratio if n and ratio else st.est_s
+        est.record_stage_ratio(cal, plan.engine, st.model,
+                               st.kind if st.kind != "distill" else "eval", raw_est, st.actual_s)
+        save_calibration(cal)
+    except OSError:
+        pass
 
 
 def _table_row(st: Stage, roles: dict) -> dict:
     model, role, _ = roles[st.id]
     return {"model": model, "role": role, "score": st.result["score"],
             "rows": st.result["rows"], "run_id": st.result.get("run_id"),
-            "stage": st.id}
+            "stage": st.id, "where": where(st.producers)}
 
 
 def _write_out(f: Folder, model: str, res: dict) -> None:
@@ -549,12 +757,17 @@ def _write_out(f: Folder, model: str, res: dict) -> None:
         shutil.copyfile(man, d / f"{safe}.manifest.json")
 
 
-def render_table(rows: list[dict]) -> str:
-    head = ["model", "role", "score", "rows"]
-    body = [[r["model"], r["role"], f"{r['score']:.3f}", str(r["rows"])] for r in rows]
-    w = [max(len(x[i]) for x in [head] + body) for i in range(4)]
-    fmt = lambda r: "  ".join(c.ljust(w[i]) for i, c in enumerate(r))
+def _grid(head: list[str], body: list[list[str]]) -> str:
+    w = [max(len(x[i]) for x in [head] + body) for i in range(len(head))]
+    fmt = lambda r: "  ".join(c.ljust(w[i]) for i, c in enumerate(r)).rstrip()
     return "\n".join([fmt(head)] + [fmt(b) for b in body])
+
+
+def render_table(rows: list[dict]) -> str:
+    head = ["model", "role", "score", "rows", "ran on"]
+    body = [[r["model"], r["role"], f"{r['score']:.3f}", str(r["rows"]), r.get("where", "-")]
+            for r in rows]
+    return _grid(head, body)
 
 
 def render_stages(stages: list[Stage]) -> str:
@@ -569,10 +782,42 @@ def render_stages(stages: list[Stage]) -> str:
     act_t = sum(s.actual_s or 0 for s in stages)
     body.append(["total", est.fmt_dur(est_t), est.fmt_dur(act_t),
                  f"{act_t / est_t:.2f}x" if est_t and act_t else "-"])
-    w = [max(len(r[i]) for r in [head] + body) for i in range(4)]
-    fmt = lambda r: "  ".join(c.ljust(w[i]) for i, c in enumerate(r))
-    return "\n".join([fmt(head)] + [fmt(b) for b in body])
+    return _grid(head, body)
+
+
+def render_provenance(stages: list[Stage]) -> str:
+    """Which engine, hardware, OS and numerics produced each stage."""
+    head = ["stage", "engine", "hardware", "os", "numerics", "quanta"]
+    body = []
+    for i, s in enumerate(stages, 1):
+        for p in (s.producers or [{}]):
+            q = p.get("quanta")
+            body.append([f"{i} {s.id}", p.get("engine", "-"), str(p.get("hardware", "-")),
+                         p.get("os", "-"), numerics_label(p.get("numerics")),
+                         str(q) if q is not None else "-"])
+    return _grid(head, body)
 
 
 def final_lines(res: BuildResult) -> list[str]:
     return [f"your model: {res.tuned_label}"]
+
+
+def table_from_state(doc: dict, ref: dict | None = None) -> str:
+    """The final table of a build, read off its state: for every stage the engine, machine
+    and OS that produced it (several, joined by ->, when it moved), and for every eval its
+    score, next to an uninterrupted reference build when one is given."""
+    ref_scores = {s["id"]: s.get("result", {}).get("score")
+                  for s in (ref or {}).get("stages", []) if s["kind"] == "eval"}
+    head = ["stage", "engine", "machine", "os", "score"] + (["reference"] if ref else [])
+    body = []
+    for i, s in enumerate(doc.get("stages", []), 1):
+        ps = s.get("producers") or []
+        uniq = lambda key: " -> ".join(dict.fromkeys(str(p.get(key, "?")) for p in ps)) or "-"
+        score = s.get("result", {}).get("score") if s["kind"] == "eval" else None
+        row = [f"{i} {s['label']}", uniq("engine"), uniq("host"), uniq("os"),
+               f"{score:.3f}" if score is not None else "-"]
+        if ref:
+            r = ref_scores.get(s["id"])
+            row.append(f"{r:.3f}" if r is not None else "-")
+        body.append(row)
+    return _grid(head, body)
