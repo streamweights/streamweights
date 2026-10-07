@@ -1,3 +1,7 @@
+---
+description: Phase 3 report: LoRA tuning streamed from disk matches resident tuning in float32, with a 70B smoke test at 4.55 TFLOP/s.
+---
+
 # Phase 3 report: spill tune
 
 Run 2026-10-04 and 2026-10-05, Apple M4 Pro (48 GB RAM, Metal working set 36 GiB).

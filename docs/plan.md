@@ -1,3 +1,7 @@
+---
+description: The streamweights technical plan: the loop, the developer-experience rules, the components, what is done and what comes next.
+---
+
 streamweights: technical plan (v4)
 
 Repo and package: streamweights. Command: spill. Local by default.

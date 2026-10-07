@@ -1,0 +1,61 @@
+site_name: streamweights
+site_description: >-
+  Build your own LLM from a 70B model bigger than your RAM: distill, LoRA fine-tune and
+  evaluate locally on Apple silicon (MLX) or Linux (PyTorch). Jobs checkpoint portably and
+  resume on any machine.
+site_url: https://streamweights.github.io/streamweights/
+repo_url: https://github.com/streamweights/streamweights
+repo_name: streamweights/streamweights
+edit_uri: edit/main/docs/
+docs_dir: docs
+use_directory_urls: true
+exclude_docs: |
+  paste-sets/
+  outreach/
+theme:
+  name: material
+  custom_dir: overrides
+  language: en
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+plugins:
+  - search
+nav:
+  - Home: index.md
+  - Guides:
+      - Fine-tune an LLM on a Mac: guides/finetune-llm-on-a-mac.md
+      - Run a 70B model on a 48 GB Mac: guides/run-a-70b-model-on-a-48gb-mac.md
+      - Distill a large model into a small one locally: guides/distill-a-large-model-locally.md
+      - LoRA fine-tuning without a big GPU: guides/lora-fine-tuning-without-a-big-gpu.md
+      - Resume a fine-tuning job on a different machine: guides/resume-fine-tuning-on-a-different-machine.md
+      - Run fine-tuning on spot instances with SkyPilot: guides/fine-tuning-on-spot-instances-with-skypilot.md
+  - Reports:
+      - reports/index.md
+      - Phase 0, mmap: reports/001-phase0.md
+      - Phase 1, streaming runner: reports/002-phase1.md
+      - Phase 1.5, correctness: reports/004-phase1.5.md
+      - Phase 1.6, proof run: reports/005-phase1.6.md
+      - Phase 2, the loop: reports/006-phase2.md
+      - Phase 2.5, long tail: reports/007-phase2.5.md
+      - Phase 3, tune: reports/008-phase3.md
+      - Phase 3.5, build: reports/009-phase3.5.md
+      - Cleanup: reports/010-cleanup.md
+      - Run anywhere: reports/012-run-anywhere.md
+  - Reference:
+      - Commands: cli.md
+      - Formats: formats.md
+      - Models: models.md
+      - Linux and other platforms: linux.md
+      - Portability: portability.md
+      - Schedulers: schedulers.md
+      - llama.cpp: llamacpp.md
+      - Plan: plan.md
+extra:
+  social_image: img/social-preview.png

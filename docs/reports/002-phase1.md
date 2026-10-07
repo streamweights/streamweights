@@ -1,3 +1,7 @@
+---
+description: Phase 1 report: the streaming runner reads a 141 GB Llama 3.3 70B model on a 48 GB Mac at 79.2% of the probed disk rate.
+---
+
 # Phase 1 report - streaming runner on MLX
 
 Run 2026-10-01/02, Apple M4 Pro (48 GB RAM, Metal working set ≈ 36 GiB, NVMe probed

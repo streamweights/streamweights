@@ -22,3 +22,7 @@ build/
 *.gguf
 nohup.out
 # Files over 10 MB are blocked by .githooks/pre-commit (gitignore cannot match by size).
+
+# generated docs-site home page (scripts/make_site_home.py) and the built site
+/docs/index.md
+/site/

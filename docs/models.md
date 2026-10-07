@@ -1,3 +1,7 @@
+---
+description: Models spill runs, with sizes and measured pass times: Qwen2.5 0.5B to 32B and Llama 3.3 70B in bf16 on a 48 GB Mac, plus supported architecture families.
+---
+
 # Models and architectures
 
 ## Curated tags
@@ -37,7 +41,7 @@ verified families except Gemma 2).
 
 Eval decode on a streamed model is disk-bound; prefill and training are compute-bound
 (2 and 6 times parameters times tokens, divided by achieved FLOP/s). Per-phase numbers live
-in the reports under [docs/reports](reports).
+in the reports under [docs/reports](reports/index.md).
 
 | model | quant | placement | workload | pass time | measured |
 |---|---|---|---|---|---|

@@ -1,3 +1,7 @@
+---
+description: Phase 2.5 report: long-tail engine fixes and a completed 2,000-row evaluation on Llama 3.3 70B bf16.
+---
+
 # Phase 2.5 report: long-tail engine fixes and the completed 2,000-row set
 
 Run 2026-10-03/04, Apple M4 Pro (48 GB RAM, Metal working set 36 GiB).

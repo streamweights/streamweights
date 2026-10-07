@@ -1,3 +1,7 @@
+---
+description: Phase 3.5 report: spill build, the banking77 example, GGUF export and shared-prefix reuse, measured on the 0.5B.
+---
+
 # Phase 3.5 report: spill build, the example, export, prefix reuse
 
 Run 2026-10-05, Apple M4 Pro (48 GB RAM, Metal working set 36 GiB), qwen2.5:0.5b only.

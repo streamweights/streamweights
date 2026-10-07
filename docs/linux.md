@@ -1,3 +1,7 @@
+---
+description: Run spill on Linux and NVIDIA with PyTorch: what is verified on CPU, what awaits verification on CUDA, and the one command to verify a GPU.
+---
+
 # Linux and other platforms
 
 Tracking issue: https://github.com/streamweights/streamweights/issues/1 (Linux support, CPU first, then NVIDIA). If you would run spill on Linux, comment there with the hardware you have: CPU model, RAM, disk, GPU if any, and what you would build.

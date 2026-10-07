@@ -1,3 +1,7 @@
+---
+description: Phase 1.5 report: correctness checks and memory headroom for the streaming runner.
+---
+
 # Phase 1.5 report - correctness and headroom
 
 Run 2026-10-02, Apple M4 Pro (48 GB RAM, Metal working set ≈ 36 GiB).

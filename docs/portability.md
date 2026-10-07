@@ -1,3 +1,7 @@
+---
+description: How a spill job moves between machines: the portable checkpoint, what it contains, its size, numerics across hardware and preemption behavior.
+---
+
 # Portability: what moves, and what it costs
 
 A `spill` job is a sequence of **quanta**. For training the quantum is one optimizer step. For

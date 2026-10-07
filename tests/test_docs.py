@@ -9,7 +9,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 README = (ROOT / "README.md").read_text()
-DOCS = [ROOT / "README.md", ROOT / "CLAUDE.md", *sorted((ROOT / "docs").glob("*.md")),
+GUIDES = sorted((ROOT / "docs/guides").glob("*.md"))
+DOCS = [ROOT / "README.md", ROOT / "CLAUDE.md", ROOT / "CONTRIBUTING.md",
+        *sorted((ROOT / "docs").glob("*.md")), *GUIDES,
+        *sorted((ROOT / "docs/outreach").glob("*.md")), ROOT / "docs/reports/index.md",
         *sorted((ROOT / "streamweights/data/examples").rglob("README.md"))]
 REPORTS = sorted((ROOT / "docs/reports").glob("*.md"))
 TRANSCRIPTS = sorted((ROOT / "docs/reports").glob("*.txt"))
@@ -18,6 +21,8 @@ PLACEHOLDERS = ("@@", "<!--TABLE-->", "TBD", "TODO", "FIXME", "XXX", "lorem", "p
 
 def test_no_placeholders_or_em_dashes():
     for p in DOCS:
+        if not p.exists():
+            continue
         text = p.read_text()
         for bad in PLACEHOLDERS:
             assert bad not in text, f"{bad!r} in {p}"
@@ -124,17 +129,19 @@ def _normalized(text: str) -> str:
     return text.replace("**", "")
 
 
-def test_every_number_in_the_readme_was_measured():
+def test_every_number_in_the_readme_and_guides_was_measured():
     corpus = _normalized("\n".join(p.read_text() for p in [*REPORTS, *TRANSCRIPTS])
                          + (ROOT / "docs/reports/data/calibration-m4pro.json").read_text())
-    for m in MEASURED.finditer(README):
-        num, unit = m.group(1), m.group(2)
-        token = f"{num} {unit}"
-        if token in SPEC or unit in ("rows", "steps"):
-            continue
-        assert (token in corpus or f"{num}{unit}" in corpus
-                or re.search(rf"\b{re.escape(num)}\s?{re.escape(unit)}\b", corpus)), \
-            f"README says {token!r}, which no report in docs/reports contains"
+    for page in (ROOT / "README.md", *GUIDES):
+        text = re.sub(r"\A---\n.*?\n---\n", "", page.read_text(), flags=re.S)
+        for m in MEASURED.finditer(text):
+            num, unit = m.group(1), m.group(2)
+            token = f"{num} {unit}"
+            if token in SPEC or unit in ("rows", "steps"):
+                continue
+            assert (token in corpus or f"{num}{unit}" in corpus
+                    or re.search(rf"\b{re.escape(num)}\s?{re.escape(unit)}\b", corpus)), \
+                f"{page.name} says {token!r}, which no report in docs/reports contains"
 
 
 def test_score_tables_match_the_quick_build_report():
@@ -192,3 +199,28 @@ def test_models_md_matches_spill_models():
         assert abs(float(row.group(3)) - float(bf16)) < 0.51, tag
         assert abs(float(row.group(4)) - float(q8)) < 0.51, tag
         assert row.group(5) == disk, tag
+
+
+def test_site_home_is_rendered_from_the_readme_with_working_links():
+    r = subprocess.run([sys.executable, str(ROOT / "scripts/make_site_home.py"), "--check"],
+                       capture_output=True, text=True, cwd=ROOT)
+    assert r.returncode == 0, r.stdout
+
+
+def test_guides_are_answer_shaped():
+    titles = ["Fine-tune an LLM on a Mac", "Run a 70B model on a 48 GB Mac",
+              "Distill a large model into a small one locally",
+              "LoRA fine-tuning without a big GPU",
+              "Resume a fine-tuning job on a different machine",
+              "Run fine-tuning on spot instances with SkyPilot"]
+    found = {}
+    for g in GUIDES:
+        text = g.read_text()
+        assert text.startswith("---\ndescription: "), g.name
+        title = re.search(r"^# (.+)$", text, re.M).group(1)
+        found[title] = text
+    assert sorted(found) == sorted(titles)
+    for title, text in found.items():
+        assert "## Try it" in text and "github.com/streamweights/streamweights" in text, title
+        opening = text.split("\n# ", 1)[1].split("\n\n", 2)[1]
+        assert len(re.findall(r"[.!?](?:\s|$)", opening)) == 2, f"{title}: two-sentence answer"

@@ -1,6 +1,10 @@
+---
+description: Run spill fine-tuning jobs under SkyPilot, Slurm and Kubernetes with an emitted config, a headless run and a resumable checkpoint.
+---
+
 # Running under a scheduler
 
-Three complete examples live in [examples/schedulers/](../examples/schedulers/): SkyPilot (a
+Three complete examples live in [examples/schedulers/](https://github.com/streamweights/streamweights/tree/main/examples/schedulers/): SkyPilot (a
 managed job on spot instances, any of H100, A100, L4, A10G or CPU only), Slurm (an sbatch script
 with `--requeue` and a SIGTERM handler) and Kubernetes (a Job with a PVC, `restartPolicy:
 OnFailure`, a CUDA image and a CPU variant). Each is a short README plus the files, validated

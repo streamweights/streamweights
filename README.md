@@ -106,7 +106,7 @@ The engines are thin: MLX on Apple silicon, PyTorch (Hugging Face transformers l
 
 ## Status and roadmap
 
-Done: run, distill, tune, eval, build and export on Apple silicon, and run-anywhere (portable jobs, the PyTorch engines, headless mode, containers, scheduler examples), with the CPU gates measured. Reports are in [docs/reports](docs/reports). The banking77 table for the 70B teacher and 7B student arrives with the full proof run. Next, in order: the verification batch (that proof run, the CUDA gates on a real GPU, a cross-cloud resume demo), then PyPI, then vision-language models, then mixture-of-experts. See [docs/plan.md](docs/plan.md).
+Done: run, distill, tune, eval, build and export on Apple silicon, and run-anywhere (portable jobs, the PyTorch engines, headless mode, containers, scheduler examples), with the CPU gates measured. Reports are in [docs/reports](docs/reports/index.md). The banking77 table for the 70B teacher and 7B student arrives with the full proof run. Next, in order: the verification batch (that proof run, the CUDA gates on a real GPU, a cross-cloud resume demo), then PyPI, then vision-language models, then mixture-of-experts. See [docs/plan.md](docs/plan.md).
 
 ## Feedback
 

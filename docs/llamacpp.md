@@ -1,3 +1,7 @@
+---
+description: The pinned llama.cpp release spill downloads for GGUF quants and conversion, and how it is verified.
+---
+
 # llama.cpp build in use
 
 Not vendored; prebuilt release downloaded into `bin/` (gitignored). Re-fetch with:

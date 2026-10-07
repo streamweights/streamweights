@@ -1,3 +1,7 @@
+---
+description: Every spill command with its real --help output, in the order you use them: build, example, run, distill, tune, eval, export, models, adapters, runs, status, tail, resume, doctor, check.
+---
+
 # Commands
 
 Generated from the real `--help` output by `scripts/make_cli_docs.py`; `tests/test_docs.py` fails if it is out of date. Commands are in the order you use them.

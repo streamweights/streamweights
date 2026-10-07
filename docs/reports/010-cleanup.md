@@ -1,3 +1,7 @@
+---
+description: Cleanup report: the merge, the usable repo and a timed fresh install.
+---
+
 # Cleanup report: merge, make the repo usable, verify a fresh install
 
 Run 2026-10-05, Apple M4 Pro, qwen2.5:0.5b only. Directive: `docs/paste-sets/010-cleanup.md`.

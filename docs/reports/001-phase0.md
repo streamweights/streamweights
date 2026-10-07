@@ -1,3 +1,7 @@
+---
+description: Phase 0 report: memory-mapping a model bigger than RAM reached only 11 to 13% of the disk rate, which is why spill streams layers in order.
+---
+
 > Names changed in 003: Spillway → streamweights, CLI → spill. Command names and the `spillway` result-metadata key below are the historical Phase 0 record (now `spill` / `streamweights`).
 # Phase 0 report - the wedge on mmap
 

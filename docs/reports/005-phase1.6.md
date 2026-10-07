@@ -1,3 +1,7 @@
+---
+description: Phase 1.6 report: the share-ready release and a measured partial proof run on the 70B.
+---
+
 # Phase 1.6 report: share-ready, then the proof run as a measured partial
 
 Run 2026-10-02/03, Apple M4 Pro (48 GB RAM, Metal working set 36 GiB).

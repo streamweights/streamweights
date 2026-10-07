@@ -1,3 +1,7 @@
+---
+description: Phase 2 report: distill, eval and adapters at inference, with measured rates on the 70B.
+---
+
 # Phase 2 report: the loop (distill, eval, adapters at inference)
 
 Run 2026-10-03, Apple M4 Pro (48 GB RAM, Metal working set 36 GiB).

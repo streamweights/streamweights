@@ -1,3 +1,7 @@
+---
+description: The JSONL formats spill reads and writes: plain eval, prompt and training rows, the OpenAI chat and batch shapes, and the result shape.
+---
+
 # Formats
 
 Every command reads JSONL, one JSON object per line. There are three plain row shapes, the
