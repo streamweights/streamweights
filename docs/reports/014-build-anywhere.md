@@ -79,7 +79,7 @@ The runs below are of `.github/workflows/relay.yml` and `ci.yml` on the branch's
 | relay.yml, including the Docker relay job | 9 min 27 s |
 | engine the macOS runner (macos-14) used | mlx: Metal was available, so the table records mlx on macOS arm64 |
 | Linux runner CPU | Intel Xeon 6973P-C, bf16 base weights on torch-cpu |
-| `spill example banking77 --tiny && spill build banking77-tiny` in ci.yml, Linux, Python 3.12 | 58 s |
+| `spill example banking77 --tiny && spill build banking77-tiny` in ci.yml, Linux, Python 3.12 | 58 s on the runner with the Xeon above (bf16), 206 s on a later run whose runner CPU had no fast bf16 (float32). GitHub's runners differ from run to run |
 | the reference job's uninterrupted tiny build, same workflow | 245.01 s |
 
 Relay results against the reference (base 0.400, your model 1.000 in this run):
@@ -90,3 +90,5 @@ Relay results against the reference (base 0.400, your model 1.000 in this run):
 | macOS to Linux (tune: mlx, then torch-cpu) | 0.400 | 0.950 | 0.05 | all six pass |
 
 Both are within the 0.15 tolerance; the claim is no tighter than that. The Docker relay job built the CPU image from the checkout, tagged it `ghcr.io/streamweights/spill:cpu`, started the tiny build on the host, stopped it 20 tune steps in, finished it in the container, and ran the reference; its transcript is the one in the relay example's README.
+
+The bf16 statistics test ran and passed on the runner with the Xeon above and was skipped, with its reason printed, on the later run's runner, whose CPU has no fast bf16 matmul. The full suite passed on Linux (Python 3.10 and 3.12) and on macOS: 293 passed in 24 min 35 s on macos-14 in the last run.
