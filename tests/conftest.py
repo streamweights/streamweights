@@ -17,6 +17,10 @@ if (_REPO / "models").exists():
 os.environ["SPILL_HOME"] = str(_home)
 # the suite parses human output through CliRunner (not a TTY); headless mode is tested explicitly
 os.environ["SPILL_HEADLESS"] = "0"
+# the torch engines pick bf16 on CPUs with fast bf16 matmul (AVX512-BF16, AMX) and float32
+# elsewhere; the identity tests compare against float32 references, so pin the numerics and
+# the result no longer depends on which CPU the runner landed on
+os.environ["SPILL_TORCH_DTYPE"] = "float32"
 GPU_TESTS = os.environ.get("SPILL_GPU_TESTS") == "1"     # opt in to Metal tests
 if not GPU_TESTS:
     os.environ["SPILL_DEVICE"] = "cpu"
