@@ -60,3 +60,8 @@ The product is the local half of building your own model: run, distill, tune, ev
 ## Where things are
 
 `docs/plan.md` (phases and what is next), `docs/linux.md` (the Linux and NVIDIA to-do), `docs/cli.md` (generated from `--help`), `docs/formats.md`, `docs/models.md`, `docs/reports/` (measured results per phase).
+
+## Run-anywhere principle
+
+The design principle: every job is a sequence of normalized quanta. For training, the quantum is one optimizer step. For run, distill and eval, it is one completed row. Any machine with a supported engine can execute the next quantum from a portable checkpoint.
+Engines are thin: MLX on Apple silicon, PyTorch everywhere else (CPU and CUDA). Streamweights owns only the streaming ring, the job layer, and the CLI.
