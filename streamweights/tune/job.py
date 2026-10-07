@@ -14,11 +14,10 @@ define a step's loss the same way (mean of its micro-batches' token-mean losses)
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import mlx.core as mx
@@ -29,47 +28,15 @@ from .. import adapters as adapters_mod
 from ..errors import SpillError
 from ..jobs.engine import Job
 from . import budget as bud
-from . import ckpt
 from . import lora as lo
+from .checkpointer import Checkpointer
 from .data import BatchPlan, DataStats, Example, load_examples, steps_for
+from .spec import TuneSpec, data_hash  # noqa: F401
 from .streamed import StreamedTrainer, make_optimizer, masked_ce
 
 GIB = 1024**3
 ASSUMED_FLOPS = 3.5e12          # effective bf16 flops/s until a run measures it
 RESIDENT_FRACTION = 0.35        # weights must be under this share of the working set
-
-
-@dataclass
-class TuneSpec:
-    model: str
-    quant: str
-    model_dir: str
-    data: str
-    name: str
-    path: str                     # resident | streamed
-    rank: int = 16
-    alpha: float = 32.0
-    dropout: float = 0.0
-    targets: list[str] | None = None
-    lr: float = 1e-4
-    weight_decay: float = 0.01
-    schedule: str = "cosine"
-    seed: int = 0
-    max_seq: int = 2048
-    micro_batch: int = 4
-    grad_accum: int = 1
-    steps: int = 1
-    epochs: float = 1.0
-    ckpt_every: int = 50
-    overwrite: bool = False
-    resident_weights: bool = False      # tests: streamed algorithm, weights in memory
-
-    def lora(self) -> lo.LoraConfig:
-        return lo.LoraConfig(self.rank, self.alpha, self.dropout, self.targets, self.lr,
-                             self.weight_decay, self.schedule, self.seed)
-
-    def to_dict(self) -> dict:
-        return asdict(self)
 
 
 @dataclass
@@ -91,16 +58,11 @@ class Prepared:
     why: str = ""
     working_set: int = 0
     stream_stats: dict = field(default_factory=dict)
+    cp: Checkpointer | None = None
 
 
 def adapters_dir() -> Path:
     return adapters_mod.ADAPTERS_DIR
-
-
-def data_hash(path: Path) -> str:
-    h = hashlib.sha256()
-    h.update(Path(path).read_bytes())
-    return h.hexdigest()
 
 
 def _dir_bytes(d: Path) -> int:
@@ -284,7 +246,7 @@ def train_streamed(prep: Prepared, job: Job, log: StepLog, stop, start_step: int
             log.step(step, sum(losses) / len(losses), toks)
             stopping = stop is not None and stop.is_set()
             if step % spec.ckpt_every == 0 or stopping or step == spec.steps:
-                _save_ckpt(job, step, tr.params, _opt_to_canon(opt, step))
+                _save_ckpt(prep, step, tr.params, _opt_to_canon(opt, step))
             if stopping:
                 break
         prep.stream_stats = {"read_bytes": tr.ring.bytes_read if tr.ring else 0,
@@ -418,7 +380,7 @@ def train_resident(prep: Prepared, job: Job, log: StepLog, stop, start_step: int
             done_micro = consumed["micro"] - consumed["micro"] % accum
             step += done_micro // accum
             flat, _ = _flat_trainable(model)
-            _save_ckpt(job, step, flat, _resident_opt_canon(opt, prefix))
+            _save_ckpt(prep, step, flat, _resident_opt_canon(opt, prefix))
             if done_micro < seg * accum:
                 break                                      # interrupted
     finally:
@@ -441,9 +403,9 @@ def _resident_opt_canon(opt, prefix: str) -> dict:
 
 # ------------------------------------------------------------ job lifecycle
 
-def _save_ckpt(job: Job, step: int, params: dict, opt: dict) -> None:
+def _save_ckpt(prep: "Prepared", step: int, params: dict, opt: dict) -> None:
     mx.eval(params, opt["m"], opt["v"])
-    ckpt.save(job.dir / "ckpt", step=step, params=params, opt=opt)
+    prep.cp.save(step, params, opt)
 
 
 def write_adapter(prep: Prepared, flat: dict, steps_done: int, job: Job, base: str,
@@ -500,15 +462,57 @@ def _record_compute_rate(prep: Prepared, result: dict) -> None:
         pass
 
 
+def _device_label() -> str:
+    from ..platforms import apple_silicon
+    from ..runs import hardware_summary  # noqa: F401
+    if mx.default_device() == mx.gpu:
+        try:
+            import platform
+            import subprocess
+            chip = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
+                                  capture_output=True, text=True).stdout.strip()
+            return f"apple-gpu:{chip}" if chip else "apple-gpu"
+        except OSError:
+            return "apple-gpu"
+    return "cpu"
+
+
+def base_dtype(model_dir) -> str:
+    """The dtype the base weights are stored and computed in: bf16, float16 or float32."""
+    from ..ring import SafetensorsIndex
+    t = next(iter(SafetensorsIndex(Path(model_dir)).layers[0].tensors))
+    return {"BF16": "bf16", "F16": "float16", "F32": "float32"}.get(t.st_dtype, t.st_dtype)
+
+
 def run_tune(prep: Prepared, job: Job, *, stop=None, progress_cb=None, resume: bool = False,
-             note=None) -> dict:
+             note=None, on_event=None) -> dict:
     """Train to prep.spec.steps (or until `stop`), checkpointing; write the adapter."""
+    import threading
     spec = prep.spec
+    stop = stop if stop is not None else threading.Event()
+    if spec.stop_after:
+        inner = progress_cb
+
+        def progress_cb(info, _inner=inner):
+            if _inner:
+                _inner(info)
+            if info["step"] >= spec.stop_after:
+                stop.set()
+    prep.cp = Checkpointer(
+        spec, job.dir, engine="mlx_stream_tune" if spec.path == "streamed" else "mlx_lm_lora",
+        device=_device_label(),
+        numerics={"base": base_dtype(spec.model_dir), "adapter": "float32",
+                  "optimizer": "float32", "dropout": spec.dropout},
+        targets=sorted(prep.shapes), on_event=on_event)
     start, init = 0, None
-    if resume and ckpt.exists(job.dir / "ckpt"):
-        start, params, opt, _ = ckpt.load(job.dir / "ckpt")
-        init = (params, opt)
-        truncate_losses(job, start)
+    ck = prep.cp.load(want=resume)
+    if ck is not None:
+        start = ck.step
+        init = ({k: mx.array(v) for k, v in ck.params.items()},
+                {"step": ck.opt["step"],
+                 "m": {k: mx.array(v) for k, v in ck.opt["m"].items()},
+                 "v": {k: mx.array(v) for k, v in ck.opt["v"].items()}})
+        prep.cp.sync_losses(start)
     job.write_meta(status="running", done=start, total=spec.steps)
     log = StepLog(job, spec.steps, start, progress_cb)
     t0 = time.monotonic()

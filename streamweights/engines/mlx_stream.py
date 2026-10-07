@@ -9,13 +9,10 @@ One full weight read per forward pass, amortized over the batch.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
-import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
@@ -26,19 +23,12 @@ from .. import logits as lg
 from ..calibration import CALIBRATION_JSON, load_calibration, save_calibration  # noqa: F401
 from ..errors import SpillError
 from ..registry import GIB, REPO_ROOT
+from ..ring import (MB, LayerPlan, RingReader, SafetensorsIndex, TensorLoc,  # noqa: F401
+                    calibrate, ring_settings)
 from .base import CompletedRow, MemoryBudget, ModelSpec
+from .common import (PREFILL_TOKENS_PER_PASS, PREFIX_MIN_ROWS,  # noqa: F401
+                     PREFIX_MIN_TOKENS, collect_eos_ids, common_prefix_len)
 
-
-# prefill is processed alongside decode, at most this many prompt tokens per
-# pass, so a wave of newcomers never turns one pass into a 28-minute wall
-PREFILL_TOKENS_PER_PASS = 2048
-
-# shared-prefix reuse engages when every row of the job starts with the same
-# token prefix at least this long (and there are enough rows to share it)
-PREFIX_MIN_TOKENS = 64
-PREFIX_MIN_ROWS = 4
-
-MB = 1024 * 1024
 
 ST_DTYPES = {
     "BF16": (np.uint16, mx.bfloat16, 2),
@@ -49,257 +39,7 @@ ST_DTYPES = {
 }
 
 
-# ---------------------------------------------------------------- index
-
-@dataclass
-class TensorLoc:
-    name: str          # safetensors key
-    shard: Path
-    offset: int        # absolute byte offset in shard
-    nbytes: int
-    shape: tuple
-    st_dtype: str
-
-
-@dataclass
-class LayerPlan:
-    """All tensors of one streamed unit (a transformer block), with a coalesced read plan."""
-    layer_id: int
-    tensors: list[TensorLoc]
-    segments: list[tuple[Path, int, int, int]] = field(default_factory=list)
-    # (shard, file_offset, length, buf_offset); tensor buf offsets assigned in order
-    tensor_buf_offsets: dict[str, int] = field(default_factory=dict)
-    nbytes: int = 0
-
-    def build(self):
-        self.tensors.sort(key=lambda t: (str(t.shard), t.offset))
-        buf_off = 0
-        segs: list[list] = []
-        for t in self.tensors:
-            self.tensor_buf_offsets[t.name] = buf_off
-            if segs and segs[-1][0] == t.shard and segs[-1][1] + segs[-1][2] == t.offset:
-                segs[-1][2] += t.nbytes
-            else:
-                segs.append([t.shard, t.offset, t.nbytes, buf_off])
-            buf_off += t.nbytes
-        self.segments = [tuple(s) for s in segs]
-        self.nbytes = buf_off
-
-
-class SafetensorsIndex:
-    """Parse all shard headers (no tensor data) and group tensors by transformer
-    block in execution order, plus embeddings, final norm, lm_head."""
-
-    def __init__(self, model_dir: Path):
-        self.model_dir = Path(model_dir)
-        self.config = json.loads((self.model_dir / "config.json").read_text())
-        self.tensors: dict[str, TensorLoc] = {}
-        for shard in sorted(self.model_dir.glob("*.safetensors")):
-            with open(shard, "rb") as f:
-                (hlen,) = np.frombuffer(f.read(8), dtype=np.uint64)
-                header = json.loads(f.read(int(hlen)))
-                base = 8 + int(hlen)
-                for name, meta in header.items():
-                    if name == "__metadata__":
-                        continue
-                    s, e = meta["data_offsets"]
-                    self.tensors[name] = TensorLoc(
-                        name, shard, base + s, e - s, tuple(meta["shape"]), meta["dtype"])
-
-        self.n_layers = self.config["num_hidden_layers"]
-        self.layers: list[LayerPlan] = []
-        for k in range(self.n_layers):
-            prefix = f"model.layers.{k}."
-            plan = LayerPlan(k, [t for n, t in self.tensors.items() if n.startswith(prefix)])
-            if not plan.tensors:
-                raise ValueError(f"no tensors found for layer {k}")
-            plan.build()
-            self.layers.append(plan)
-        self.max_layer_bytes = max(p.nbytes for p in self.layers)
-
-        self.embed = self.tensors["model.embed_tokens.weight"]
-        self.final_norm = self.tensors["model.norm.weight"]
-        self.lm_head = self.tensors.get("lm_head.weight")  # None if tied
-        self.tied = self.lm_head is None
-
-
-# ---------------------------------------------------------------- ring reader
-
-class _Fds:
-    """Per-shard fds with F_NOCACHE so streamed weights never pollute the page cache."""
-
-    def __init__(self):
-        self._fds: dict[Path, int] = {}
-        self._lock = threading.Lock()
-
-    def get(self, shard: Path) -> int:
-        with self._lock:
-            fd = self._fds.get(shard)
-            if fd is None:
-                fd = os.open(shard, os.O_RDONLY)
-                if hasattr(fcntl, "F_NOCACHE"):
-                    fcntl.fcntl(fd, fcntl.F_NOCACHE, 1)
-                self._fds[shard] = fd
-            return fd
-
-    def close(self):
-        with self._lock:
-            for fd in self._fds.values():
-                os.close(fd)
-            self._fds.clear()
-
-
-class RingReader:
-    """N preallocated host buffers; a producer thread fills them with layers in
-    schedule order using a thread pool of large preads; compute consumes in the
-    same order. The free-slot semaphore guarantees a slot is never overwritten
-    while still in use."""
-
-    def __init__(self, index: SafetensorsIndex, n_slots: int = 3,
-                 chunk_bytes: int = 16 * MB, n_threads: int = 4):
-        self.index = index
-        self.n_slots = n_slots
-        self.chunk = chunk_bytes
-        self.bufs = [bytearray(index.max_layer_bytes) for _ in range(n_slots)]
-        self.free = threading.Semaphore(n_slots)
-        self.ready: dict[int, int] = {}       # schedule seq -> slot id
-        self.cond = threading.Condition()
-        self.pool = ThreadPoolExecutor(max_workers=n_threads)
-        self.fds = _Fds()
-        self.bytes_read = 0
-        self.read_seconds = 0.0
-        self._stop = threading.Event()
-        self._producer: threading.Thread | None = None
-
-    def _read_segment(self, fd: int, file_off: int, length: int, buf: bytearray, buf_off: int):
-        mv = memoryview(buf)
-        done = 0
-        while done < length:
-            n = min(self.chunk, length - done)
-            got = os.preadv(fd, [mv[buf_off + done: buf_off + done + n]], file_off + done)
-            if got <= 0:
-                raise IOError("short pread")
-            done += got
-
-    def _fill_slot(self, slot: int, plan: LayerPlan):
-        t0 = time.monotonic()
-        futs = []
-        for shard, foff, length, boff in plan.segments:
-            fd = self.fds.get(shard)
-            # split large segments across the pool in chunk-sized pieces
-            pos = 0
-            while pos < length:
-                n = min(self.chunk, length - pos)
-                futs.append(self.pool.submit(
-                    self._read_segment, fd, foff + pos, n, self.bufs[slot], boff + pos))
-                pos += n
-        for f in futs:
-            f.result()
-        self.bytes_read += plan.nbytes
-        self.read_seconds += time.monotonic() - t0
-
-    def start(self, schedule: list[int]):
-        """schedule: list of layer ids in the exact order compute will consume them."""
-        def produce():
-            slot_order = list(range(self.n_slots))
-            next_slot = 0
-            for seq, layer_id in enumerate(schedule):
-                if self._stop.is_set():
-                    return
-                self.free.acquire()
-                if self._stop.is_set():
-                    return
-                slot = slot_order[next_slot % self.n_slots]
-                next_slot += 1
-                self._fill_slot(slot, self.index.layers[layer_id])
-                with self.cond:
-                    self.ready[seq] = slot
-                    self.cond.notify_all()
-        self._producer = threading.Thread(target=produce, daemon=True)
-        self._producer.start()
-
-    def get(self, seq: int) -> tuple[int, memoryview]:
-        with self.cond:
-            while seq not in self.ready:
-                self.cond.wait(timeout=60)
-        slot = self.ready.pop(seq)
-        return slot, memoryview(self.bufs[slot])
-
-    def release(self, slot: int):
-        self.free.release()
-
-    def stop(self):
-        self._stop.set()
-        self.free.release()  # unblock producer
-        if self._producer:
-            self._producer.join(timeout=10)
-        self.pool.shutdown(wait=False)
-        self.fds.close()
-
-
-# ---------------------------------------------------------------- calibration
-
-def calibrate(index: SafetensorsIndex, n_layers: int = 4,
-              chunks_mb=(4, 16, 64), threads=(2, 4, 8)) -> dict:
-    """Measure isolated read rate (no compute) over a grid; persist the best."""
-    results = []
-    for cmb in chunks_mb:
-        for nt in threads:
-            ring = RingReader(index, n_slots=3, chunk_bytes=cmb * MB, n_threads=nt)
-            sched = list(range(min(n_layers, index.n_layers)))
-            t0 = time.monotonic()
-            ring.start(sched)
-            total = 0
-            for seq in range(len(sched)):
-                slot, _ = ring.get(seq)
-                total += index.layers[sched[seq]].nbytes
-                ring.release(slot)
-            dt = time.monotonic() - t0
-            ring.stop()
-            mbps = total / dt / MB
-            results.append({"chunk_mb": cmb, "threads": nt, "mbps": round(mbps, 1)})
-    best = max(results, key=lambda r: r["mbps"])
-    cal = load_calibration()
-    cal.update({
-        "isolated_read_mbps": best["mbps"],
-        "chunk_mb": best["chunk_mb"],
-        "threads": best["threads"],
-        "grid": results,
-        "calibrated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-    })
-    save_calibration(cal)
-    return cal
-
-
 # ---------------------------------------------------------------- compute
-
-def collect_eos_ids(model_dir: Path, tokenizer) -> set[int]:
-    """Every EOS id the model declares: generation_config.json and config.json
-    (int or list), the tokenizer's own ids, and the chat template's end-of-turn
-    token (for Llama 3.x that includes 128009)."""
-    ids: set[int] = set()
-    for fname in ("generation_config.json", "config.json"):
-        p = Path(model_dir) / fname
-        if p.exists():
-            v = json.loads(p.read_text()).get("eos_token_id")
-            if isinstance(v, int):
-                ids.add(v)
-            elif isinstance(v, list):
-                ids.update(int(x) for x in v)
-    if getattr(tokenizer, "eos_token_ids", None):
-        ids.update(tokenizer.eos_token_ids)
-    if getattr(tokenizer, "eos_token_id", None) is not None:
-        ids.add(tokenizer.eos_token_id)
-    # chat template end-of-turn token, resolved through the vocabulary
-    for tok in ("<|eot_id|>", "<|im_end|>", "<|end_of_text|>", "<|endoftext|>"):
-        try:
-            tid = tokenizer.convert_tokens_to_ids(tok)
-            if tid is not None and tid >= 0:
-                ids.add(tid)
-        except Exception:
-            pass
-    return ids
-
 
 def _model_modules(config: dict):
     """One reusable TransformerBlock + args + family for the architecture."""
@@ -396,19 +136,6 @@ class SharedPrefixCache(StreamKVCache):
             sk = mx.broadcast_to(sk, (k.shape[0],) + tuple(sk.shape[1:]))
             sv = mx.broadcast_to(sv, (v.shape[0],) + tuple(sv.shape[1:]))
         return mx.concatenate([sk, k], axis=2), mx.concatenate([sv, v], axis=2)
-
-
-def common_prefix_len(seqs: list[list[int]]) -> int:
-    """Longest token prefix shared by every sequence."""
-    if not seqs:
-        return 0
-    a, b = min(seqs), max(seqs)          # lexicographic extremes bound the common prefix
-    n = 0
-    for x, y in zip(a, b):
-        if x != y:
-            break
-        n += 1
-    return n
 
 
 def _bind(block, plan: LayerPlan, buf: memoryview, prefix: str) -> float:

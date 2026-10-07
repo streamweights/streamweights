@@ -1,55 +1,36 @@
-"""Tune job checkpoints: adapter parameters and AdamW state, one format for both
-trainers. The checkpoint directory is replaced atomically (write a sibling, swap),
-so a crash mid-save leaves the previous checkpoint intact."""
+"""Tune job checkpoints on MLX: a thin layer over the portable checkpoint
+(streamweights.portable.checkpoint), converting between mx arrays and the float32 numpy form
+every engine reads. `d` is a local directory or a Store (a state URI)."""
 
 from __future__ import annotations
 
-import json
-import shutil
 from pathlib import Path
 
-import mlx.core as mx
+from ..portable import checkpoint as pc
+from ..portable.store import Store
 
 
-def save(d: Path, *, step: int, params: dict, opt: dict, extra: dict | None = None) -> None:
+def _store(d) -> Store:
+    return d if isinstance(d, Store) else Store(d)
+
+
+def save(d, *, step: int, params: dict, opt: dict, extra: dict | None = None) -> None:
     """params: {name: array}; opt: {"step": int, "m": {name: arr}, "v": {name: arr}}."""
-    d = Path(d)
-    tmp = d.with_name(d.name + ".new")
-    old = d.with_name(d.name + ".old")
-    shutil.rmtree(tmp, ignore_errors=True)
-    tmp.mkdir(parents=True)
-    mx.save_safetensors(str(tmp / "params.safetensors"), dict(params))
-    flat = {f"m::{k}": v for k, v in opt["m"].items()}
-    flat.update({f"v::{k}": v for k, v in opt["v"].items()})
-    mx.save_safetensors(str(tmp / "opt.safetensors"), flat)
-    (tmp / "state.json").write_text(json.dumps({"step": step, "opt_step": int(opt["step"]),
-                                                **(extra or {})}))
-    shutil.rmtree(old, ignore_errors=True)
-    if d.exists():
-        d.rename(old)
-    tmp.rename(d)
-    shutil.rmtree(old, ignore_errors=True)
+    pc.save_tune(_store(d), step=step, params=params, opt=opt, state=extra or {})
 
 
-def exists(d: Path) -> bool:
-    d = Path(d)
-    if (d / "state.json").exists():
-        return True
-    old = d.with_name(d.name + ".old")      # crash between the two renames
-    return (old / "state.json").exists()
+def exists(d) -> bool:
+    return pc.latest_step(_store(d)) is not None
 
 
-def load(d: Path) -> tuple[int, dict, dict, dict]:
-    """(step, params, opt, state.json) from a checkpoint directory."""
-    d = Path(d)
-    if not (d / "state.json").exists():
-        old = d.with_name(d.name + ".old")
-        if (old / "state.json").exists():
-            d = old
-    state = json.loads((d / "state.json").read_text())
-    params = mx.load(str(d / "params.safetensors"))
-    flat = mx.load(str(d / "opt.safetensors"))
-    opt = {"step": state["opt_step"],
-           "m": {k[3:]: v for k, v in flat.items() if k.startswith("m::")},
-           "v": {k[3:]: v for k, v in flat.items() if k.startswith("v::")}}
-    return state["step"], params, opt, state
+def load(d):
+    """(step, params, opt, state.json) from the latest committed checkpoint, as mx arrays."""
+    import mlx.core as mx
+    ck = pc.load_tune(_store(d))
+    if ck is None:
+        raise FileNotFoundError(f"no committed checkpoint in {d}")
+    params = {k: mx.array(v) for k, v in ck.params.items()}
+    opt = {"step": ck.opt["step"],
+           "m": {k: mx.array(v) for k, v in ck.opt["m"].items()},
+           "v": {k: mx.array(v) for k, v in ck.opt["v"].items()}}
+    return ck.step, params, opt, ck.state
