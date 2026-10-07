@@ -13,6 +13,9 @@ Package `streamweights`, CLI `spill`. Repo: https://github.com/streamweights/str
 - Hardware limits are set per directive. Unless a directive says otherwise: no 70B or 7B runs, no model downloads over 2 GB, GPU use limited to `qwen2.5:0.5b`, because the user works on this machine.
 - No PyPI publishing, no release workflow, no tags, until a directive asks. Install lines use the GitHub URL.
 - Paste sets are saved verbatim in `docs/paste-sets/` and committed first.
+- Every directive ends by updating the README and the docs site to reflect the current state, with measured numbers only.
+- Never post publicly on the user's behalf: no issues, pull requests or comments on other repositories; drafts only. Commit after every numbered item of a directive.
+- Directive 013 additionally forbids model runs of any size, PyPI publishing and tags.
 
 ## Developer-experience rules (binding on every command)
 
