@@ -1,0 +1,35 @@
+# spill tune on an NVIDIA GPU. restartPolicy: OnFailure restarts the container when it exits
+# non-zero, and exit code 75 (preempted, checkpoint written) is exactly that; the restarted
+# container reruns the same command and resumes from /data/state.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: spill-tune
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      restartPolicy: OnFailure
+      terminationGracePeriodSeconds: 45     # SIGTERM, then 45 s: the checkpoint takes at most 30
+      containers:
+        - name: spill
+          image: ghcr.io/streamweights/spill:cuda
+          args: ["tune", "--config", "/config/tune.json"]
+          env:
+            - name: SPILL_HOME
+              value: /data/home
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: spill-data
+        - name: config
+          configMap:
+            name: spill-job

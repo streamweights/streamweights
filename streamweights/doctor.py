@@ -114,3 +114,21 @@ def report(hw: dict, cal: dict, *, registry_tags, models_dir, interrupted_lines:
         lines = [l for l in lines if not l.startswith(("overnight", "training"))]
         lines.append(f"platform     {platform.system()} {platform.machine()}: {platform_line()}")
     return "\n".join(lines)
+
+
+def engine_lines(choice, avail: dict, rates: dict) -> list[str]:
+    """Which engine a job gets here and why, and a measured rate for every usable engine
+    (float32 matmul TFLOP/s and memory GB/s, measured by this doctor run)."""
+    lines = [f"engine       {choice.name} ({choice.why})"]
+    for name in ("mlx", "torch-cpu", "torch-cuda"):
+        ok, why = avail[name]
+        r = rates.get(name)
+        if ok and r and "matmul_tflops" in r:
+            body = (f"{r['matmul_tflops']:.3g} TFLOP/s float32 matmul, {r['memory_gb_s']:.0f} GB/s "
+                    f"memory, measured now")
+        elif ok:
+            body = "usable"
+        else:
+            body = f"not usable here: {why}"
+        lines.append(f"             {name}: {body}")
+    return lines

@@ -95,13 +95,24 @@ Arguments:
                [required]
 
 Options:
-  --quant <str>     8bit|4bit (mlx) or Q8_0|Q4_K_M (gguf); bf16 is the default
-  --out <path>      also copy results.jsonl here
-  --context <int>   context window in tokens  [default: 4096]
-  --quiet           one progress line, no live slot block
-  --notify <str>    POST a small JSON to this URL when done
-  --logprobs <int>  per-token top-K log-probs, K up to 64
-  --help            Show this message and exit.
+  --quant <str>         8bit|4bit (mlx) or Q8_0|Q4_K_M (gguf); bf16 is the
+                        default
+  --out <path>          also copy results.jsonl here
+  --context <int>       context window in tokens  [default: 4096]
+  --quiet               one progress line, no live slot block
+  --notify <str>        POST a small JSON to this URL when done
+  --logprobs <int>      per-token top-K log-probs, K up to 64
+  --state <str>         portable job state: a path, s3://, gs://, az://
+                        (resumes from the latest checkpoint there)
+  --weights <str>       stage the model from this location instead of Hugging
+                        Face
+  --engine <str>        mlx | torch-cpu | torch-cuda (default: chosen from the
+                        hardware)
+  --headless            JSON-lines events on stdout, exit 75 when preempted
+                        (automatic when stdout is not a terminal)
+  --config <path>       run the invocation stored in this job.json
+  --emit-config <path>  write this invocation to job.json and exit
+  --help                Show this message and exit.
 
   Example: spill run qwen2.5:0.5b sample
 ```
@@ -121,15 +132,25 @@ Arguments:
                with an assistant target  [required]
 
 Options:
-  --score           teacher-forced: score the given assistant targets, prefill
-                    only, no sampling
-  --logprobs <int>  top-K per token, K up to 64  [default: 32]
-  --quant <str>     8bit | 4bit; bf16 is the default
-  --out <path>      distillation JSONL (default runs/<id>/distill.jsonl)
-  --context <int>   context window in tokens  [default: 4096]
-  --quiet           one progress line, no live slot block
-  --notify <str>    POST a small JSON to this URL when done
-  --help            Show this message and exit.
+  --score               teacher-forced: score the given assistant targets,
+                        prefill only, no sampling
+  --logprobs <int>      top-K per token, K up to 64  [default: 32]
+  --quant <str>         8bit | 4bit; bf16 is the default
+  --out <path>          distillation JSONL (default runs/<id>/distill.jsonl)
+  --context <int>       context window in tokens  [default: 4096]
+  --quiet               one progress line, no live slot block
+  --notify <str>        POST a small JSON to this URL when done
+  --state <str>         portable job state: a path, s3://, gs://, az://
+                        (resumes from the latest checkpoint there)
+  --weights <str>       stage the model from this location instead of Hugging
+                        Face
+  --engine <str>        mlx | torch-cpu | torch-cuda (default: chosen from the
+                        hardware)
+  --headless            JSON-lines events on stdout, exit 75 when preempted
+                        (automatic when stdout is not a terminal)
+  --config <path>       run the invocation stored in this job.json
+  --emit-config <path>  write this invocation to job.json and exit
+  --help                Show this message and exit.
 
   Example: spill distill qwen2.5:0.5b sample
 ```
@@ -148,21 +169,33 @@ Arguments:
                (messages)  [required]
 
 Options:
-  --name <str>        adapter name (see: spill adapters)  [required]
-  --rank <int>        LoRA rank  [default: 16]
-  --lr <float>        learning rate  [default: 0.0001]
-  --steps <int>       optimizer steps (default: --epochs of the data)
-  --epochs <float>    passes over the data  [default: 1.0]
-  --batch <int>       micro-batch (default: 4 resident, sized from the memory
-                      budget when streamed)
-  --grad-accum <int>  micro-batches per optimizer step  [default: 1]
-  --max-seq <int>     token cap per example; whole exchanges are dropped from
-                      the left  [default: 2048]
-  --path <str>        auto | resident | streamed  [default: auto]
-  --overwrite         replace an existing adapter
-  --quiet             a progress line every 10 steps
-  --notify <str>      POST a small JSON to this URL when done
-  --help              Show this message and exit.
+  --name <str>          adapter name (see: spill adapters)  [required]
+  --rank <int>          LoRA rank  [default: 16]
+  --lr <float>          learning rate  [default: 0.0001]
+  --steps <int>         optimizer steps (default: --epochs of the data)
+  --epochs <float>      passes over the data  [default: 1.0]
+  --batch <int>         micro-batch (default: 4 resident, sized from the
+                        memory budget when streamed)
+  --grad-accum <int>    micro-batches per optimizer step  [default: 1]
+  --max-seq <int>       token cap per example; whole exchanges are dropped
+                        from the left  [default: 2048]
+  --targets <str>       comma-separated modules to adapt, e.g. q_proj,v_proj
+                        (default: every linear)
+  --path <str>          auto | resident | streamed  [default: auto]
+  --overwrite           replace an existing adapter
+  --quiet               a progress line every 10 steps
+  --notify <str>        POST a small JSON to this URL when done
+  --state <str>         portable job state: a path, s3://, gs://, az://
+                        (resumes from the latest checkpoint there)
+  --weights <str>       stage the model from this location instead of Hugging
+                        Face
+  --engine <str>        mlx | torch-cpu | torch-cuda (default: chosen from the
+                        hardware)
+  --headless            JSON-lines events on stdout, exit 75 when preempted
+                        (automatic when stdout is not a terminal)
+  --config <path>       run the invocation stored in this job.json
+  --emit-config <path>  write this invocation to job.json and exit
+  --help                Show this message and exit.
 
   Example: spill tune qwen2.5:0.5b banking77-quick/train.jsonl --name banking
 ```
@@ -183,15 +216,25 @@ Arguments:
                model with a run against this file's hash
 
 Options:
-  --metric <str>   exact_match | contains | regex | json_field | judge |
-                   script:<file.py>  [default: exact_match]
-  --judge <str>    judge model (implies --metric judge)
-  --rerun          ignore cached runs for this input hash
-  --quant <str>    8bit | 4bit; bf16 is the default
-  --context <int>  context window in tokens  [default: 4096]
-  --quiet          one progress line, no live slot block
-  --notify <str>   POST a small JSON to this URL when done
-  --help           Show this message and exit.
+  --metric <str>        exact_match | contains | regex | json_field | judge |
+                        script:<file.py>  [default: exact_match]
+  --judge <str>         judge model (implies --metric judge)
+  --rerun               ignore cached runs for this input hash
+  --quant <str>         8bit | 4bit; bf16 is the default
+  --context <int>       context window in tokens  [default: 4096]
+  --quiet               one progress line, no live slot block
+  --notify <str>        POST a small JSON to this URL when done
+  --state <str>         portable job state: a path, s3://, gs://, az://
+                        (resumes from the latest checkpoint there)
+  --weights <str>       stage the model from this location instead of Hugging
+                        Face
+  --engine <str>        mlx | torch-cpu | torch-cuda (default: chosen from the
+                        hardware)
+  --headless            JSON-lines events on stdout, exit 75 when preempted
+                        (automatic when stdout is not a terminal)
+  --config <path>       run the invocation stored in this job.json
+  --emit-config <path>  write this invocation to job.json and exit
+  --help                Show this message and exit.
 
   Example: spill eval banking77-quick/evals.jsonl qwen2.5:0.5b
   qwen2.5:0.5b+banking
@@ -302,7 +345,9 @@ Arguments:
   job  job id or build folder (default: the latest job)
 
 Options:
-  --help  Show this message and exit.
+  --headless       JSON-lines events on stdout, exit 75 when preempted
+  --weights <str>  stage the model from this location instead of Hugging Face
+  --help           Show this message and exit.
 
   Example: spill resume banking77-quick
 ```

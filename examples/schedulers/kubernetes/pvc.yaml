@@ -1,0 +1,11 @@
+# One volume for everything spill keeps: the per-machine weights cache (SPILL_HOME) and the
+# portable job state (--state). A restarted pod, on any node that can mount it, resumes.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spill-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 200Gi

@@ -21,8 +21,7 @@ def no_mlx(monkeypatch):
     monkeypatch.setenv("SPILL_NO_MLX", "1")
 
 
-@pytest.mark.parametrize("args", [["build", "x"], ["tune", "m", "f.jsonl", "--name", "a"],
-                                  ["distill", "m", "sample"]])
+@pytest.mark.parametrize("args", [["build", "x"]])
 def test_mlx_only_commands_print_one_line(no_mlx, args):
     r = R.invoke(app, args)
     assert r.exit_code == 1

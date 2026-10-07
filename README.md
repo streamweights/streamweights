@@ -67,26 +67,42 @@ The steps as individual commands, if you want to stop between them:
 
 Every command ends by printing the one that usually comes next. Formats are in [docs/formats.md](docs/formats.md), commands in [docs/cli.md](docs/cli.md), models in [docs/models.md](docs/models.md).
 
+## Runs anywhere
+
+The same command runs on a Mac, a Linux box or a cloud GPU, and a job moves between them and resumes: every job is a sequence of steps or rows, and any machine can take the next one from a checkpoint at `--state` (a path, `s3://`, `gs://` or `az://`). Engines are thin: MLX on Apple silicon, PyTorch everywhere else. [docs/portability.md](docs/portability.md) says what moves and what it costs.
+
+```
+spill tune qwen2.5:7b train.jsonl --name mine --state s3://my-bucket/mine   # start anywhere, rerun to resume anywhere
+```
+
+- **Headless.** Piped, or with `--headless`, a job writes JSON-lines events on stdout (start, step or row, checkpoint, preempted, done, error), and on SIGTERM writes a checkpoint within 30 seconds and exits 75 so a scheduler retries. `--emit-config job.json` writes a laptop run as a file; `--config job.json` runs it anywhere.
+- **Containers.** `ghcr.io/streamweights/spill:cpu` and `:cuda` run `spill` headless with `SPILL_HOME` on a volume.
+- **Schedulers.** SkyPilot, Slurm and Kubernetes examples in [examples/schedulers](examples/schedulers), described in [docs/schedulers.md](docs/schedulers.md).
+
 ## Requirements
 
-- An Apple silicon Mac (tested on a 48 GB M4 Pro). Other machines: see Linux and other platforms below.
+- An Apple silicon Mac (tested on a 48 GB M4 Pro) for the fastest path. Linux, Windows and Intel Macs run on PyTorch: see Runs anywhere and Linux and other platforms.
 - Python 3.10 or newer.
 - Disk for the models you use plus a 20 GB floor that downloads never cross (the 7B student is 15 GB, the 70B teacher 131 GB).
 - Plugged in for anything long: long jobs hold the Mac awake and warn when it is on battery. `spill doctor` checks your machine.
 
 ## Linux and other platforms
 
-`pip install` succeeds on Linux, Windows and Intel Macs, but MLX is installed only on Apple silicon. Elsewhere `spill run` works through llama.cpp, and `export`, `check`, `models` and `doctor` work. Streaming a model bigger than RAM, `distill`, `tune` and `build` do not yet, and say so in one line.
+`pip install` brings PyTorch everywhere and MLX only on Apple silicon. On the PyTorch engines `run`, `distill`, `tune`, `eval` and `export` work, with streaming from disk, batching, log-probs and adapters. **CPU is verified**: identity, tune and resume gates on the 0.5B ([report](docs/reports/012-run-anywhere.md)), and a Linux CPU build in CI. **NVIDIA is built but awaiting verification**; on a CUDA machine run
 
-A CPU engine with the same layer-ordered disk streaming is the next phase, then NVIDIA GPUs. The plan is in [docs/linux.md](docs/linux.md) and the tracking issue is [#1](https://github.com/streamweights/streamweights/issues/1). If you would run it on Linux, comment there with the hardware you have.
+```
+docker run --gpus all ghcr.io/streamweights/spill:cuda python -m streamweights.verify_cuda
+```
+
+`spill build` is Apple silicon only for now and says so in one line elsewhere. Details in [docs/linux.md](docs/linux.md); the tracking issue is [#1](https://github.com/streamweights/streamweights/issues/1). If you would run it on Linux, comment there with the hardware you have.
 
 ## Under the hood
 
-The full bf16 model is streamed from disk in layer order instead of held in memory: one forward pass reads every weight once whether the batch holds one prompt or five hundred, so a 70B model that cannot fit in 48 GB still runs every row at full precision. Rows that share a system prompt compute its keys and values once. Training streams the same way, recomputing each layer on the way back. Everything else is plain MLX on Apple silicon.
+The full bf16 model is streamed from disk in layer order instead of held in memory: one forward pass reads every weight once whether the batch holds one prompt or five hundred, so a 70B model that cannot fit in 48 GB still runs every row at full precision. Rows that share a system prompt compute its keys and values once. Training streams the same way, recomputing each layer on the way back. The engines are thin: MLX on Apple silicon, PyTorch (Hugging Face transformers layers bound from the same ring) everywhere else. streamweights owns the ring, the job layer and the CLI.
 
 ## Status
 
-Phases 0 to 3.5 are done: run, distill, tune, eval, build, export (reports in [docs/reports](docs/reports)). The banking77 table for the 70B teacher and 7B student arrives with the full proof run. Next, in order: that proof run, a Linux CPU engine, NVIDIA, vision-language models, mixture-of-experts ([docs/plan.md](docs/plan.md)).
+Phases 0 to 3.5 are done: run, distill, tune, eval, build, export (reports in [docs/reports](docs/reports)). Run-anywhere is done too: portable jobs, the PyTorch engines, headless mode, containers and scheduler examples, with the CPU gates in [docs/reports/012-run-anywhere.md](docs/reports/012-run-anywhere.md). The banking77 table for the 70B teacher and 7B student arrives with the full proof run. Next, in order: the verification batch (that proof run, the CUDA gates on a real GPU, a cross-cloud resume demo), then PyPI and launch, then vision-language models, then mixture-of-experts ([docs/plan.md](docs/plan.md)).
 
 ## Feedback
 

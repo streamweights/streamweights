@@ -1,0 +1,71 @@
+name: Containers
+
+# Build both images on every push to main and publish them to ghcr.io/streamweights/spill.
+# The CPU image is smoke-tested before it is pushed: a 20-row eval on qwen2.5:0.5b, and the
+# committed step-50 MLX checkpoint resumed on torch-cpu. The CUDA image is built and pushed
+# only (no GPU runner); `docker run --gpus all ghcr.io/streamweights/spill:cuda python -m
+# streamweights.verify_cuda` verifies it on a CUDA machine.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/streamweights/spill
+
+jobs:
+  cpu:
+    name: cpu image (build, smoke test, push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/cpu.Dockerfile
+          load: true
+          tags: ${{ env.IMAGE }}:cpu
+          cache-from: type=gha,scope=cpu
+          cache-to: type=gha,scope=cpu,mode=max
+      - name: Smoke test (20-row eval on the 0.5B, resume the step-50 fixture)
+        run: scripts/container_smoke.sh "$IMAGE:cpu"
+      - name: Push
+        if: github.ref == 'refs/heads/main'
+        run: docker push "$IMAGE:cpu"
+
+  cuda:
+    name: cuda image (build, push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space for the PyTorch CUDA base image
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet || true
+          df -h /
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/cuda.Dockerfile
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ${{ env.IMAGE }}:cuda
+          cache-from: type=gha,scope=cuda
+          cache-to: type=gha,scope=cuda,mode=max

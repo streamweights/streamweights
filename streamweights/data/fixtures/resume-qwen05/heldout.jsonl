@@ -1,0 +1,60 @@
+{"custom_id": "held-000", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That show? delightful, truly."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-001", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the phone shoddy."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-002", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The hotel was disappointing."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-003", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a wonderful laptop!"}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-004", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The book was delightful."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-005", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The laptop was excellent."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-006", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The concert was fantastic."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-007", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a bad movie!"}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-008", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My game turned out to be superb."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-009", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My restaurant turned out to be outstanding."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-010", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the phone lovely."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-011", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My book turned out to be mediocre."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-012", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a excellent service!"}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-013", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the hotel dreadful."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-014", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a bad book."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-015", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the phone fantastic."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-016", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The laptop was horrible."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-017", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a bad show!"}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-018", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My laptop turned out to be terrible."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-019", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The laptop was charming."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-020", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a mediocre restaurant."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-021", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That restaurant? shoddy, truly."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-022", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The service was shoddy."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-023", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a mediocre concert."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-024", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That restaurant? great, truly."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-025", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That concert? excellent, truly."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-026", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a boring concert!"}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-027", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a terrible restaurant."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-028", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a outstanding phone."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-029", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That movie? awful, truly."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-030", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My show turned out to be brilliant."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-031", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a fantastic phone!"}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-032", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The movie was delightful."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-033", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My game turned out to be great."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-034", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That movie? awful, truly."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-035", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the phone horrible."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-036", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: What a horrible game!"}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-037", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The phone was horrible."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-038", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a shoddy restaurant."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-039", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That game? lovely, truly."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-040", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the restaurant superb."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-041", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the phone great."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-042", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The show was superb."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-043", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the game awful."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-044", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The restaurant was bad."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-045", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The movie was brilliant."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-046", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The laptop was outstanding."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-047", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My show turned out to be great."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-048", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: That phone? excellent, truly."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-049", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a awful laptop."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-050", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My service turned out to be shoddy."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-051", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: The service was poor."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-052", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a disappointing service."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-053", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the phone superb."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-054", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the laptop awful."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-055", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a lovely laptop."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-056", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: My show turned out to be lovely."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-057", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: I found the game brilliant."}], "max_tokens": 12}, "expected": "kiwi"}
+{"custom_id": "held-058", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a dreadful show."}], "max_tokens": 12}, "expected": "plum"}
+{"custom_id": "held-059", "body": {"messages": [{"role": "user", "content": "Give the sentiment code for this review.\n\nReview: Honestly, a excellent movie."}], "max_tokens": 12}, "expected": "kiwi"}

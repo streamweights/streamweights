@@ -15,6 +15,8 @@ for _f in ("hardware.json", "calibration.json"):
 if (_REPO / "models").exists():
     (_home / "models").symlink_to(_REPO / "models")
 os.environ["SPILL_HOME"] = str(_home)
+# the suite parses human output through CliRunner (not a TTY); headless mode is tested explicitly
+os.environ["SPILL_HEADLESS"] = "0"
 GPU_TESTS = os.environ.get("SPILL_GPU_TESTS") == "1"     # opt in to Metal tests
 if not GPU_TESTS:
     os.environ["SPILL_DEVICE"] = "cpu"
@@ -62,6 +64,8 @@ def _isolated_build_registry(tmp_path, monkeypatch):
 
 def _needs_mlx(path: Path) -> bool:
     text = path.read_text()
+    if re.search(r"^# no-mlx-needed", text, re.M):      # tests of the platform-neutral layers
+        return False
     return bool(re.search(r"^\s*(import mlx|from mlx|from tests\.tiny|from \.tiny|from \. import tiny"
                           r"|from streamweights\.(engines|tune)|from tests\.test_)", text, re.M))
 

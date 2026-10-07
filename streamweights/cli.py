@@ -14,7 +14,7 @@ from pathlib import Path
 import typer
 import typer.core
 
-from . import overnight, platforms
+from . import engine_select, overnight, platforms, runtime
 from .errors import SpillError
 from . import probe as probe_mod
 from .engines.base import MemoryBudget, ModelSpec
@@ -66,11 +66,25 @@ def _main(ctx: typer.Context):
 SAMPLE_PATH = Path(__file__).parent / "data" / "sample-20.jsonl"
 
 
+def _long_job(name: str, notify_url: str | None = None):
+    """caffeinate and notifications for a person at a terminal; nothing of either when headless."""
+    if runtime.ENV.headless:
+        return contextlib.nullcontext()
+    return overnight.long_job(name, notify_url)
+
+
 def _fail(e):
     """One line ending in the command that gets you unstuck; the traceback only with --debug."""
     from .errors import SpillError
     if _DEBUG:
         raise e
+    from .errors import StageInterrupted
+    if runtime.ENV.stopped_early and isinstance(e, StageInterrupted):
+        typer.echo(f"stopped early (--stop-after {runtime.ENV.stop_after}): {e.done}/{e.total} "
+                   f"rows are checkpointed; run the same command again to continue")
+        return
+    runtime.emit("error", message=e.line() if isinstance(e, SpillError)
+                 else f"{type(e).__name__}: {e}")
     if isinstance(e, SpillError):
         cmd = next((a for a in sys.argv[1:] if a in COMMAND_ORDER), None)
         jsonl = next((a for a in sys.argv[1:] if a.endswith(".jsonl")), None)
@@ -95,7 +109,14 @@ def main():
     except ImportError:
         import click
     try:
-        app(prog_name="spill", standalone_mode=False)
+        sys.argv[1:] = _config_args(sys.argv[1:])
+    except SpillError as e:
+        typer.echo(f"spill: {e.line(default='spill --help')}", err=True)
+        raise SystemExit(1)
+    try:
+        rc = app(prog_name="spill", standalone_mode=False)
+        if isinstance(rc, int) and rc:        # a command ended with typer.Exit(code)
+            raise SystemExit(rc)
     except typer.Exit as e:
         raise SystemExit(e.exit_code)
     except typer.Abort:
@@ -114,17 +135,90 @@ def main():
             raise SystemExit(x.exit_code)
 
 
+JOB_COMMANDS = ("run", "distill", "tune", "eval")
+
+
+def _pop_option(args: list[str], flag: str) -> tuple[str | None, list[str]]:
+    """(value, args without it) for `--flag value` or `--flag=value`."""
+    out, val, i = [], None, 0
+    while i < len(args):
+        a = args[i]
+        if a == flag and i + 1 < len(args):
+            val, i = args[i + 1], i + 2
+            continue
+        if a.startswith(flag + "="):
+            val, i = a.split("=", 1)[1], i + 1
+            continue
+        out.append(a)
+        i += 1
+    return val, out
+
+
+def _config_args(args: list[str]) -> list[str]:
+    """Expand `--config job.json` into the invocation it stores, and write the exact config of
+    an invocation (and stop) for `--emit-config job.json`."""
+    from . import jobconfig
+    cfg_path, args = _pop_option(args, "--config")
+    emit_path, args = _pop_option(args, "--emit-config")
+    if cfg_path is None and emit_path is None:
+        return args
+    group = typer.main.get_command(app)
+    cfg = jobconfig.load(Path(cfg_path)) if cfg_path else None
+    cmd = next((a for a in args if a in JOB_COMMANDS), None)
+    if cmd is None and cfg is not None:
+        cmd = cfg["command"]
+        args = [cmd] + args
+    if cmd not in JOB_COMMANDS:
+        raise SpillError("--config and --emit-config work with run, distill, tune and eval",
+                         "spill tune --help")
+    idx = args.index(cmd)
+    rest = args[idx + 1:]
+    click_cmd = group.commands[cmd]
+    if cfg is not None:
+        if cfg["command"] != cmd:
+            raise SpillError(f"{cfg_path} is a spill {cfg['command']} job, not {cmd}",
+                             f"spill {cfg['command']} --config {cfg_path}")
+        rest = jobconfig.to_argv(cfg, click_cmd, rest)
+    if emit_path is not None:
+        out = jobconfig.build(cmd, click_cmd, rest)
+        jobconfig.write(Path(emit_path), out)
+        typer.echo(f"wrote {emit_path}: the exact configuration of this spill {cmd}; it was "
+                   f"not run")
+        typer.echo(f"\nnext: spill {cmd} --config {emit_path}")
+        raise SystemExit(0)
+    return args[:idx + 1] + rest
+
+
 def _resolve_input(input_arg: str) -> Path:
     from .errors import SpillError
     if input_arg == "sample":
         typer.echo("(using the packaged 20-prompt sample: spill run <model> sample)")
         return SAMPLE_PATH
+    from .portable.store import is_uri
+    if is_uri(input_arg):
+        return _fetch_input(input_arg)
     p = Path(input_arg)
     if not p.exists():
         raise SpillError(f"input file {input_arg} does not exist",
                          "spill run <model> sample")
     return p
 
+
+def _fetch_input(uri: str) -> Path:
+    """An input named by URI (s3://, gs://, az://, memory://) is copied into the per-machine
+    cache and used from there."""
+    import hashlib
+
+    from .portable.store import Store
+    parent, _, leaf = uri.rpartition("/")
+    cache = REPO_ROOT_INPUTS / hashlib.sha256(uri.encode()).hexdigest()[:12] / leaf
+    Store(parent).copy_to_local(leaf, cache)
+    return cache
+
+
+from .registry import REPO_ROOT as _ROOT  # noqa: E402
+
+REPO_ROOT_INPUTS = _ROOT / "state" / "inputs"
 
 GATEWAY = "http://127.0.0.1:11435"
 MB = 1024 * 1024
@@ -245,6 +339,15 @@ class _LiveRenderer:
         sys.stderr.flush()
 
 
+def _live_cb(job_dir, quiet):
+    """The per-pass callback: the redrawn terminal block for a person, a live.json writer
+    (no drawing) when headless."""
+    if runtime.ENV.headless:
+        from .cli_torch import _HeadlessPass
+        return _HeadlessPass(job_dir)
+    return _LiveRenderer(job_dir, quiet)
+
+
 def _pass_line(info):  # retained for callers without a job dir
     _LiveRenderer()(info)
 
@@ -282,7 +385,15 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
     ws = hw["gpu"]["vram_bytes"]
     ram = hw["ram_total_bytes"]
 
-    if res.kind == "hf":
+    if runtime.ENV.weights and quant in (None, "bf16"):
+        from .portable.weights import stage_weights
+        path, staged = stage_weights(runtime.ENV.weights,
+                                     note=lambda m: typer.echo(f"   {m}", err=True))
+        size = sum(f.stat().st_size for f in Path(path).glob("*.safetensors"))
+        typer.echo(f"   weights staged from {staged['uri']}: {staged['bytes'] / 1e9:.2f} GB copied "
+                   f"in {staged['seconds']:.1f} s ({staged['reused']} files already here)",
+                   err=True)
+    elif res.kind == "hf":
         path = download_hf(res)
         size = res.st_bytes
     elif quant == "bf16":
@@ -384,7 +495,8 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
 
     label = model + (f"+{adapter.id}" if adapter is not None else "")
     options = {"mode": opts.mode, "logprobs": opts.logprobs,
-               "adapter": opts.adapter, "kind": opts.kind, "max_tokens": max_tokens}
+               "adapter": opts.adapter, "kind": opts.kind, "max_tokens": max_tokens,
+               "engine_choice": "mlx", "state": runtime.state_uri()}
     job = Job.create(input_jsonl, model, quant, context, batch, out, rows=rows,
                      options=options)
     spec = ModelSpec(model, quant, Path(path), reg[model].arch if model in reg else {},
@@ -403,7 +515,7 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
                                 if k in ("id", "hash", "layout", "rank", "base")}
                        if adapter is not None else None,
                        options=options, kind="run")
-    engine.pass_cb = _LiveRenderer(job.dir, quiet)
+    engine.pass_cb = _live_cb(job.dir, quiet)
     out_path = out or (runs_mod.run_dir(job.id) / "distill.jsonl"
                        if opts.kind == "distill" else job.results_path)
     cmd = opts.cmd or ("eval" if opts.kind == "judge" else opts.kind)
@@ -421,12 +533,15 @@ def _run_mlx(res, input_jsonl: Path, quant: str, reason: str,
                     f"scored with the teacher's top-{opts.logprobs} log-probs, batch {shown_batch}. "
                     f"Est. {_fmt_dur(est)} (decode from the measured pass time plus "
                     f"prefill).{cost_note}")
-    typer.echo(
-        f"spill {cmd} {label}: {quant} ({size / GIB:.1f} GB, {fam.label}: {fam.state}) "
-        f"{'fits' if size <= ram else 'does not fit'} in {ram / GIB:.0f} GB RAM, {placement}. "
-        f"{what} Cost: $0.{overnight.battery_note()} "
-        f"Results -> {out_path}")
+    line = (f"spill {cmd} {label}: {quant} ({size / GIB:.1f} GB, {fam.label}: {fam.state}) "
+            f"{'fits' if size <= ram else 'does not fit'} in {ram / GIB:.0f} GB RAM, {placement}. "
+            f"{what} Cost: $0.{'' if runtime.ENV.headless else overnight.battery_note()} "
+            f"Results -> {out_path}")
+    typer.echo(line)
     typer.echo(f"   why: {why}")
+    runtime.emit("start", job=job.id, model=label, command=cmd, rows=n_prompts, batch=shown_batch,
+                 placement=placement, estimated_seconds=round(est or 0),
+                 state=runtime.state_uri(), message=line)
 
     from .jobs.runner import run_job
     try:
@@ -469,18 +584,36 @@ def run(
     quiet: bool = typer.Option(False, "--quiet", help="one progress line, no live slot block"),
     notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when done"),
     logprobs: int = typer.Option(None, "--logprobs", help="per-token top-K log-probs, K up to 64"),
+    state: str = typer.Option(None, "--state", help="portable job state: a path, s3://, gs://, "
+                                                    "az:// (resumes from the latest checkpoint there)"),
+    weights: str = typer.Option(None, "--weights", help="stage the model from this location "
+                                                        "instead of Hugging Face"),
+    engine: str = typer.Option(None, "--engine", help="mlx | torch-cpu | torch-cuda "
+                                                      "(default: chosen from the hardware)"),
+    headless: bool = typer.Option(False, "--headless", help="JSON-lines events on stdout, exit "
+                                                            "75 when preempted (automatic when "
+                                                            "stdout is not a terminal)"),
+    config: Path = typer.Option(None, "--config", help="run the invocation stored in this "
+                                                       "job.json"),
+    emit_config: Path = typer.Option(None, "--emit-config", help="write this invocation to "
+                                                                 "job.json and exit"),
+    stop_after: int = typer.Option(None, "--stop-after", hidden=True),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Run a JSONL of prompts (or `sample`) through a model, a curated tag or any HF repo id."""
     global _DEBUG
     _DEBUG = debug
-    try:
-        with overnight.long_job("spill run " + model, notify):
-            _run_impl(model, input_jsonl, quant, out, context, parallel, quiet,
-                      RunOpts(logprobs=logprobs,
-                              prefix_reuse=not os.environ.get("SPILL_NO_PREFIX_REUSE")))
-    except Exception as e:
-        _fail(e)
+    with runtime.job_session("run", state=state, weights=weights, engine=engine,
+                             headless_flag=headless, stop_after=stop_after):
+        try:
+            with _long_job("spill run " + model, notify):
+                _run_impl(model, input_jsonl, quant, out, context, parallel, quiet,
+                          RunOpts(logprobs=logprobs,
+                                  prefix_reuse=not os.environ.get("SPILL_NO_PREFIX_REUSE")))
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
 
 
 def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
@@ -502,11 +635,22 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
     input_jsonl = _resolve_input(input_arg)
     rows = formats.load_rows(input_jsonl, mode=opts.mode)
     max_tokens = max(r["body"].get("max_tokens", 128) for r in rows)
-    mlx_ok = _is_mac() and quant in (None, "bf16", "8bit", "4bit")
-    if not mlx_ok and (adapter_spec or opts.logprobs or scoring):
-        raise SpillError("adapters, --logprobs and --score need the MLX engines (Apple "
-                         "silicon, bf16/8bit/4bit); the llama.cpp path does not support them",
-                         "spill run <model> <file>")
+    gguf = quant not in (None, "bf16", "8bit", "4bit")      # an explicit GGUF quant: llama.cpp
+    choice = None if gguf else engine_select.choose_engine(runtime.ENV.engine)
+    if choice is not None:
+        runtime.set_engine(choice.name)
+    mlx_ok = choice is not None and choice.is_mlx
+    if gguf and (adapter_spec or opts.logprobs or scoring):
+        raise SpillError("adapters, --logprobs and --score need the MLX or torch engines "
+                         "(bf16); the llama.cpp path (--quant Q8_0, Q4_K_M) does not support "
+                         "them", "spill run <model> <file>")
+    if choice is not None and choice.is_torch:
+        if quant in ("8bit", "4bit"):
+            raise SpillError(f"--quant {quant} runs on the MLX engine; the torch engines run "
+                             f"bf16", "spill ... --engine mlx")
+        from .cli_torch import run_torch
+        return run_torch(res, input_jsonl, out, context, parallel, hw, rows, quiet, opts,
+                         adapter_spec, choice)
     adapter = resolve_adapter(adapter_spec) if adapter_spec else None
 
     if mlx_ok:
@@ -532,13 +676,10 @@ def _run_impl(model, input_arg, quant, out, context, parallel, quiet,
                         out, context, parallel, hw, rows, quiet=quiet, opts=opts,
                         adapter=adapter)
     model = res.name
-    if not _is_mac():
-        typer.echo(f"spill: no Apple silicon here, so run uses llama.cpp (works, slower); "
-                   f"{platforms.platform_line()}")
     if res.kind == "hf":
         from .errors import SpillError
-        raise SpillError("arbitrary HF repos run on the Metal streaming path only; "
-                         "on this machine use a curated tag", "spill models")
+        raise SpillError("arbitrary HF repos run on the MLX and torch engines; the llama.cpp "
+                         "path (--quant Q8_0, Q4_K_M) needs a curated tag", "spill models")
 
     # non-Apple path (or explicit GGUF quant): llama.cpp, Phase 0 policy
     m = reg[model]
@@ -618,27 +759,44 @@ def distill(
     context: int = typer.Option(4096, "--context", help="context window in tokens"),
     quiet: bool = typer.Option(False, "--quiet", help="one progress line, no live slot block"),
     notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when done"),
+    state: str = typer.Option(None, "--state", help="portable job state: a path, s3://, gs://, "
+                                                    "az:// (resumes from the latest checkpoint there)"),
+    weights: str = typer.Option(None, "--weights", help="stage the model from this location "
+                                                        "instead of Hugging Face"),
+    engine: str = typer.Option(None, "--engine", help="mlx | torch-cpu | torch-cuda "
+                                                      "(default: chosen from the hardware)"),
+    headless: bool = typer.Option(False, "--headless", help="JSON-lines events on stdout, exit "
+                                                            "75 when preempted (automatic when "
+                                                            "stdout is not a terminal)"),
+    config: Path = typer.Option(None, "--config", help="run the invocation stored in this "
+                                                       "job.json"),
+    emit_config: Path = typer.Option(None, "--emit-config", help="write this invocation to "
+                                                                 "job.json and exit"),
+    stop_after: int = typer.Option(None, "--stop-after", hidden=True),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Collect a big model's answers to learn from: completions plus per-token top-k
     log-probs, or its log-probs over targets you supply (--score)."""
     global _DEBUG
     _DEBUG = debug
-    try:
-        platforms.require_mlx("distill")
-        opts = RunOpts(mode="score" if score else "generate", logprobs=logprobs,
-                       kind="distill")
-        with overnight.long_job("spill distill " + teacher, notify):
-            job, prog = _run_impl(teacher, input_jsonl, quant, out, context, None,
-                                  quiet, opts)
-        if prog.done >= prog.total:
-            dest = _finalize_distill(job)
-            _next_hint(f"spill check {dest}" if not score else
-                       f"spill runs")
-        else:
-            _next_hint(f"spill resume {job.id}")
-    except Exception as e:
-        _fail(e)
+    with runtime.job_session("distill", state=state, weights=weights, engine=engine,
+                             headless_flag=headless, stop_after=stop_after):
+        try:
+            opts = RunOpts(mode="score" if score else "generate", logprobs=logprobs,
+                           kind="distill")
+            with _long_job("spill distill " + teacher, notify):
+                job, prog = _run_impl(teacher, input_jsonl, quant, out, context, None,
+                                      quiet, opts)
+            if prog.done >= prog.total:
+                dest = _finalize_distill(job)
+                _next_hint(f"spill check {dest}" if not score else
+                           f"spill runs")
+            else:
+                _next_hint(f"spill resume {job.id}")
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
 
 
 @app.command("eval", short_help="Score models on your eval set, one table",
@@ -656,17 +814,36 @@ def eval_cmd(
     context: int = typer.Option(4096, "--context", help="context window in tokens"),
     quiet: bool = typer.Option(False, "--quiet", help="one progress line, no live slot block"),
     notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when done"),
+    state: str = typer.Option(None, "--state", help="portable job state: a path, s3://, gs://, "
+                                                    "az:// (resumes from the latest checkpoint there)"),
+    weights: str = typer.Option(None, "--weights", help="stage the model from this location "
+                                                        "instead of Hugging Face"),
+    engine: str = typer.Option(None, "--engine", help="mlx | torch-cpu | torch-cuda "
+                                                      "(default: chosen from the hardware)"),
+    headless: bool = typer.Option(False, "--headless", help="JSON-lines events on stdout, exit "
+                                                            "75 when preempted (automatic when "
+                                                            "stdout is not a terminal)"),
+    config: Path = typer.Option(None, "--config", help="run the invocation stored in this "
+                                                       "job.json"),
+    emit_config: Path = typer.Option(None, "--emit-config", help="write this invocation to "
+                                                                 "job.json and exit"),
+    stop_after: int = typer.Option(None, "--stop-after", hidden=True),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Run the eval set against each model (reusing finished runs for this exact input),
     score it, and print one table plus the rows where the models disagree."""
     global _DEBUG
     _DEBUG = debug
-    try:
-        with overnight.long_job("spill eval " + Path(input_jsonl).name, notify):
-            _eval_impl(input_jsonl, models, metric, judge, rerun, quant, context, None, quiet)
-    except Exception as e:
-        _fail(e)
+    with runtime.job_session("eval", state=state, weights=weights, engine=engine,
+                             headless_flag=headless, stop_after=stop_after):
+        try:
+            with _long_job("spill eval " + Path(input_jsonl).name, notify):
+                _eval_impl(input_jsonl, models, metric, judge, rerun, quant, context, None,
+                           quiet)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
 
 
 def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel, quiet,
@@ -710,6 +887,8 @@ def _eval_impl(input_arg, models, metric, judge, rerun, quant, context, parallel
 
     scored, run_ids = [], []
     for n, label in enumerate(models):
+        if runtime.ENV.state:
+            runtime.ENV.state_leaf = runtime.slug(label)
         base, ad_spec = split_model_adapter(label)
         ad_hash = resolve_adapter(ad_spec).hash if ad_spec else None
         res = resolve_model(base)
@@ -803,28 +982,56 @@ def tune(
     grad_accum: int = typer.Option(1, "--grad-accum", help="micro-batches per optimizer step"),
     max_seq: int = typer.Option(2048, "--max-seq", help="token cap per example; whole "
                                 "exchanges are dropped from the left"),
+    targets: str = typer.Option(None, "--targets", help="comma-separated modules to adapt, "
+                                "e.g. q_proj,v_proj (default: every linear)"),
     path: str = typer.Option("auto", "--path", help="auto | resident | streamed"),
     overwrite: bool = typer.Option(False, "--overwrite", help="replace an existing adapter"),
     quiet: bool = typer.Option(False, "--quiet", help="a progress line every 10 steps"),
     notify: str = typer.Option(None, "--notify", help="POST a small JSON to this URL when done"),
+    state: str = typer.Option(None, "--state", help="portable job state: a path, s3://, gs://, "
+                                                    "az:// (resumes from the latest checkpoint there)"),
+    weights: str = typer.Option(None, "--weights", help="stage the model from this location "
+                                                        "instead of Hugging Face"),
+    engine: str = typer.Option(None, "--engine", help="mlx | torch-cpu | torch-cuda "
+                                                      "(default: chosen from the hardware)"),
+    headless: bool = typer.Option(False, "--headless", help="JSON-lines events on stdout, exit "
+                                                            "75 when preempted (automatic when "
+                                                            "stdout is not a terminal)"),
+    config: Path = typer.Option(None, "--config", help="run the invocation stored in this "
+                                                       "job.json"),
+    emit_config: Path = typer.Option(None, "--emit-config", help="write this invocation to "
+                                                                 "job.json and exit"),
+    stop_after: int = typer.Option(None, "--stop-after", hidden=True),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Train a LoRA adapter on your data against the full-precision base."""
     global _DEBUG
     _DEBUG = debug
-    try:
-        platforms.require_mlx("tune")
-        with overnight.long_job("spill tune " + name, notify):
-            _tune_impl(model, train_jsonl, name, rank, 2 * rank, 0.0, None, lr, "cosine", 0.01,
-                       steps, epochs, batch, grad_accum, max_seq, 0, path, 50, overwrite, quiet)
-    except Exception as e:
-        _fail(e)
+    with runtime.job_session("tune", state=state, weights=weights, engine=engine,
+                             headless_flag=headless, stop_after=stop_after):
+        try:
+            with _long_job("spill tune " + name, notify):
+                _tune_impl(model, train_jsonl, name, rank, 2 * rank, 0.0, targets, lr, "cosine",
+                           0.01, steps, epochs, batch, grad_accum, max_seq, 0, path, 50,
+                           overwrite, quiet)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
 
 
 def _tune_model_dir(model: str) -> tuple[str, Path]:
     """(display name, safetensors dir) for a tag, HF repo id, or local directory."""
     from .errors import SpillError
     from .resolve import download_hf, resolve_model
+    if runtime.ENV.weights:
+        from .portable.weights import stage_weights
+        d, staged = stage_weights(runtime.ENV.weights,
+                                  note=lambda m: typer.echo(f"   {m}", err=True))
+        typer.echo(f"   weights staged from {staged['uri']}: {staged['bytes'] / 1e9:.2f} GB "
+                   f"copied in {staged['seconds']:.1f} s ({staged['reused']} files already "
+                   f"here)", err=True)
+        return model, d
     p = Path(model).expanduser()
     if p.is_dir():
         if not (p / "config.json").exists() or not any(p.glob("*.safetensors")):
@@ -842,11 +1049,16 @@ def _tune_pre_line(prep, size_gb: float, ws: int, ram: int, dest: Path) -> None:
     s, st = prep.spec, prep.stats
     fam = classify(prep.config)
     tg = ",".join(sorted({p.rsplit(".", 1)[-1] for p in prep.shapes}))
-    placement = ("streamed from NVMe, two weight streams per micro-batch"
-                 if s.path == "streamed" else "resident (mlx-lm LoRA tuner)")
+    if s.engine == "mlx":
+        placement = ("streamed from NVMe, two weight streams per micro-batch"
+                     if s.path == "streamed" else "resident (mlx-lm LoRA tuner)")
+    else:
+        placement = (f"streamed from disk on {s.engine}, two weight streams per micro-batch"
+                     if s.path == "streamed" else f"resident on {s.engine} (PEFT LoRA layers)")
+        placement += f"; {prep.dtype_note}; adapter and optimizer float32"
     trunc = (f", {st.truncated} truncated" if st.truncated else "") + \
             (f", {len(st.skipped)} skipped" if st.skipped else "")
-    typer.echo(
+    line = (
         f"spill tune {s.model}: bf16 ({size_gb:.1f} GB, {fam.label}: {fam.state}), {placement}. "
         f"Adapter {s.name}: rank {s.rank} alpha {s.alpha:g} dropout {s.dropout:g} on {tg} in "
         f"{prep.n_layers} layers ({prep.lora_params / 1e6:.1f}M parameters), lr {s.lr:g} "
@@ -854,13 +1066,20 @@ def _tune_pre_line(prep, size_gb: float, ws: int, ram: int, dest: Path) -> None:
         f"({st.trained_tokens:,} trained) at --max-seq {s.max_seq}{trunc}. "
         f"{s.steps} steps of micro-batch {s.micro_batch} x grad-accum {s.grad_accum}. "
         f"Est. {_fmt_dur(prep.est_total_s)} ({prep.est_note}). Cost: $0."
-        f"{overnight.battery_note()} Adapter -> {dest}")
+        f"{'' if runtime.ENV.headless else overnight.battery_note()} Adapter -> {dest}")
+    typer.echo(line)
     typer.echo(f"   why: {prep.why}")
-    for line, why in st.skipped[:5]:
-        typer.echo(f"   skipped line {line}: {why}", err=True)
+    for ln, why in st.skipped[:5]:
+        typer.echo(f"   skipped line {ln}: {why}", err=True)
+    return line
 
 
 def _tune_progress(quiet: bool):
+    if runtime.ENV.headless:
+        def hcb(i):
+            runtime.ENV.events.step(i)
+        return hcb
+
     def cb(i):
         line = (f"step {i['step']}/{i['steps']} \u00b7 loss {i['loss']:.4g} \u00b7 "
                 f"{i['avg_step_s']:.3g} s/step \u00b7 ETA {_fmt_eta(i['eta_s'])} \u00b7 "
@@ -874,13 +1093,23 @@ def _tune_progress(quiet: bool):
     return cb
 
 
+def _tune_module(engine_name: str):
+    """tune.job (MLX) or tune.torch_job (PyTorch): the same prepare / run_tune surface."""
+    if engine_name == "mlx":
+        from .tune import job as m
+    else:
+        from .tune import torch_job as m
+    return m
+
+
 def _tune_run(prep, job, resume: bool, quiet: bool, hw: dict, base_label: str):
     import signal
     import threading
 
     from . import runs as runs_mod
-    from .tune.job import run_tune
-    stop = threading.Event()
+    run_tune = _tune_module(prep.spec.engine).run_tune
+    guard = runtime.ENV.guard
+    stop = runtime.ENV.stop if guard is not None else threading.Event()
     n_int = {"n": 0}
 
     def on_sig(*_):
@@ -892,21 +1121,26 @@ def _tune_run(prep, job, resume: bool, quiet: bool, hw: dict, base_label: str):
         else:
             raise KeyboardInterrupt
     prev = {}
-    for sg in (signal.SIGINT, signal.SIGTERM):
-        try:
-            prev[sg] = signal.signal(sg, on_sig)
-        except ValueError:
-            pass
+    if guard is None:                 # a person at a terminal; headless jobs use the guard
+        for sg in (signal.SIGINT, signal.SIGTERM):
+            try:
+                prev[sg] = signal.signal(sg, on_sig)
+            except ValueError:
+                pass
+
+    def on_event(ev: dict):
+        ev = dict(ev)
+        runtime.emit(ev.pop("event"), **ev)
     try:
         res = run_tune(prep, job, stop=stop, progress_cb=_tune_progress(quiet), resume=resume,
-                       note=lambda m: typer.echo(f"   {m}", err=True))
+                       note=lambda m: typer.echo(f"   {m}", err=True), on_event=on_event)
     except Exception as e:
         if any(k in str(e) for k in ("Insufficient Memory", "kIOGPU", "OutOfMemory",
-                                     "metal::malloc")):
+                                     "metal::malloc", "CUDA out of memory")):
             from .errors import SpillError
             mb, ga = prep.spec.micro_batch, prep.spec.grad_accum
             raise SpillError(
-                f"Metal ran out of memory at micro-batch {mb}; the budget estimate was too "
+                f"the device ran out of memory at micro-batch {mb}; the budget estimate was too "
                 f"optimistic for this model and sequence length (checkpoints are kept)",
                 f"spill tune ... --batch {max(1, mb // 2)} --grad-accum {ga * 2}") from e
         raise
@@ -924,6 +1158,11 @@ def _tune_run(prep, job, resume: bool, quiet: bool, hw: dict, base_label: str):
             except ValueError:
                 pass
     sys.stderr.write("\n")
+    if res["interrupted"] and prep.spec.stop_after and res["step"] >= prep.spec.stop_after:
+        runtime.ENV.stopped_early = True
+    runtime.ENV.summary.update(step=res["step"], steps=res["steps"], job=job.id,
+                               first_loss=res["first_loss"], final_loss=res["final_loss"],
+                               adapter=res.get("adapter"))
     runs_mod.finish_run(job.id, status="interrupted" if res["interrupted"] else "completed",
                         rows_done=res["step"])
     return res
@@ -963,18 +1202,28 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
     from . import runs as runs_mod
     from .calibration import load_calibration
     from .errors import SpillError
-    from .tune import job as tj
+    from .portable.store import is_uri
+    if is_uri(str(train_jsonl)):
+        train_jsonl = _fetch_input(str(train_jsonl))
+    train_jsonl = Path(train_jsonl)
     if not train_jsonl.exists():
         raise SpillError(f"training file {train_jsonl} does not exist",
                          "spill example banking77 --quick")
     if path not in ("auto", "resident", "streamed"):
         raise SpillError("--path must be auto, resident or streamed")
+    choice = engine_select.choose_engine(runtime.ENV.engine)
+    runtime.set_engine(choice.name)
+    tj = _tune_module(choice.name)
     dest = adapters_mod.ADAPTERS_DIR / name
-    if dest.exists() and not overwrite:
+    if dest.exists() and not overwrite and not runtime.ENV.state:
         raise SpillError(f"adapter {name} already exists at {dest}",
                          f"spill tune ... --name {name}-2   (or --overwrite)")
     hw = probe_mod.load()
-    ws = hw["gpu"]["vram_bytes"]
+    if choice.is_mlx:
+        ws = hw["gpu"]["vram_bytes"]
+    else:
+        from .engines.torch_common import memory_total_bytes
+        ws = memory_total_bytes(choice.name)
     label, mdir = _tune_model_dir(model)
     size = sum(f.stat().st_size for f in mdir.glob("*.safetensors"))
     chosen = tj.decide_path(size, ws, path)
@@ -984,12 +1233,13 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
         targets=[t.strip() for t in targets.split(",")] if targets else None, lr=lr,
         weight_decay=weight_decay, schedule=schedule, seed=seed, max_seq=max_seq,
         micro_batch=batch or 4, grad_accum=grad_accum, steps=steps or 1, epochs=epochs,
-        ckpt_every=ckpt_every, overwrite=overwrite)
+        ckpt_every=ckpt_every, overwrite=overwrite, engine=choice.name,
+        state=runtime.state_uri(), stop_after=runtime.ENV.stop_after)
     if spec.grad_accum < 1:
         raise SpillError("--grad-accum must be at least 1")
     prep = tj.prepare(spec, working_set=ws, calibration=load_calibration(), hw=hw,
                       micro_batch_given=batch is not None, steps_given=steps is not None)
-    _tune_pre_line(prep, size / GIB, ws, hw["ram_total_bytes"], dest)
+    line = _tune_pre_line(prep, size / GIB, ws, hw["ram_total_bytes"], dest)
 
     job = Job.create(train_jsonl, label, "bf16", spec.max_seq, spec.micro_batch, None,
                      options={"kind": "tune", "tune": spec.to_dict()})
@@ -998,10 +1248,16 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
     job.write_meta(total=spec.steps, done=0,
                    options={"kind": "tune", "tune": spec.to_dict()})
     mspec = ModelSpec(label, "bf16", mdir)
+    engine_label = (("mlx_stream_tune" if chosen == "streamed" else "mlx_lm_lora")
+                    if choice.is_mlx else
+                    ("torch_stream_tune" if chosen == "streamed" else "torch_peft_lora"))
     runs_mod.start_run(job, command=None, spec=mspec, input_path=train_jsonl, hw=hw,
-                       engine_name="mlx_stream_tune" if chosen == "streamed" else "mlx_lm_lora",
+                       engine_name=engine_label,
                        options={"kind": "tune", "tune": spec.to_dict()}, kind="tune")
     prep.spec = spec
+    runtime.emit("start", job=job.id, command="tune", model=label, steps=spec.steps,
+                 placement=chosen, state=runtime.state_uri(), message=line,
+                 estimated_seconds=round(prep.est_total_s))
     res = _tune_run(prep, job, False, quiet, hw, label)
     _tune_report(prep, job, res, train_jsonl)
     return job, res
@@ -1033,10 +1289,19 @@ def _tune_build(model, train, name, resume_job, epochs=1.0, quiet=True):
 
 def _tune_resume(j: Job, meta: dict) -> None:
     from .calibration import load_calibration
-    from .tune import job as tj
+    from .tune.spec import TuneSpec
     hw = probe_mod.load()
-    spec = tj.TuneSpec(**meta["options"]["tune"])
-    prep = tj.prepare(spec, working_set=hw["gpu"]["vram_bytes"], calibration=load_calibration(),
+    spec = TuneSpec.from_dict(meta["options"]["tune"])
+    tj = _tune_module(spec.engine)
+    if spec.engine == "mlx":
+        ws = hw["gpu"]["vram_bytes"]
+    else:
+        from .engines.torch_common import memory_total_bytes
+        ws = memory_total_bytes(spec.engine)
+    runtime.set_engine(spec.engine)
+    if runtime.ENV.stop_after:
+        spec.stop_after = runtime.ENV.stop_after
+    prep = tj.prepare(spec, working_set=ws, calibration=load_calibration(),
                       hw=hw, micro_batch_given=True, steps_given=True)
     from . import runs as runs_mod
     runs_mod.mark_resumed(j.id)
@@ -1122,8 +1387,23 @@ def tail(job: str = typer.Argument(None, help="job id (default: the latest job)"
 
 @app.command(short_help="Continue an interrupted job or build",
              epilog="Example: spill resume banking77-quick")
-def resume(job: str = typer.Argument(None, help="job id or build folder (default: the latest job)")):
+def resume(job: str = typer.Argument(None, help="job id or build folder (default: the latest job)"),
+           headless: bool = typer.Option(False, "--headless", help="JSON-lines events on stdout, "
+                                                                   "exit 75 when preempted"),
+           weights: str = typer.Option(None, "--weights", help="stage the model from this "
+                                                               "location instead of Hugging Face")):
     """Continue the latest or named job from its checkpoint; a folder continues its build."""
+    global _DEBUG
+    with runtime.job_session("resume", weights=weights, headless_flag=headless):
+        try:
+            _resume_impl(job)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
+
+
+def _resume_impl(job: str | None):
     if job and (Path(job) / ".build" / "state.json").exists():
         from .cli_build import resume_build
         resume_build(Path(job))
@@ -1147,7 +1427,18 @@ def resume(job: str = typer.Argument(None, help="job id or build folder (default
     typer.echo(f"resuming {j.id}: {done}/{j.total} done, {j.total - done} remaining")
     hw = probe_mod.load()
     quant = j.quant
-    if _is_mac() and quant in ("bf16", "8bit", "4bit"):
+    o = meta0.get("options", {})
+    if o.get("state") and not runtime.ENV.state:
+        runtime.ENV.state = o["state"]
+    ch = o.get("engine_choice")
+    if ch and ch.startswith("torch"):
+        from .cli_torch import resume_torch
+        runtime.emit("start", job=j.id, command="resume", rows=j.total, done=done,
+                     state=runtime.state_uri())
+        resume_torch(j, hw, ch)
+    elif _is_mac() and quant in ("bf16", "8bit", "4bit"):
+        runtime.emit("start", job=j.id, command="resume", rows=j.total, done=done,
+                     state=runtime.state_uri())
         _run_mlx_resume(j, quant, hw)
     else:
         reg = load_registry()
@@ -1205,7 +1496,7 @@ def _run_mlx_resume(j: Job, quant: str, hw: dict) -> None:
         size = sum(f.stat().st_size for f in path.glob("*.safetensors"))
     engine = MlxResidentEngine() if size <= ws * 0.70 else \
         MlxStreamEngine(progress_note=lambda s: typer.echo(f"   {s}", err=True))
-    engine.pass_cb = _LiveRenderer(j.dir, quiet=False)
+    engine.pass_cb = _live_cb(j.dir, False)
     spec = ModelSpec(j.model, quant, Path(path),
                      reg[j.model].arch if j.model in reg else {}, j.ctx)
     o = j.read_meta().get("options", {})

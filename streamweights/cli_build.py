@@ -347,6 +347,9 @@ def _doctor_impl():
                           models_dir=MODELS_DIR, interrupted_lines=interrupted,
                           version=__version__, adapters=len(list_local_adapters()),
                           mlx=mlx_available()))
+    from . import engine_select as es
+    typer.echo("\n".join(doc.engine_lines(es.choose_engine(), es.availability(),
+                                          es.measure_rates())))
     have = any(True for _ in MODELS_DIR.glob("*/bf16-st")) if MODELS_DIR.exists() else False
     first = (overnight.interrupted_builds() or [None])[-1]
     jobs = overnight.interrupted_jobs(JOBS_DIR)

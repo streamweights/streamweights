@@ -1,0 +1,47 @@
+# A SkyPilot managed job: spill tune, headless, from an emitted config.
+#
+#   sky jobs launch examples/schedulers/skypilot/job.yaml --env BUCKET=my-spill-bucket
+#
+# Spot instances with automatic recovery: when a spot VM is preempted SkyPilot launches a new
+# one (any of the accelerators below, or a CPU-only machine) and reruns `run`; spill finds the
+# latest committed checkpoint under --state in the bucket and continues from it.
+
+name: spill-tune
+
+resources:
+  use_spot: true
+  job_recovery:
+    strategy: EAGER_NEXT_REGION
+    max_restarts_on_errors: 3
+  disk_size: 200
+  any_of:
+    - accelerators: H100:1
+    - accelerators: A100:1
+    - accelerators: L4:1
+    - accelerators: A10G:1
+    - cpus: 16+          # CPU only: slower, and the same checkpoint
+
+envs:
+  BUCKET: my-spill-bucket     # an existing bucket (or a new name SkyPilot creates)
+  SPILL_HOME: /bucket/home    # per-job cache; weights are staged from /bucket/weights
+
+file_mounts:
+  /bucket:
+    name: ${BUCKET}
+    mode: MOUNT_CACHED        # writes are flushed in the background; checkpoints are small
+
+setup: |
+  set -e
+  pip install --upgrade pip
+  if ! command -v nvidia-smi >/dev/null 2>&1; then
+    # CPU-only machine: the CPU build of PyTorch is a much smaller download
+    pip install torch --index-url https://download.pytorch.org/whl/cpu
+  fi
+  pip install "streamweights[cloud] @ git+https://github.com/streamweights/streamweights"
+
+run: |
+  # tune.json was written on a laptop with --emit-config and uploaded:
+  #   spill tune qwen2.5:7b train.jsonl --name mine --state /bucket/state/mine \
+  #        --weights /bucket/weights/qwen2.5-7b --emit-config tune.json
+  #   (the path /bucket does not need to exist on the laptop; nothing runs)
+  spill tune --config /bucket/jobs/tune.json --headless

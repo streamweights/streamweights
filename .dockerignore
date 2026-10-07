@@ -1,0 +1,17 @@
+.git
+.venv
+.github
+__pycache__
+*.pyc
+/models
+/jobs
+/runs
+/adapters
+/exports
+/state
+/bin
+/tools
+/docs
+/scripts
+/tests
+/examples

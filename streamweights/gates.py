@@ -1,0 +1,547 @@
+"""The run-anywhere gates, as a library: identity of the PyTorch engines against each other and
+against MLX, and jobs that move between engines mid-run. `scripts/gates_012.py` runs them on
+a Mac; `streamweights.verify_cuda` runs them on a CUDA machine.
+
+Tune and eval gates run the real `spill` command in a subprocess against a private SPILL_HOME,
+in headless mode, so what is gated is what a user runs. Inference gates call the engines
+directly, because they compare log-probs token by token.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+
+GATE_LR = 2e-5            # natural-text gate: the loss falls from 1.4 to 0.3 in 100 steps
+TOY_LR = 5e-6             # toy task: the adapter learns it (held-out score 0 -> 1) and the loss is still moving at step 50
+
+
+# ---------------------------------------------------------------- running spill
+
+@dataclass
+class Result:
+    rc: int
+    events: list[dict]
+    stderr: str
+    stdout: str = ""
+
+    def last(self, kind: str) -> dict | None:
+        for e in reversed(self.events):
+            if e.get("event") == kind:
+                return e
+        return None
+
+    @property
+    def done(self) -> dict | None:
+        return self.last("done")
+
+
+class Work:
+    """A private SPILL_HOME for gate runs: shares the repo's downloaded models and measured
+    hardware, so nothing is downloaded twice and no gate writes into the checkout."""
+
+    def __init__(self, root: Path, models_from: Path | None = None, state_from: Path | None = None):
+        self.root = Path(root)
+        self.home = self.root / "home"
+        (self.home / "state").mkdir(parents=True, exist_ok=True)
+        for f in ("hardware.json", "calibration.json"):
+            if state_from and (Path(state_from) / f).exists() and not (self.home / "state" / f).exists():
+                shutil.copy(Path(state_from) / f, self.home / "state" / f)
+        if models_from and Path(models_from).exists() and not (self.home / "models").exists():
+            (self.home / "models").symlink_to(Path(models_from).resolve())
+
+    def spill(self, args: list, *, dtype: str | None = None, env: dict | None = None,
+              timeout: int = 7200, cwd: Path | None = None) -> Result:
+        e = {**os.environ, "SPILL_HOME": str(self.home), "SPILL_HEADLESS": "1"}
+        if dtype:
+            e["SPILL_TORCH_DTYPE"] = dtype
+        e.update(env or {})
+        p = subprocess.run([sys.executable, "-m", "streamweights", *[str(a) for a in args]],
+                           capture_output=True, text=True, env=e, timeout=timeout, cwd=cwd)
+        evs = []
+        for line in p.stdout.splitlines():
+            try:
+                evs.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+        return Result(p.returncode, evs, p.stderr, p.stdout)
+
+    def job_losses(self, job_id: str) -> list[float]:
+        p = self.home / "jobs" / job_id / "losses.jsonl"
+        by_step = {}
+        for line in p.read_text().splitlines():
+            if line.strip():
+                d = json.loads(line)
+                by_step[d["step"]] = d["loss"]
+        return [by_step[k] for k in sorted(by_step)]
+
+    def adapter_params(self, name: str) -> dict[str, np.ndarray]:
+        from .tune.lora_core import read_adapter_params
+        return read_adapter_params(self.home / "adapters" / name)
+
+
+def tune_args(model, data, name, *, engine, path="streamed", steps=50, lr=GATE_LR, batch=4,
+              max_seq=256, rank=16, targets=None, state=None, stop_after=None, seed=None):
+    a = ["tune", model, data, "--name", name, "--engine", engine, "--path", path,
+         "--steps", steps, "--lr", lr, "--batch", batch, "--max-seq", max_seq, "--rank", rank,
+         "--overwrite", "--quiet"]
+    if targets:
+        a += ["--targets", targets]
+    if state:
+        a += ["--state", state]
+    if stop_after:
+        a += ["--stop-after", stop_after]
+    return a
+
+
+# ---------------------------------------------------------------- comparisons
+
+def loss_stats(a: list[float], b: list[float]) -> dict:
+    n = min(len(a), len(b))
+    rel = [abs(x - y) / max(abs(y), 1e-12) for x, y in zip(a[:n], b[:n])]
+    return {"steps": n, "max_rel": max(rel) if rel else None,
+            "mean_rel": float(np.mean(rel)) if rel else None,
+            "worst_step": int(np.argmax(rel)) + 1 if rel else None}
+
+
+def adapter_cosines(pa: dict, pb: dict) -> dict:
+    from .tune.lora_core import cosine_np
+    cos = {k: cosine_np(pa[k], pb[k]) for k in pa if k in pb}
+    worst = min(cos, key=cos.get)
+    return {"tensors": len(cos), "min": cos[worst], "mean": float(np.mean(list(cos.values()))),
+            "worst": worst}
+
+
+def compare_inference(a: dict, b: dict) -> dict:
+    """a, b: {custom_id: CompletedRow} with log-probs. Greedy identity (same text and the same
+    token ids) and the largest log-prob and top-k log-prob difference over every token."""
+    same, max_lp, max_top, n_tok = 0, 0.0, 0.0, 0
+    diffs = []
+    for cid, ra in a.items():
+        rb = b[cid]
+        ta = [r["token_id"] for r in ra.logprobs or []]
+        tb = [r["token_id"] for r in rb.logprobs or []]
+        if ra.content == rb.content and ta == tb:
+            same += 1
+        else:
+            diffs.append(cid)
+        for x, y in zip(ra.logprobs or [], rb.logprobs or []):
+            if x["token_id"] != y["token_id"]:
+                break                                     # past the first divergence
+            n_tok += 1
+            max_lp = max(max_lp, abs(x["logprob"] - y["logprob"]))
+            for (i1, l1), (i2, l2) in zip(x["top"], y["top"]):
+                if i1 == i2:
+                    max_top = max(max_top, abs(l1 - l2))
+    return {"rows": len(a), "greedy_identical": same, "different_rows": diffs,
+            "tokens_compared": n_tok, "max_logprob_diff": max_lp, "max_top_logprob_diff": max_top}
+
+
+# ---------------------------------------------------------------- inference
+
+def infer(engine: str, model_dir: Path, rows: list[dict], *, resident: bool, dtype: str | None,
+          logprobs: int = 5, batch: int | None = None) -> tuple[dict, dict]:
+    """Run `rows` through an engine in this process; ({custom_id: CompletedRow}, stats)."""
+    from .engines.base import MemoryBudget, ModelSpec
+    spec = ModelSpec("gate", "bf16", Path(model_dir), {}, 4096, extra={"logprobs": logprobs})
+    if engine == "mlx":
+        from .engines.mlx_resident import MlxResidentEngine
+        from .engines.mlx_stream import MlxStreamEngine
+        eng = MlxResidentEngine() if resident else MlxStreamEngine()
+        ws = int(os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") * 0.75)
+    else:
+        from .engines.torch_common import memory_total_bytes
+        from .engines.torch_resident import TorchResidentEngine
+        from .engines.torch_stream import TorchEngine
+        eng = (TorchResidentEngine if resident else TorchEngine)(engine=engine, dtype=dtype)
+        ws = memory_total_bytes(engine)
+    t0 = time.monotonic()
+    out = {c.custom_id: c for c in eng.run_batch(rows, spec, MemoryBudget(ws, batch_override=batch))}
+    secs = time.monotonic() - t0
+    passes = sorted(getattr(eng, "last_pass_times", []) or [])
+    stats = {"seconds": round(secs, 3), "passes": len(passes),
+             "median_pass_s": round(passes[len(passes) // 2], 4) if passes else None,
+             "completion_tokens": sum(c.completion_tokens for c in out.values())}
+    prov = getattr(eng, "provider", None)
+    ring = getattr(prov, "ring", None)
+    if ring is not None and ring.read_seconds:
+        stats["read_gb_s"] = round(ring.bytes_read / ring.read_seconds / 1e9, 3)
+        stats["read_mode"] = ring.mode
+    return out, stats
+
+
+def gate_inference_stream_vs_resident(model_dir, rows, engine="torch-cpu", dtype="float32") -> dict:
+    a, sa = infer(engine, model_dir, rows, resident=True, dtype=dtype)
+    b, sb = infer(engine, model_dir, rows, resident=False, dtype=dtype)
+    cmp = compare_inference(a, b)
+    cmp["pass"] = cmp["greedy_identical"] == cmp["rows"] and cmp["max_logprob_diff"] <= 1e-5
+    cmp.update(engine=engine, dtype=dtype, resident=sa, streamed=sb)
+    return cmp
+
+
+def gate_inference_vs_mlx(model_dir, rows, torch_engine="torch-cpu", dtype="float32") -> dict:
+    t, st = infer(torch_engine, model_dir, rows, resident=True, dtype=dtype)
+    m, sm = infer("mlx", model_dir, rows, resident=True, dtype=None)
+    cmp = compare_inference(t, m)
+    cmp["pass"] = cmp["greedy_identical"] == cmp["rows"]       # the log-prob difference is reported
+    cmp.update(torch=st, mlx=sm, torch_engine=torch_engine, dtype=dtype)
+    return cmp
+
+
+# ---------------------------------------------------------------- tune
+
+def run_tune_cli(work: Work, name: str, args: list, dtype: str | None = None) -> dict:
+    t0 = time.monotonic()
+    r = work.spill(args, dtype=dtype)
+    if r.rc not in (0,):
+        raise RuntimeError(f"spill tune failed (exit {r.rc}): {r.stderr[-400:]}")
+    done = r.done or {}
+    steps = [e["step"] for e in r.events if e["event"] == "step"]
+    out = {"name": name, "job": done.get("job"), "seconds": round(time.monotonic() - t0, 2),
+           "first_step_run": steps[0] if steps else None, "last_step_run": steps[-1] if steps else None,
+           "events": r.events, "complete": done.get("complete")}
+    if out["job"]:
+        out["losses"] = work.job_losses(out["job"])
+    return out
+
+
+def gate_tune_identity(work: Work, model, data, *, a: dict, b: dict, steps=50, lr=GATE_LR,
+                       loss_tol: float, cos_tol: float | None, dtype="float32",
+                       tag: str = "g") -> dict:
+    """Run two tunes that differ in engine/path and compare loss per step and adapter tensors.
+    `a` and `b` are {"engine":, "path":}."""
+    ra = run_tune_cli(work, f"{tag}-a", tune_args(model, data, f"{tag}-a", steps=steps, lr=lr, **a),
+                      dtype)
+    rb = run_tune_cli(work, f"{tag}-b", tune_args(model, data, f"{tag}-b", steps=steps, lr=lr, **b),
+                      dtype)
+    ls = loss_stats(ra["losses"], rb["losses"])
+    cs = adapter_cosines(work.adapter_params(f"{tag}-a"), work.adapter_params(f"{tag}-b"))
+    ok = ls["max_rel"] is not None and ls["max_rel"] <= loss_tol and (
+        cos_tol is None or cs["min"] > cos_tol)
+    return {"a": a, "b": b, "steps": steps, "lr": lr, "dtype": dtype, "loss": ls, "adapter": cs,
+            "loss_tolerance": loss_tol, "cosine_floor": cos_tol, "pass": ok,
+            "losses_a": ra["losses"], "losses_b": rb["losses"],
+            "seconds": {"a": ra["seconds"], "b": rb["seconds"]}}
+
+
+def eval_scores(work: Work, heldout: str, labels: list[str], engine: str, dtype: str | None = None
+                ) -> dict[str, float]:
+    """`spill eval` over the labels (model+adapter), exact match; {label: mean score}."""
+    e = {"SPILL_ENGINE": engine}
+    r = work.spill(["eval", heldout, *labels, "--rerun", "--quiet", "--engine", engine],
+                   dtype=dtype, env=e)
+    if r.rc != 0:
+        raise RuntimeError(f"spill eval failed: {r.stderr[-400:]}")
+    runs = work.home / "runs"
+    dirs = sorted(d for d in runs.iterdir() if d.name.startswith("eval-"))
+    table = (dirs[-1] / "table.md").read_text().splitlines()
+    scores = {}
+    for line in table:
+        if line.startswith("| ") and not line.startswith("| model") and "---" not in line:
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            adapter = cells[2]
+            key = next((l for l in labels if (l.endswith("+" + adapter) if adapter != "-" else "+" not in l)), None)
+            if key:
+                scores[key] = float(cells[4].split()[0])
+    return scores
+
+
+# ---------------------------------------------------------------- resume across engines
+
+def noise_check(resumed: list[float], ref: list[float], ref_other: list[float], start: int) -> dict:
+    """The resumed curve (steps start+1..) against the reference run, next to the distance
+    between two clean runs on different engines (the noise): the resumed curve must be no
+    farther from the reference than 1.5 x the clean pair, plus a 1% slack."""
+    seg = slice(start, min(len(resumed), len(ref), len(ref_other)))
+    def mean_rel(x, y):
+        return float(np.mean([abs(p - q) / max(abs(q), 1e-12) for p, q in zip(x[seg], y[seg])]))
+    d_resumed = mean_rel(resumed, ref)
+    d_noise = mean_rel(ref_other, ref)
+    return {"mean_rel_resumed_vs_reference": d_resumed, "mean_rel_clean_pair": d_noise,
+            "limit": 1.5 * d_noise + 0.01, "pass": d_resumed <= 1.5 * d_noise + 0.01}
+
+
+def gate_resume_tune(work: Work, model, data, *, first: str, then: str, steps=100, at=50,
+                     lr=GATE_LR, tag="r", targets=None, rank=16, heldout=None, dtype_then=None,
+                     score_labels_engine=None) -> dict:
+    """Tune `first` for `at` steps and checkpoint, continue on `then` to `steps`, compare with an
+    uninterrupted run on `first` (the reference) and one on `then` (the noise)."""
+    state = str(work.root / f"state-{tag}-{first}-to-{then}")
+    shutil.rmtree(state, ignore_errors=True)
+    common = dict(steps=steps, lr=lr, rank=rank, targets=targets)
+    part1 = run_tune_cli(work, "p1", tune_args(model, data, f"{tag}-p1", engine=first, state=state,
+                                               stop_after=at, **common))
+    part2 = run_tune_cli(work, "p2", tune_args(model, data, f"{tag}-res", engine=then, state=state,
+                                               **common), dtype_then)
+    ref = run_tune_cli(work, "ref", tune_args(model, data, f"{tag}-ref", engine=first, **common))
+    other = run_tune_cli(work, "other", tune_args(model, data, f"{tag}-oth", engine=then, **common),
+                         dtype_then)
+    from .portable import checkpoint as pc
+    from .portable.store import Store
+    ck = pc.load_tune(Store(state))
+    hist = ck.state["history"]
+    res = {"first": first, "then": then, "stopped_at": part1["last_step_run"],
+           "resumed_from": part2["first_step_run"] - 1, "final_step": part2["last_step_run"],
+           "history": [{"range": h["range"], "engine": h["engine"], "hardware": h["hardware"],
+                        "numerics": h["numerics"]["base"]} for h in hist],
+           "curve": noise_check(part2["losses"], ref["losses"], other["losses"], at),
+           "loss_first_segment_identical_to_reference": loss_stats(
+               part2["losses"][:at], ref["losses"][:at])["max_rel"],
+           "losses": {"resumed": part2["losses"], "reference": ref["losses"],
+                      "other": other["losses"]}}
+    res["pass"] = (res["curve"]["pass"] and res["resumed_from"] == at
+                   and res["final_step"] == steps and len(hist) == 2)
+    if heldout:
+        eng = score_labels_engine or then
+        base = Path(model).name if Path(model).is_dir() else model
+        sc = eval_scores(work, heldout, [f"{model}+{tag}-res", f"{model}+{tag}-ref",
+                                         f"{model}+{tag}-oth"], eng)
+        r_, f_, o_ = (sc.get(f"{model}+{tag}-res"), sc.get(f"{model}+{tag}-ref"),
+                      sc.get(f"{model}+{tag}-oth"))
+        slack = max(abs((o_ or 0) - (f_ or 0)), 2 / 60)
+        res["scores"] = {"resumed": r_, "reference": f_, "other_engine_clean": o_,
+                         "limit_difference": slack,
+                         "pass": r_ is not None and f_ is not None and abs(r_ - f_) <= slack}
+        res["pass"] = res["pass"] and res["scores"]["pass"]
+    return res
+
+
+def gate_resume_rows(work: Work, heldout: str, model: str, *, first: str, then: str, half: int,
+                     tag="rows") -> dict:
+    """spill eval on `first`, stopped after `half` rows, finished on `then`: no row missing,
+    none duplicated, each row stamped with the engine that produced it."""
+    state = str(work.root / f"state-{tag}-{first}-to-{then}")
+    shutil.rmtree(state, ignore_errors=True)
+    r1 = work.spill(["eval", heldout, model, "--rerun", "--quiet", "--engine", first,
+                     "--state", state, "--stop-after", half])
+    audit1 = rows_audit(work, state, [])
+    r2 = work.spill(["eval", heldout, model, "--rerun", "--quiet", "--engine", then,
+                     "--state", state])
+    ids = [json.loads(l)["custom_id"] for l in Path(heldout).read_text().splitlines() if l.strip()]
+    audit = rows_audit(work, state, ids)
+    audit.update(first=first, then=then, exit_codes=[r1.rc, r2.rc],
+                 rows_after_first_leg=audit1["rows"], total=len(ids))
+    audit["pass"] = (r1.rc == 0 and r2.rc == 0 and audit1["rows"] == half
+                     and audit["rows"] == len(ids) and audit["unique"] == len(ids)
+                     and not audit["missing"] and audit["duplicated"] == 0
+                     and len(audit["by_engine"]) == 2)
+    return audit
+
+
+def rows_audit(work: Work, state_root: str, input_ids: list[str]) -> dict:
+    """Read the committed segments under a state location (an eval keeps one sub-directory per
+    model) and audit them against the input ids."""
+    from .portable import rows as pr
+    from .portable.store import Store
+    root = Store(state_root)
+    leaves = [n for n in root.ls() if root.exists(f"{n}/rows")]
+    store = root.sub(leaves[0]) if leaves else root
+    segs = pr.committed_segments(store)
+    ids = [i for s in segs for i in s["ids"]]
+    lines = []
+    for s in segs:
+        data = store.read(f"rows/seg-{s['n']:06d}.jsonl").decode().splitlines()
+        lines += [json.loads(l) for l in data]
+    engines = [(l["custom_id"], l["streamweights"]["engine"], l["streamweights"].get("hardware"),
+                (l["streamweights"].get("numerics") or {}).get("base")) for l in lines]
+    return {"segments": [{"rows": s["rows"], "engine": s["engine"], "hardware": s["hardware"],
+                          "numerics": s["numerics"]} for s in segs],
+            "rows": len(ids), "unique": len(set(ids)), "missing": sorted(set(input_ids) - set(ids)),
+            "duplicated": len(ids) - len(set(ids)),
+            "row_engines": sorted({e[1] for e in engines}),
+            "by_engine": {k: sum(1 for e in engines if e[1] == k) for k in {e[1] for e in engines}}}
+
+
+# ---------------------------------------------------------------- bf16: statistics, no identity claim
+
+def _agreement(a: dict, b: dict) -> dict:
+    c = compare_inference(a, b)
+    return {"rows_identical": c["greedy_identical"], "rows": c["rows"],
+            "max_logprob_diff": c["max_logprob_diff"], "tokens_compared": c["tokens_compared"]}
+
+
+def bf16_inference_statistics(model_bf16, model_f32, rows, torch_engine="torch-cpu") -> dict:
+    """Greedy agreement between engines and numerics on the same rows, next to batch-shape
+    noise (the same engine and numerics, batch 1 against the whole set). bf16 paths are expected
+    to differ by rounding noise; what is reported is how much, and how much the same engine
+    differs from itself when only the batch shape changes."""
+    out = {"rows": len(rows)}
+    t32, _ = infer(torch_engine, model_f32, rows, resident=True, dtype="float32")
+    tb, st = infer(torch_engine, model_bf16, rows, resident=True, dtype="bf16")
+    out["torch_bf16_seconds"] = st["seconds"]
+    out["torch_bf16_vs_torch_f32"] = _agreement(tb, t32)
+    try:
+        import mlx.core  # noqa: F401
+        mb, _ = infer("mlx", model_bf16, rows, resident=True, dtype=None)
+        m32, _ = infer("mlx", model_f32, rows, resident=True, dtype=None)
+        mb1, _ = infer("mlx", model_bf16, rows, resident=True, dtype=None, batch=1)
+        out["mlx_bf16_vs_mlx_f32"] = _agreement(mb, m32)
+        out["torch_bf16_vs_mlx_bf16"] = _agreement(tb, mb)
+        out["batch_shape_noise_mlx_bf16_batch1_vs_all"] = _agreement(mb1, mb)
+    except ImportError:
+        pass
+    tb1, _ = infer(torch_engine, model_bf16, rows, resident=True, dtype="bf16", batch=1)
+    out["batch_shape_noise_torch_bf16_batch1_vs_all"] = _agreement(tb1, tb)
+    return out
+
+
+def bf16_gradient_statistics(model_bf16, model_f32, data, *, max_seq=256, batch=4, cut=48,
+                             torch_engine="torch-cpu", do_torch_bf16=True) -> dict:
+    """Phase 3's gradient check, for the torch engine: the same parameters and the same batch,
+    per-tensor cosine of the bf16 gradient to the float32 gradient (mean, minimum, worst
+    tensor), for torch bf16 and for MLX bf16, next to batch-shape noise (one micro-batch of
+    `batch` examples against two of half the size, accumulated) for each engine."""
+    import torch
+
+    from .engines.common import collect_eos_ids
+    from .engines.torch_common import device_for, linear_shapes_meta, load_tokenizer
+    from .ring import SafetensorsIndex
+    from .tune import lora_core as lo
+    from .tune.data import BatchPlan, load_examples
+    from .tune.torch_train import StreamedTrainer
+    dev = device_for(torch_engine)
+    ix = SafetensorsIndex(Path(model_f32))
+    shapes = linear_shapes_meta(ix)
+    tok = load_tokenizer(Path(model_f32))
+    exs, _ = load_examples(Path(data), tok, max_seq, collect_eos_ids(Path(model_f32), tok))
+    plan = BatchPlan(exs[:64], batch, 0, tok.pad_token_id or 0)
+    b = plan.batch(0)
+    b.inputs, b.targets, b.mask = b.inputs[:, :cut], b.targets[:, :cut], b.mask[:, :cut]
+    cfg = lo.LoraConfig(rank=16, alpha=32, seed=0)
+    p0 = lo.init_params_np(shapes, ix.n_layers, 16, 0)
+    rng = np.random.RandomState(1)
+    p0 = {k: (v if k.endswith("lora_a") else (rng.randn(*v.shape) * 0.02).astype(np.float32))
+          for k, v in p0.items()}
+
+    def torch_grads(model_dir, dtype, inputs, targets, mask):
+        tr = StreamedTrainer(Path(model_dir), cfg, p0, dtype=dtype, device=dev, shapes=shapes,
+                             resident_weights=True)
+        try:
+            return tr.micro_batch(inputs, targets, mask, 0)
+        finally:
+            tr.close()
+
+    def stats(x, y):
+        cs = {k: lo.cosine_np(x[k], y[k]) for k in x}
+        worst = min(cs, key=cs.get)
+        return {"mean_cosine": float(np.mean(list(cs.values()))), "min_cosine": cs[worst],
+                "worst_tensor": worst}
+
+    def halves(fn, dirs_dtype):
+        parts = []
+        h = b.inputs.shape[0] // 2
+        for sl in (slice(0, h), slice(h, None)):
+            g, n = fn(dirs_dtype, b.inputs[sl], b.targets[sl], b.mask[sl])
+            parts.append((g, n))
+        tot = sum(n for _, n in parts)
+        return {k: sum(np.asarray(_np(g[k])) * (n / tot) for g, n in parts) for k in parts[0][0]}
+
+    def _np(x):
+        from .portable.checkpoint import to_numpy_f32
+        return to_numpy_f32(x)
+
+    _, g32, _ = torch_grads(model_f32, torch.float32, b.inputs, b.targets, b.mask)
+    out = {"batch_examples": int(b.inputs.shape[0]), "tokens": int(b.inputs.size)}
+    gb = None
+    if do_torch_bf16:
+        _, gb, _ = torch_grads(model_bf16, torch.bfloat16, b.inputs, b.targets, b.mask)
+        out["torch_bf16_vs_torch_f32"] = stats(gb, g32)
+
+        def tg(md, i, t, m):
+            _, g, n = torch_grads(md[0], md[1], i, t, m)
+            return g, n
+        out["batch_shape_noise_torch_bf16_one_batch_vs_two_halves"] = stats(
+            halves(tg, (model_bf16, torch.bfloat16)), gb)
+    try:
+        import mlx.core as mx
+
+        from .tune.streamed import StreamedTrainer as MlxTrainer
+
+        def mlx_grads(model_dir, inputs, targets, mask):
+            tr = MlxTrainer(Path(model_dir), cfg, params={k: mx.array(v) for k, v in p0.items()},
+                            resident_weights=True)
+            try:
+                _, g, n = tr.micro_batch(inputs, targets, mask, 0)
+            finally:
+                tr.close()
+            return {k: np.array(v) for k, v in g.items()}, n
+        mg, _ = mlx_grads(model_bf16, b.inputs, b.targets, b.mask)
+        out["mlx_bf16_vs_torch_f32"] = stats(mg, g32)
+        if gb is not None:
+            out["torch_bf16_vs_mlx_bf16"] = stats(gb, mg)
+        out["batch_shape_noise_mlx_bf16_one_batch_vs_two_halves"] = stats(
+            halves(lambda md, i, t, m: mlx_grads(md, i, t, m), model_bf16), mg)
+    except ImportError:
+        pass
+    return out
+
+
+# ---------------------------------------------------------------- the committed fixture
+
+def fixture_dir() -> Path:
+    """The step-50 MLX checkpoint committed with the package (qwen2.5:0.5b, a toy task, rank 4
+    on q_proj and v_proj, a 100-step schedule stopped at step 50)."""
+    return Path(__file__).resolve().parent / "data" / "fixtures" / "resume-qwen05"
+
+
+def gate_resume_fixture(work: Work, engine: str, *, stop_after: int | None = None,
+                        dtype: str | None = None, mean_rel_limit: float = 0.35) -> dict:
+    """Resume the committed MLX checkpoint on `engine` and compare the continued loss curve with
+    the uninterrupted MLX run recorded next to it. The fixture was produced with bf16 base
+    weights on an Apple GPU; the continuation runs wherever this is called, and the checkpoint's
+    own history records both."""
+    src = fixture_dir()
+    dst = work.root / f"fixture-{engine}"
+    shutil.rmtree(dst, ignore_errors=True)
+    shutil.copytree(src, dst)
+    args = ["tune", "--config", "job.json", "--engine", engine, "--overwrite"]
+    if stop_after:
+        args += ["--stop-after", stop_after]
+    r = work.spill(args, dtype=dtype, cwd=dst)
+    steps = [e for e in r.events if e["event"] == "step"]
+    expected = json.loads((src / "expected_losses.json").read_text())
+    out = {"engine": engine, "exit_code": r.rc, "stderr": r.stderr[-300:] if r.rc else ""}
+    if not steps:
+        out["pass"] = False
+        return out
+    rel = [abs(e["loss"] - expected[e["step"] - 1]) / max(abs(expected[e["step"] - 1]), 1e-9)
+           for e in steps]
+    from .portable import checkpoint as pc
+    from .portable.store import Store
+    hist = pc.load_tune(Store(dst / "state")).state["history"]
+    out.update(first_step=steps[0]["step"], last_step=steps[-1]["step"], steps_run=len(steps),
+               mean_rel_loss_difference=float(np.mean(rel)), max_rel_loss_difference=max(rel),
+               history=[{"range": h["range"], "engine": h["engine"], "hardware": h["hardware"],
+                         "numerics": h["numerics"]["base"]} for h in hist],
+               seconds_per_step=float(np.median([e["step_s"] for e in steps[1:]]))
+               if len(steps) > 2 else None)
+    out["pass"] = (r.rc == 0 and out["first_step"] == 51 and out["mean_rel_loss_difference"]
+                   < mean_rel_limit and (stop_after or out["last_step"] == 100)
+                   and all(np.isfinite(e["loss"]) for e in steps) and len(hist) == 2)
+    return out
+
+
+def make_f32_copy(src: Path, dst: Path) -> Path:
+    """A float32 copy of a safetensors model directory (the identity gates compute in float32)."""
+    from . import safetensors_np as snp
+    src, dst = Path(src), Path(dst)
+    dst.mkdir(parents=True, exist_ok=True)
+    for f in sorted(src.iterdir()):
+        if f.suffix == ".safetensors":
+            entries = [(n, "F32", shape, (lambda raw=raw, dt=dt: snp.to_f32(raw, dt)))
+                       for n, dt, shape, raw in snp.tensors(f)]
+            snp.write(dst / f.name, entries, {"format": "pt"})
+        elif f.is_file():
+            shutil.copy(f, dst / f.name)
+    cfg = json.loads((dst / "config.json").read_text())
+    cfg["torch_dtype"] = "float32"
+    (dst / "config.json").write_text(json.dumps(cfg))
+    return dst

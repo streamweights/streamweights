@@ -31,7 +31,9 @@ MODELS_YAML = Path(__file__).resolve().parent / "models.yaml"
 MODELS_DIR = REPO_ROOT / "models"
 
 GIB = 1024**3
-MIN_FREE_AFTER_DOWNLOAD = 20 * GIB
+import os as _os  # noqa: E402
+
+MIN_FREE_AFTER_DOWNLOAD = int(float(_os.environ.get("SPILL_MIN_FREE_GB", 20)) * GIB)   # CI lowers it
 
 KV_BYTES_PER_ELT = 2  # f16 KV cache
 
