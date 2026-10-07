@@ -8,7 +8,7 @@ name: Containers
 
 on:
   push:
-    branches: [main, anyhw]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

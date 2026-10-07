@@ -29,10 +29,15 @@ L = []
 w = L.append
 w("# Run anywhere: portable jobs, a PyTorch engine, scheduler-ready (directive 012)")
 w("")
-w("Measured on one machine: an Apple M4 Pro, 48 GB, macOS, Python 3.12, torch 2.14.1, transformers "
-  "5.18, PEFT 0.21, MLX 0.32. Model: qwen2.5:0.5b (bf16 safetensors), and a float32 copy of it "
-  "for the float32 gates. Every number below is from `docs/reports/012-gates.json`, written by "
-  "`scripts/gates_012.py`. The torch engine ran on the CPU of this Mac; no CUDA device was "
+meta = (G.get("meta") or {})
+mv = meta[sorted(meta)[-1]] if meta else {}
+w("Measured on one machine: an Apple M4 Pro, 48 GB, macOS, Python "
+  f"{mv.get('python', '3.12')}, torch {mv.get('torch', '?')}, transformers {mv.get('transformers', '?')}, "
+  f"PEFT {mv.get('peft', '?')}, MLX {mv.get('mlx', '?')}. Model: qwen2.5:0.5b (bf16 safetensors), and a "
+  "float32 copy of it for the float32 gates. Every number below is from "
+  "`docs/reports/012-gates.json`, written by `scripts/gates_012.py` (the bf16 gradient statistics were "
+  "measured under transformers 5.18.0, the rest under the version above; the file records every run). "
+  "The torch engine ran on the CPU of this Mac; no CUDA device was "
   "available, so the NVIDIA engine is built and not verified (`python -m streamweights.verify_cuda` "
   "is the verification, see `docs/linux.md`).")
 w("")

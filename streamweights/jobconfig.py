@@ -77,15 +77,10 @@ def to_argv(cfg: dict, click_cmd, cli_args: list[str]) -> list[str]:
                     present.add(p.name)
     cli_positional = [t for i, t in enumerate(cli_args)
                       if not t.startswith("-") and not _is_option_value(cli_args, i, click_cmd)]
-    out = list(cli_args)
-    if not cli_positional:
-        for name, val in cfg.get("arguments", {}).items():
-            vals = val if isinstance(val, list) else [val]
-            out = [str(v) for v in vals] + out
-        # restore the file's argument order (dicts keep insertion order)
-        order = [str(v) for val in cfg.get("arguments", {}).values()
-                 for v in (val if isinstance(val, list) else [val])]
-        out = order + list(cli_args)
+    # the file's arguments, in the order it lists them, unless the command line gave its own
+    given = [str(v) for val in cfg.get("arguments", {}).values()
+             for v in (val if isinstance(val, list) else [val])]
+    out = (given if not cli_positional else []) + list(cli_args)
     for name, val in cfg.get("options", {}).items():
         p = by_name.get(name)
         if p is None:

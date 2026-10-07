@@ -10,17 +10,17 @@
   "engine": "torch-cpu",
   "dtype": "float32",
   "resident": {
-   "seconds": 6.32,
+   "seconds": 6.587,
    "passes": 48,
-   "median_pass_s": 0.0652,
+   "median_pass_s": 0.0654,
    "completion_tokens": 581
   },
   "streamed": {
-   "seconds": 6.645,
+   "seconds": 6.57,
    "passes": 48,
-   "median_pass_s": 0.0902,
+   "median_pass_s": 0.0897,
    "completion_tokens": 581,
-   "read_gb_s": 31.851,
+   "read_gb_s": 32.083,
    "read_mode": "nocache"
   }
  },
@@ -33,15 +33,15 @@
   "max_top_logprob_diff": 0.00018199999999990446,
   "pass": true,
   "torch": {
-   "seconds": 5.684,
+   "seconds": 5.719,
    "passes": 48,
-   "median_pass_s": 0.0661,
+   "median_pass_s": 0.0669,
    "completion_tokens": 581
   },
   "mlx": {
-   "seconds": 2.237,
+   "seconds": 2.111,
    "passes": 48,
-   "median_pass_s": 0.0233,
+   "median_pass_s": 0.0234,
    "completion_tokens": 581
   },
   "torch_engine": "torch-cpu",
@@ -179,8 +179,8 @@
    0.9195264577865601
   ],
   "seconds": {
-   "a": 96.37,
-   "b": 76.1
+   "a": 95.31,
+   "b": 75.61
   }
  },
  "7d_torch_vs_mlx_tune_f32_natural": {
@@ -315,8 +315,8 @@
    0.9195731282234192
   ],
   "seconds": {
-   "a": 95.02,
-   "b": 40.41
+   "a": 93.38,
+   "b": 40.09
   }
  },
  "7d_torch_vs_mlx_tune_f32_toy": {
@@ -451,8 +451,8 @@
    0.02727402001619339
   ],
   "seconds": {
-   "a": 42.23,
-   "b": 18.32
+   "a": 42.47,
+   "b": 18.59
   },
   "scores_torch_adapter_vs_mlx_adapter": {
    "/Users/amrishkapoor/spillway/models/qwen2.5-0.5b/f32-st": 0.0,
@@ -1975,7 +1975,7 @@
  },
  "7e_bf16_inference_statistics": {
   "rows": 10,
-  "torch_bf16_seconds": 2.523,
+  "torch_bf16_seconds": 2.861,
   "torch_bf16_vs_torch_f32": {
    "rows_identical": 9,
    "rows": 10,
@@ -2041,41 +2041,54 @@
    "model_gb": 0.99,
    "rows": 160,
    "streamed": {
-    "seconds": 24.883,
+    "seconds": 25.991,
     "passes": 50,
-    "median_pass_s": 0.2272,
+    "median_pass_s": 0.2347,
     "completion_tokens": 4648,
-    "read_gb_s": 11.484,
+    "read_gb_s": 11.21,
     "read_mode": "nocache"
    },
    "resident": {
-    "seconds": 22.184,
+    "seconds": 22.003,
     "passes": 50,
-    "median_pass_s": 0.1579,
+    "median_pass_s": 0.1567,
     "completion_tokens": 4648
    },
-   "tokens_per_s_streamed": 186.8,
-   "tokens_per_s_resident": 209.5
+   "tokens_per_s_streamed": 178.8,
+   "tokens_per_s_resident": 211.2
   },
   "float32 files": {
    "model_gb": 1.98,
    "rows": 160,
    "streamed": {
-    "seconds": 24.806,
+    "seconds": 26.182,
     "passes": 50,
-    "median_pass_s": 0.1924,
+    "median_pass_s": 0.2024,
     "completion_tokens": 4648,
-    "read_gb_s": 32.967,
+    "read_gb_s": 20.351,
     "read_mode": "nocache"
    },
    "resident": {
-    "seconds": 24.092,
+    "seconds": 24.92,
     "passes": 50,
-    "median_pass_s": 0.1697,
+    "median_pass_s": 0.1573,
     "completion_tokens": 4648
    },
-   "tokens_per_s_streamed": 187.4,
-   "tokens_per_s_resident": 192.9
+   "tokens_per_s_streamed": 177.5,
+   "tokens_per_s_resident": 186.5
+  }
+ },
+ "meta": {
+  "2026-10-06 19:55": {
+   "torch": "2.14.1",
+   "transformers": "5.19.0",
+   "peft": "0.21.2",
+   "mlx": "0.32.3",
+   "mlx-lm": "0.32.0",
+   "safetensors": "0.8.0",
+   "streamweights": "0.1.0",
+   "python": "3.12.13",
+   "platform": "macOS-15.7.3-arm64-arm-64bit"
   }
  }
 }

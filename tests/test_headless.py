@@ -208,6 +208,25 @@ def test_config_roundtrip_in_process():
     assert cfg2 == cfg
 
 
+def test_config_roundtrip_for_eval_with_a_list_of_models():
+    from typer.main import get_command
+
+    from streamweights.cli import app
+    cmd = get_command(app).commands["eval"]
+    argv = ["evals.jsonl", "base", "base+mine", "--metric", "contains", "--rerun"]
+    cfg = jobconfig.build("eval", cmd, argv)
+    assert cfg["arguments"] == {"input_jsonl": "evals.jsonl", "models": ["base", "base+mine"]}
+    assert cfg["options"]["metric"] == "contains" and cfg["options"]["rerun"] is True
+    again = jobconfig.to_argv(cfg, cmd, [])
+    assert again[:3] == ["evals.jsonl", "base", "base+mine"]
+    assert jobconfig.build("eval", cmd, again) == cfg
+    # positional arguments on the command line replace the file's; options merge
+    over = jobconfig.to_argv(cfg, cmd, ["other.jsonl", "--metric", "exact_match"])
+    parsed = jobconfig.build("eval", cmd, over)
+    assert parsed["arguments"] == {"input_jsonl": "other.jsonl"}
+    assert parsed["options"]["metric"] == "exact_match" and parsed["options"]["rerun"] is True
+
+
 # ---------------------------------------------------------------- engine selection
 
 def test_engine_selection_is_automatic(monkeypatch):

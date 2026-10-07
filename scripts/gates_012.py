@@ -82,13 +82,17 @@ def toy_identity(w):
           flush=True)
 
 
-def bf16():
+def bf16infer():
     rows = formats.load_rows(SAMPLE)
     for r in rows:
         r["body"]["max_tokens"] = 24
     inf = G.bf16_inference_statistics(BF16, F32, rows[:10])
     save("7e_bf16_inference_statistics", inf)
     print("7e inference", json.dumps(inf, indent=1), flush=True)
+
+
+def bf16():
+    bf16infer()
     bf16grad()
 
 
@@ -143,9 +147,21 @@ def resume():
               flush=True)
 
 
+def versions():
+    import platform
+    from importlib.metadata import version
+    meta = {k: version(k) for k in ("torch", "transformers", "peft", "mlx", "mlx-lm", "safetensors",
+                                    "streamweights")}
+    meta.update(python=platform.python_version(), platform=platform.platform())
+    cur = json.loads(OUT.read_text()).get("meta", {}) if OUT.exists() else {}
+    cur[time.strftime("%Y-%m-%d %H:%M")] = meta
+    save("meta", cur)
+
+
 if __name__ == "__main__":
     OUT.parent.mkdir(exist_ok=True)
+    versions()
     for cmd in [a for a in sys.argv[1:] if not a.startswith("--")] or ["identity"]:
         {"identity": identity, "bf16": bf16, "resume": resume,
          "toy": lambda: toy_identity(work()), "bf16grad": bf16grad,
-         "timing": timing}[cmd]()
+         "bf16infer": bf16infer, "timing": timing}[cmd]()
