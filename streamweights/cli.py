@@ -51,8 +51,7 @@ _DEBUG = False
 
 @app.callback()
 def _main(ctx: typer.Context):
-    """Build your own model on your Mac. Errors are one line; add --debug to any command
-    for the traceback."""
+    """A 70B model doesn't fit on your laptop. Build your own model from it anyway."""
     if ctx.invoked_subcommand in ("resume", "doctor", None) or "--help" in sys.argv:
         return
     try:

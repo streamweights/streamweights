@@ -5,8 +5,7 @@ Generated from the real `--help` output by `scripts/make_cli_docs.py`; `tests/te
 ```
 Usage: spill [OPTIONS] COMMAND [ARGS]...
 
-  Build your own model on your Mac. Errors are one line; add --debug to any
-  command for the traceback.
+  A 70B model doesn't fit on your laptop. Build your own model from it anyway.
 
 Options:
   --help  Show this message and exit.

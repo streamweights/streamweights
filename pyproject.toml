@@ -1,14 +1,16 @@
 [project]
 name = "streamweights"
 version = "0.1.0"
-description = "Build your own model on the Mac you already own: fine-tune and distill from a 70B teacher locally with MLX, even when the model is bigger than your RAM. The same jobs run on Linux and CUDA through PyTorch and resume across machines."
+description = "A 70B model doesn't fit on your laptop. Build your own model from it anyway."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Amrish Kapoor" }]
-keywords = ["mlx", "apple-silicon", "llm", "fine-tuning", "lora", "distillation",
-            "local-llm", "llama", "qwen", "evaluation", "batch-inference", "gguf", "ollama"]
+keywords = ["llm", "fine-tuning", "lora", "distillation", "knowledge-distillation",
+            "evaluation", "llm-evaluation", "llm-training", "mlx", "apple-silicon", "macos",
+            "linux", "pytorch", "local-llm", "on-device-ai", "llama", "qwen", "gguf", "ollama",
+            "batch-inference", "huggingface"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -16,12 +18,15 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
+    "Operating System :: POSIX",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Natural Language :: English",
     "Environment :: GPU",
 ]
 dependencies = [
