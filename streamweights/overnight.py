@@ -209,6 +209,8 @@ def interrupted_jobs(jobs_dir: Path, stale_s: float = 900) -> list[dict]:
         st = m.get("status")
         if total and done >= total:
             continue
+        if (m.get("options") or {}).get("build"):
+            continue                      # a build's stage: `spill resume <folder>` owns it
         if st in ("interrupted", "failed"):
             pass
         elif st == "running":

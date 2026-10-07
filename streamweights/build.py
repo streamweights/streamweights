@@ -649,8 +649,8 @@ def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = N
         save_state(plan)
         sync_in(plan, st)
         env = runtime.ENV
-        saved = (env.state, env.state_leaf, env.stop_after)
-        env.state, env.state_leaf = bs.stage_uri(st.id), None
+        saved = (env.state, env.state_leaf, env.stop_after, env.in_build)
+        env.state, env.state_leaf, env.in_build = bs.stage_uri(st.id), None, True
         if _stage_matches(st, stop_key) and stop_n:
             env.stop_after = stop_n
         env.stopped_early = False
@@ -683,7 +683,7 @@ def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = N
             save_state(plan)
             raise
         finally:
-            env.state, env.state_leaf, env.stop_after = saved
+            env.state, env.state_leaf, env.stop_after, env.in_build = saved
         st.actual_s = round(time.monotonic() - t0, 1)
         if res.get("interrupted"):
             st.status = "interrupted"
@@ -814,7 +814,7 @@ def table_from_state(doc: dict, ref: dict | None = None) -> str:
         ps = s.get("producers") or []
         uniq = lambda key: " -> ".join(dict.fromkeys(str(p.get(key, "?")) for p in ps)) or "-"
         score = s.get("result", {}).get("score") if s["kind"] == "eval" else None
-        row = [f"{i} {s['label']}", uniq("engine"), uniq("host"), uniq("os"),
+        row = [f"{i} {s['id']}", uniq("engine"), uniq("host"), uniq("os"),
                f"{score:.3f}" if score is not None else "-"]
         if ref:
             r = ref_scores.get(s["id"])
