@@ -57,7 +57,7 @@ Homepage = "https://github.com/streamweights/streamweights"
 Repository = "https://github.com/streamweights/streamweights"
 Issues = "https://github.com/streamweights/streamweights/issues"
 Discussions = "https://github.com/streamweights/streamweights/discussions"
-Documentation = "https://github.com/streamweights/streamweights/tree/main/docs"
+Documentation = "https://streamweights.github.io/streamweights/"
 
 [project.scripts]
 spill = "streamweights.cli:main"

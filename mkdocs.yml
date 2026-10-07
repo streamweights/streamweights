@@ -48,6 +48,7 @@ nav:
       - Phase 3.5, build: reports/009-phase3.5.md
       - Cleanup: reports/010-cleanup.md
       - Run anywhere: reports/012-run-anywhere.md
+      - Tagline and docs site: reports/013-tagline-seo.md
   - Reference:
       - Commands: cli.md
       - Formats: formats.md

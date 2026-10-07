@@ -18,3 +18,4 @@ Every number in the README and the guides comes from one of these reports, measu
 | [009 Phase 3.5](009-phase3.5.md) | `spill build`, the example, export, prefix reuse |
 | [010 Cleanup](010-cleanup.md) | the merge, and a fresh install timed |
 | [012 Run anywhere](012-run-anywhere.md) | portable jobs, the PyTorch engines, cross-hardware resume gates |
+| [013 Tagline, README, docs site](013-tagline-seo.md) | the tagline, the rewrite, the site and the decisions behind them (no measurements) |

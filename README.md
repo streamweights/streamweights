@@ -108,6 +108,8 @@ The engines are thin: MLX on Apple silicon, PyTorch (Hugging Face transformers l
 
 Done: run, distill, tune, eval, build and export on Apple silicon, and run-anywhere (portable jobs, the PyTorch engines, headless mode, containers, scheduler examples), with the CPU gates measured. Reports are in [docs/reports](docs/reports/index.md). The banking77 table for the 70B teacher and 7B student arrives with the full proof run. Next, in order: the verification batch (that proof run, the CUDA gates on a real GPU, a cross-cloud resume demo), then PyPI, then vision-language models, then mixture-of-experts. See [docs/plan.md](docs/plan.md).
 
+Guides and the docs site: https://streamweights.github.io/streamweights/ (how to fine-tune an LLM on a Mac, run a 70B model on a 48 GB Mac, distill locally, resume on a different machine, and run on spot instances with SkyPilot).
+
 ## Feedback
 
 Send a transcript of your first fifteen minutes and the one moment you got stuck, in [Discussions](https://github.com/streamweights/streamweights/discussions) or as an issue. Run `spill doctor` and paste its output into hardware reports.
