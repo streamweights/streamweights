@@ -42,6 +42,8 @@ jobs:
           spill doctor
       - name: build is not Mac-only any more (Linux)
         if: runner.os == 'Linux'
+        env:
+          SPILL_HEADLESS: "0"
         run: |
           out=$(spill build /nonexistent 2>&1 || true)
           echo "$out"
