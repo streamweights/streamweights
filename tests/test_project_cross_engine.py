@@ -71,8 +71,10 @@ def test_killed_mid_training_and_finished_on_the_other_engine(tmp_path, first, s
     m = read_json(proj / "runs" / rid / "manifest.json")
     engines = [p["engine"] for p in m["stages"]["train"]["producers"]]
     assert engines[0] == first and engines[-1] == second, engines
-    assert m["engine_transitions"] and first in m["engine_transitions"][0] and second in m["engine_transitions"][0]
-    assert "numerics" in m["engine_transitions"][0]
+    if first != second:
+        assert m["engine_transitions"] and first in m["engine_transitions"][0] \
+            and second in m["engine_transitions"][0]
+        assert "numerics" in m["engine_transitions"][0]
     # optimizer and cursor: the first checkpoint the second engine published continues the step
     # count and carries the first engine's range in its history
     pay = proj / ".spill" / "runs" / rid / "payloads"

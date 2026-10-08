@@ -233,6 +233,7 @@ def test_stale_writer_cannot_publish_stage_or_complete(backend, tmp_path):
 
 
 def test_capability_refusals_before_any_publication(tmp_path):
+    pytest.importorskip("botocore", reason="S3 needs the cloud extra: pip install -e .[cloud]")
     class NoCas:
         """An S3 look-alike that ignores conditional headers."""
         def put_object(self, **kw):

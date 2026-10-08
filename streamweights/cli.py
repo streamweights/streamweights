@@ -1565,7 +1565,7 @@ def status():
         if meta.get("status") == "running" and (d / "live.json").exists():
             try:
                 _LiveRenderer()(json.loads((d / "live.json").read_text()))
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError, KeyError):   # a tune job's or a killed job's live.json
                 pass
     _next_hint("spill tail")
 

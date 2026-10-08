@@ -27,6 +27,7 @@ from .test_project_build import FakeExecutor, make_project, pytestmark  # noqa: 
 @pytest.fixture(scope="module")
 def made(tmp_path_factory):
     tmp = tmp_path_factory.mktemp("bundle")
+    modelid.ensure_embedding()                 # the pinned 92 MB embedding, fetched once if absent
     proj = make_project(tmp)
     plan = P.make_plan(proj, engine="torch-cpu")
     done = CO.Coordinator(proj, FakeExecutor(), "torch-cpu", say=lambda s: None).build(plan)
@@ -115,9 +116,8 @@ def test_install_into_a_fresh_cache_checks_the_pinned_hashes_and_forks_a_new_run
 
 
 def test_reacquisition_verifies_a_pinned_directory_and_rejects_a_changed_file(tmp_path):
+    modelid.ensure_embedding()
     src = modelid.embedding_dir()
-    if not (src / "model.safetensors").exists():
-        pytest.skip("the embedding model is fetched by the first plan/build")
     d = tmp_path / "emb"
     shutil.copytree(src, d)
     modelid.verify_dir("embedding:minilm", d)
