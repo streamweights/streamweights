@@ -36,11 +36,15 @@ def made(tmp_path_factory):
     C.save(proj, cfg)
     plan2 = P.make_plan(proj, engine="torch-cpu")
     CO.Coordinator(proj, FakeExecutor(interrupt_train_at=5), "torch-cpu", say=lambda s: None).build(plan2)
+    saved = os.environ.get("AWS_SECRET_ACCESS_KEY")
     os.environ["AWS_SECRET_ACCESS_KEY"] = "sekrit-do-not-bundle-123"
     try:
         m = BU.create_bundle(proj, tmp / "out.bundle", say=lambda s: None)
     finally:
-        os.environ.pop("AWS_SECRET_ACCESS_KEY")
+        if saved is None:
+            os.environ.pop("AWS_SECRET_ACCESS_KEY", None)
+        else:
+            os.environ["AWS_SECRET_ACCESS_KEY"] = saved
     return proj, tmp / "out.bundle", m, done
 
 
