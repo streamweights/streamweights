@@ -187,6 +187,11 @@ def load_extras() -> tuple[dict, dict]:
     return raw.get("safetensors", {}), raw.get("mlx_quants", {})
 
 
+def load_pins() -> dict:
+    """Pinned model assets (repo, revision, per-file sha256) from models.yaml."""
+    return yaml.safe_load(MODELS_YAML.read_text()).get("pins", {})
+
+
 def safetensors_spec(model_name: str) -> dict | None:
     st, _ = load_extras()
     return st.get(model_name)
@@ -215,6 +220,7 @@ def download_safetensors(model_name: str) -> Path:
     if safetensors_downloaded(model_name):
         return dest
     from .download import fetch
+    pin = load_pins().get(model_name)
     return fetch(spec["repo"], dest, ["*.safetensors", "*.json"],
-                 f"{model_name} bf16 safetensors",
+                 f"{model_name} bf16 safetensors", revision=pin["revision"] if pin else None,
                  recovery=f"spill run {model_name} <input> --quant 8bit")
