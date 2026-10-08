@@ -62,6 +62,9 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
         raise SpillError(f"{folder} already has a {C.CONFIG_NAME}", f"spill plan {folder}   "
                          f"(a different folder: --project <folder>)")
     cols, recs = _load(Path(data), mapping, task)
+    _, missing = D.build_rows(cols, [], mapping, None, Path(data).name)
+    if missing:
+        raise D.DataErrors(missing)
     sug = D.suggest_task(recs, mapping) if all(
         mapping[k] in cols for k in ("input", "output")) else D.Suggestion(None, "")
     if task is None:
