@@ -1209,6 +1209,12 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
                          "spill example banking77 --quick")
     if path not in ("auto", "resident", "streamed"):
         raise SpillError("--path must be auto, resident or streamed")
+    from .tune.data import distill_as_training, is_distill_file
+    if is_distill_file(train_jsonl):                 # the output of `spill distill` trains as it is
+        import tempfile
+        train_jsonl, n_d = distill_as_training(
+            train_jsonl, Path(tempfile.mkdtemp(prefix="spill-distill-")) / "train.jsonl")
+        typer.echo(f"   training on {n_d} teacher answers from the distill file")
     choice = engine_select.choose_engine(runtime.ENV.engine)
     runtime.set_engine(choice.name)
     tj = _tune_module(choice.name)
