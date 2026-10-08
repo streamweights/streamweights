@@ -78,16 +78,30 @@ def state_root(project: Path) -> Path:
 
 def list_runs(project: Path) -> list[dict]:
     """Control documents of every run whose authority is local to this project."""
+    return list_runs_at(str(state_root(project)))
+
+
+def list_runs_at(state_root_uri: str) -> list[dict]:
+    """Control documents of the runs under a state location (a local .spill or s3://.../.spill)."""
+    from ..portable.store import Store, is_uri
+    from . import caps
     out = []
-    base = state_root(project) / "runs"
-    if base.exists():
-        for d in sorted(base.iterdir()):
-            f = d / "control.json"
-            if f.exists():
-                try:
-                    out.append(json.loads(f.read_text()))
-                except json.JSONDecodeError:
-                    continue
+    if not is_uri(state_root_uri) or state_root_uri.startswith("file://"):
+        base = Path(state_root_uri[7:] if state_root_uri.startswith("file://") else state_root_uri) / "runs"
+        if base.exists():
+            for d in sorted(base.iterdir()):
+                f = d / "control.json"
+                if f.exists():
+                    try:
+                        out.append(json.loads(f.read_text()))
+                    except json.JSONDecodeError:
+                        continue
+        return out
+    from .runstate import run_uri
+    for name in Store(state_root_uri).ls("runs"):
+        doc, _ = caps.open_backend(run_uri(state_root_uri, name), probe=False).read()
+        if doc:
+            out.append(doc)
     return out
 
 
@@ -134,7 +148,9 @@ def _public_models(plan: P.BuildPlan) -> dict:
 
 class Coordinator:
     def __init__(self, project: Path, executor="local", engine: str | None = None,
-                 say=print, stop_after: str | None = None, state_root_uri: str | None = None):
+                 say=print, stop_after: str | None = None, state_root_uri: str | None = None,
+                 remote_project: str | None = None):
+        self.remote_project = remote_project
         self.project = Path(project).resolve()
         self.executor = EXECUTORS[executor]() if isinstance(executor, str) else executor
         self.engine = engine
@@ -185,6 +201,40 @@ class Coordinator:
             rs = RunState.create(self.state_root, rid, plan.identity, self.work_root)
             resumed = False
         return self._execute(rs, plan, resumed, parent)
+
+    def resume(self, run_id: str, engine_override: str | None = None) -> BuildOutcome:
+        """Continue an unfinished run with the inputs it was started with (its frozen
+        snapshot), never with the live project files. The receiving side verifies model and
+        tokenizer identity first and names every difference."""
+        rs = RunState.open(self.state_root, run_id, self.work_root)
+        doc = rs.doc()
+        if doc["status"] == ctl.COMPLETED:
+            raise SpillError(f"run {run_id} is completed; a completed run cannot resume training",
+                             f"spill build {self.project} --new-run")
+        if doc["status"] == ctl.INCOMING:
+            raise SpillError(f"run {run_id} here is the destination of a handoff that is not "
+                             f"committed yet", "re-run `spill move` at the source to finish it")
+        if doc["status"] == ctl.TRANSFERRED:
+            raise SpillError(f"run {run_id} was handed to {doc['handoff']['dest']}",
+                             f"spill resume {doc['handoff']['dest']}")
+        frozen = self.work_root / "frozen" / run_id
+        shutil.rmtree(frozen, ignore_errors=True)
+        if rs.accepted_stage("inputs") is None:
+            raise SpillError(f"run {run_id} never froze its inputs, so there is nothing to continue; "
+                             f"it holds no committed work", f"spill build {self.project} --new-run")
+        rs.fetch_stage("inputs", frozen)
+        (frozen / "result.json").unlink(missing_ok=True)
+        plan = P.make_plan(self.project, engine_override, fetch=True, frozen=frozen)
+        if plan.identity != doc["identity"]:
+            old = read_json(frozen / "identity.json")["fields"]
+            diff = identity_diff(old, plan.identity_fields)
+            raise SpillError(f"this machine cannot continue run {run_id}: it differs in "
+                             f"{', '.join(diff) or 'identity'} (models are compared by file "
+                             f"hash, not by name)", "fetch the pinned model revision named in "
+                             "the run (spill plan shows it), then resume")
+        self.engine = self.engine or plan.engine
+        self.say(f"continuing run {run_id} on {plan.engine} (its stages accepted so far are kept)")
+        return self._execute(rs, plan, True, None)
 
     def _run_fields(self, run_id: str) -> dict | None:
         rs = RunState.open(self.state_root, run_id, self.work_root)
@@ -379,6 +429,9 @@ class Coordinator:
         dest = rs.install_snapshot(plan.project)
         from .index import write_index
         write_index(plan.project)
+        if self.remote_project:
+            from .remote import push_completed
+            push_completed(self.remote_project, plan.project, rs.run_id)
         return BuildOutcome(rs.run_id, "completed", dest, results, manifest["table"], resumed)
 
 

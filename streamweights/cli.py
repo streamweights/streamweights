@@ -1402,6 +1402,16 @@ def resume(job: str = typer.Argument(None, help="job id or build folder (default
     """Continue the latest or named job from its checkpoint; a folder continues its build."""
     global _DEBUG
     _DEBUG = debug
+    from .cli_project import is_project_target
+    if is_project_target(job):
+        try:
+            from .cli_project import project_resume
+            project_resume(job, engine, headless, "local", stop_after)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
+        return
     is_build = bool(job) and Path(job).is_dir() and (
         (Path(job) / ".build" / "state.json").exists()
         or (state and (Path(job) / "evals.jsonl").exists()))

@@ -54,9 +54,16 @@ class BuildPlan:
         return None if any(v is None for v in vals) else sum(vals)
 
 
-def load_project(project: Path) -> tuple[dict, dict]:
+def load_project(project: Path, frozen: Path | None = None) -> tuple[dict, dict]:
     """(config, {name: sha256 of the canonical data file}); refuses a project whose files are
-    gone."""
+    gone. With `frozen` (a run's own frozen inputs) the config and data come from there and the
+    test hash from the run's recorded identity, never from the live project."""
+    if frozen is not None:
+        cfg = C.parse((Path(frozen) / "streamweights.toml").read_bytes(), "the run's frozen config")
+        ident = json.loads((Path(frozen) / "identity.json").read_text())
+        return cfg, {"train": sha_file(Path(frozen) / "train.jsonl"),
+                     "val": sha_file(Path(frozen) / "val.jsonl"),
+                     "test": ident["split_sha256"]["test"]}
     cfg = C.load(project)
     shas = {}
     for name in ("train", "val", "test"):
@@ -97,12 +104,14 @@ def _lora_params(model_dir: Path | None, rank: int) -> int | None:
 
 
 def make_plan(project: Path, engine: str | None = None, verify: bool = True,
-              fetch: bool = False) -> BuildPlan:
+              fetch: bool = False, frozen: Path | None = None) -> BuildPlan:
     from .. import probe as probe_mod
     from ..calibration import load_calibration
     project = Path(project)
-    cfg, shas = load_project(project)
+    cfg, shas = load_project(project, frozen)
     contract = cfg["contract"]
+    data_dir = Path(frozen) if frozen is not None else project / "data"
+    path_of = (lambda n: data_dir / f"{n}.jsonl")
     t = cfg["training"]
     task = cfg["task"]["type"]
     eng, why = engine_pick(engine or (cfg["model"].get("engine") if cfg["model"].get("engine") not in (None, "", "auto") else None))
@@ -119,11 +128,12 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
     fields = C.identity_fields(cfg, shas, mid)
     ident_sha = sha_obj(fields)
 
-    train = read_jsonl(project / "data" / "train.jsonl")
-    val = read_jsonl(project / "data" / "val.jsonl")
+    train = read_jsonl(path_of("train"))
+    val = read_jsonl(path_of("val"))
     schema = None
     if task == "json":
-        schema = json.loads((project / contract["schema_file"]).read_text())
+        schema = json.loads(((Path(frozen) if frozen is not None else project) /
+                             contract["schema_file"]).read_text())
     inputs = [{"name": "train.jsonl", "sha256": shas["train"]},
               {"name": "val.jsonl", "sha256": shas["val"]}]
 

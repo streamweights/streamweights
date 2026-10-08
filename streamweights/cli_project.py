@@ -183,3 +183,89 @@ def report(
         _fail(e)
         return
     _next_hint(f"spill export {project}")
+
+
+@app.command(short_help="Hand a project's committed state to another location (a folder or s3://)",
+             epilog="Example: spill move tickets s3://my-bucket/tickets")
+def move(
+    first: str = typer.Argument(..., help="the project folder, or the destination when it is "
+                                          "the only argument (the folder is then ./)"),
+    dest: str = typer.Argument(None, help="the destination: a folder or s3://bucket/prefix"),
+    wait: float = typer.Option(120.0, "--wait", help="seconds to wait for a running build to stop "
+                                                     "at its next committed boundary"),
+    with_exports: bool = typer.Option(False, "--with-exports", help="also copy the bulk export "
+                                                                    "artifacts (records always move)"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
+):
+    """Quiesce the writer, commit its progress, copy a consistent snapshot, verify every
+    checksum, fence the source, then activate the destination. Safe to run again after an
+    interruption. The source bytes are kept."""
+    import streamweights.cli as cli
+    cli._DEBUG = debug
+    folder, target = (Path(first), dest) if dest else (Path("."), first)
+    try:
+        from .project import config as C
+        from .project import move as M
+        C.load(folder)
+        typer.echo(f"spill move {folder.name if str(folder) != '.' else Path.cwd().name}: hand the "
+                   f"committed state to {target}. Source bytes are kept. Cost: $0.")
+        r = M.move(folder, target, say=typer.echo, wait_s=wait, with_exports=with_exports)
+    except Exception as e:
+        _fail(e)
+        return
+    typer.echo(f"moved {r.files} files ({r.bytes / 1e6:.1f} MB), checksums verified; the source is "
+               f"fenced, the destination is active (transfer {r.transfer_id})")
+    _next_hint(f"spill resume {r.dest}")
+
+
+def is_project_target(target: str | None) -> bool:
+    from .portable.store import is_uri
+    if not target:
+        return False
+    if is_uri(target) and not target.startswith("file://"):
+        return True
+    p = Path(target[7:] if target.startswith("file://") else target)
+    return p.is_dir() and (p / "streamweights.toml").exists()
+
+
+def project_resume(target, engine, headless, executor, stop_after):
+    """`spill resume <project-or-uri>`: acquire the run's ownership and continue it."""
+    from . import runtime
+    from .project import coordinator as CO
+    from .project import remote as RM
+    from .portable.store import is_uri
+    remote_uri = None
+    if RM.is_remote(target):
+        remote_uri = target.rstrip("/")
+        project = RM.working_copy(remote_uri)
+        n = RM.pull_project(remote_uri, project)
+        state_root = f"{remote_uri}/.spill"
+        typer.echo(f"spill resume {remote_uri}: authority is the control object there; working "
+                   f"copy of {n} project files -> {project}")
+    else:
+        project = Path(target[7:] if target.startswith("file://") else target).resolve()
+        state_root = str(project / ".spill")
+    runs = CO.list_runs_at(state_root)
+    open_runs = [r for r in runs if r["status"] in ("idle", "running", "handoff")]
+    if not open_runs:
+        if any(r["status"] == "incoming" for r in runs):
+            raise SpillError("this location is the destination of a handoff that was not "
+                             "committed, so it cannot run yet",
+                             "re-run `spill move` at the source to finish the handoff")
+        moved = [r for r in runs if r["status"] == "transferred"]
+        if moved:
+            raise SpillError(f"run {moved[-1]['run_id']} was handed to "
+                             f"{moved[-1]['handoff']['dest']}", f"spill resume {moved[-1]['handoff']['dest']}")
+        raise SpillError(f"{target} has no unfinished run; everything is complete",
+                         f"spill report {project}")
+    rid = sorted(open_runs, key=lambda r: r["run_id"])[-1]["run_id"]
+    with runtime.job_session("build", engine=engine, headless_flag=headless):
+        co = CO.Coordinator(project, executor, engine, say=typer.echo, stop_after=stop_after,
+                            state_root_uri=state_root, remote_project=remote_uri)
+        out = co.resume(rid, engine)
+    if out.status == "stopped":
+        typer.echo(f"\nbuild stopped; run {out.run_id} keeps what was committed")
+        _next_hint(f"spill resume {target}")
+        raise typer.Exit(130)
+    typer.echo(f"run {out.run_id}: completed -> {out.snapshot}")
+    _next_hint(f"spill report {project}")
