@@ -91,4 +91,5 @@ for j in d["journeys"]:
         out.append(f"- {j['task']} / {j['engine']} / {fmt}: `{v['output'][:90]}` in {v['seconds']} s "
                    f"(exit {v['exit']}), input `{v['input'][:60]}`")
 out.append("")
-(ROOT / "docs/reports/015-workflow.md").write_text("\n".join(out))
+out += (ROOT / "scripts" / "report_015_static.md").read_text().splitlines()
+(ROOT / "docs/reports/015-workflow.md").write_text("\n".join(out) + "\n")
