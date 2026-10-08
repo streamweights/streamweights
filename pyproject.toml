@@ -44,13 +44,16 @@ dependencies = [
     "safetensors>=0.4.3",
     "fsspec>=2024.6",
     "psutil>=5.9",
+    "jsonschema>=4.18",
+    "tomli>=2; python_version < '3.11'",
+    "tomli-w>=1.0",
     "mlx>=0.30; sys_platform == 'darwin' and platform_machine == 'arm64'",
     "mlx-lm>=0.30; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "build", "twine"]
-cloud = ["s3fs>=2024.6", "gcsfs>=2024.6", "adlfs>=2024.7"]
+cloud = ["s3fs>=2024.6", "boto3>=1.36", "gcsfs>=2024.6", "adlfs>=2024.7"]
 
 [project.urls]
 Homepage = "https://github.com/streamweights/streamweights"
