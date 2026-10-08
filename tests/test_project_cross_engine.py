@@ -92,7 +92,10 @@ def test_killed_mid_training_and_finished_on_the_other_engine(tmp_path, first, s
     assert later, [s["step"] for s in states]
     s = later[0]
     assert s["opt_step"] == s["step"] and s["data_cursor"]["step"] == s["step"]
-    assert s["history"][0]["range"][0] == 0 and s["history"][0]["range"][1] == committed
-    assert s["history"][1]["range"][0] == committed
-    assert s["history"][0]["engine"] != s["history"][1]["engine"] or first == second
+    hist = s["history"]
+    if first != second:
+        assert hist[0]["range"] == [0, committed] and hist[1]["range"][0] == committed
+        assert hist[0]["engine"] != hist[1]["engine"]
+    else:                                   # one engine, one merged range from step 0
+        assert hist[0]["range"][0] == 0 and hist[-1]["range"][1] >= s["step"]
     assert len(m["table"]) == 3
