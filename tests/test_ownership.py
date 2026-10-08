@@ -290,7 +290,7 @@ def test_killed_during_checkpoint_publication_recovers_last_accepted(backend, tm
     b, _ = finish(spawn(backend, "B", [["acquire"], ["restore", 5]], lease=30))
     r = b[1]
     assert r["ok"] and r["step"] == committed * 10 and r["cursor"] == {"micro_batch_index": committed * 10}
-    assert r["files"] == ["COMMIT", "MANIFEST.json", "params.bin"] or \
+    assert r["files"] == ["COMMIT", "PAYLOAD.json", "params.bin"] or \
         r["files"] == ["COMMIT", "params.bin"]
     assert r["params"].startswith(f"params-A-{committed * 10}")
     assert "last committed checkpoint" in r["recovery"] and "unknown" in r["recovery"]

@@ -31,6 +31,9 @@ class JobEnv:
     state_leaf: str | None = None      # a sub-location of `state` (one per model in an eval)
     stopped_early: bool = False        # --stop-after was reached
     in_build: bool = False             # a stage of `spill build`: its jobs belong to the build
+    on_checkpoint: object = None       # called as f(step, local_dir, state) after a tune checkpoint
+                                       # commits; the project coordinator publishes it through the
+                                       # fenced control object (project/runstate.py)
     summary: dict = field(default_factory=dict)
 
 

@@ -4,7 +4,7 @@ when the control object points at its manifest (control.py); nothing here overwr
 published payload, and orphans left by a dead or superseded writer are simply unreferenced.
 
   <state>/payloads/<kind>-g<generation>-s<seq>-<attempt>/<files...>
-  <state>/payloads/<kind>-g<generation>-s<seq>-<attempt>/MANIFEST.json     written last
+  <state>/payloads/<kind>-g<generation>-s<seq>-<attempt>/PAYLOAD.json     written last
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def write_payload(store: Store, kind: str, generation: int, seq: int, attempt: s
     reading it back; return the reference the control object will hold. Refuses to write
     into a location that already exists."""
     d = payload_dir(kind, generation, seq, attempt)
-    if store.exists(f"{d}/MANIFEST.json") or store.ls(d):
+    if store.exists(f"{d}/PAYLOAD.json") or store.ls(d):
         raise SpillError(f"payload {d} already exists; payloads are never overwritten",
                          "run the command again")
     entries = {}
@@ -47,7 +47,7 @@ def write_payload(store: Store, kind: str, generation: int, seq: int, attempt: s
     manifest = {"schema": 1, "kind": kind, "generation": generation, "seq": seq,
                 "attempt": attempt, "files": entries, **(meta or {})}
     mbytes = (json.dumps(manifest, indent=1, sort_keys=True) + "\n").encode()
-    store.write(f"{d}/MANIFEST.json", mbytes)
+    store.write(f"{d}/PAYLOAD.json", mbytes)
     verify_payload(store, d, sha_bytes(mbytes))
     hooks.fire("payload_written")
     return {"dir": d, "manifest_sha256": sha_bytes(mbytes), "attempt": attempt,
@@ -58,7 +58,7 @@ def verify_payload(store: Store, d: str, manifest_sha256: str | None = None) -> 
     """The manifest of payload `d`, after checking that every file it lists is present with
     the recorded size and hash. Raises SpillError on any difference."""
     try:
-        mbytes = store.read(f"{d}/MANIFEST.json")
+        mbytes = store.read(f"{d}/PAYLOAD.json")
     except (FileNotFoundError, OSError):
         raise SpillError(f"payload {d} has no manifest; it was never completed",
                          "spill resume <project>")
@@ -88,4 +88,4 @@ def read_payload(store: Store, ref: dict, dest: Path) -> dict:
 
 def dir_files(d: Path, exclude=()) -> dict[str, Path]:
     return {str(p.relative_to(d)): p for p in sorted(Path(d).rglob("*"))
-            if p.is_file() and p.name not in exclude}
+            if p.is_file() and p.name not in ("PAYLOAD.json", *exclude)}

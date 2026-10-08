@@ -93,6 +93,9 @@ class Checkpointer:
         pc.save_tune(self.store, step=step, params=params, opt=opt, state=state)
         self.history = hist
         self.start_step = step
+        from .. import runtime
+        if runtime.ENV.on_checkpoint is not None and self.store.local:
+            runtime.ENV.on_checkpoint(step, Path(self.store.root) / pc._dir(step), state)
         if self.on_event:
             self.on_event({"event": "checkpoint", "step": step, "uri": self.store.uri,
                            "seconds": round(time.monotonic() - t0, 3)})

@@ -487,15 +487,19 @@ def split_sha(rows: list[Row]) -> str:
                              for r in rows).encode())
 
 
+def check_sizes(task: str | None, n_train: int, n_val: int, train_labels=()) -> list[str]:
+    """Reasons a build cannot go ahead on these sizes; empty when usable."""
+    bad = []
+    if n_train < MIN_TRAIN:
+        bad.append(f"the training set has {n_train} rows; at least {MIN_TRAIN} are needed")
+    if n_val < MIN_VAL:
+        bad.append(f"the validation set has {n_val} rows; at least {MIN_VAL} are needed to "
+                   f"compare anything")
+    if task == "classification" and n_train and len({norm_dup(str(x)) for x in train_labels}) < 2:
+        bad.append("the training set has fewer than two classes")
+    return bad
+
+
 def check_usable(splits: Splits, task: str | None = None) -> list[str]:
     """Reasons this split cannot be built on; empty when usable."""
-    bad = []
-    if task == "classification" and len({norm_dup(str(r.output)) for r in splits.train}) < 2:
-        bad.append("the training set has fewer than two classes")
-    if len(splits.train) < MIN_TRAIN:
-        bad.append(f"the training set has {len(splits.train)} rows; at least {MIN_TRAIN} are "
-                   f"needed")
-    if len(splits.val) < MIN_VAL:
-        bad.append(f"the validation set has {len(splits.val)} rows; at least {MIN_VAL} are "
-                   f"needed to compare anything")
-    return bad
+    return check_sizes(task, len(splits.train), len(splits.val), [r.output for r in splits.train])

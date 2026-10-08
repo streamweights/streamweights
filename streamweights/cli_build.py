@@ -373,13 +373,29 @@ def build(
     reference: str = typer.Option(None, "--reference", help="with --table: the state of an "
                                                             "uninterrupted build, for a "
                                                             "reference column"),
+    new_run: bool = typer.Option(False, "--new-run", help="project folders: build again as a new "
+                                                          "run even if a run already has these "
+                                                          "exact inputs"),
+    executor: str = typer.Option("local", "--executor", hidden=True),
     stop_after: str = typer.Option(None, "--stop-after", hidden=True),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Build your own model from a folder: distill, tune, eval, one table. Runs on MLX on
-    Apple silicon and on PyTorch (CPU or CUDA) everywhere else."""
+    Apple silicon and on PyTorch (CPU or CUDA) everywhere else. A folder made by `spill init`
+    (it has streamweights.toml) builds a run; a folder with evals.jsonl builds as before."""
     import streamweights.cli as cli
     cli._DEBUG = debug
+    from .project import config as project_config
+    if project_config.exists(folder):
+        try:
+            from .cli_project import project_build
+            project_build(folder, student, teacher, epochs, engine, headless, executor, new_run,
+                          stop_after, notify)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
+        return
     if table:
         try:
             _print_table(folder, state, reference)
