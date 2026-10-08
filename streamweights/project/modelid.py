@@ -126,11 +126,13 @@ def embedding_identity(fetch: bool = True) -> dict:
 
 def ensure_embedding(say=lambda s: None) -> Path:
     """The pinned embedding model (92 MB), fetched at its revision if absent."""
+    from .. import guard
     pin = load_pins()[EMBEDDING_TAG]
     d = embedding_dir()
     if (d / "model.safetensors").exists():
         verify_dir(EMBEDDING_TAG, d)
         return d
+    guard.check(pin["repo"])
     from huggingface_hub import snapshot_download
     say(f"fetching {pin['repo']}@{pin['revision'][:12]} "
         f"({sum(m['bytes'] for m in pin['files'].values()) / 1e6:.0f} MB) -> {d}")

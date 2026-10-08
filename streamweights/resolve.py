@@ -25,6 +25,8 @@ class Resolved:
 
 
 def resolve_model(arg: str) -> Resolved:
+    from . import guard
+    guard.check(arg)
     reg = load_registry()
     if arg in reg:
         return Resolved("tag", arg, st_bytes=safetensors_spec(arg)["bytes"])

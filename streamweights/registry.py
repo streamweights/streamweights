@@ -143,6 +143,8 @@ def load_registry() -> dict[str, Model]:
 def download(model: Model, quant_name: str, progress: bool = True) -> list[Path]:
     """Download (or convert) a quant. Enforces the disk policy: print size and
     destination, never start a download that would leave under 20 GB free."""
+    from . import guard
+    guard.check(model.name)
     q = model.quants[quant_name]
     dest = MODELS_DIR / model.name.replace(":", "-") / quant_name
     if q.downloaded(model.name):
@@ -215,6 +217,8 @@ def safetensors_downloaded(model_name: str) -> bool:
 def download_safetensors(model_name: str) -> Path:
     """bf16 safetensors with the 20 GB floor checked before the first byte, one progress
     line with speed and ETA, and resume after an interruption."""
+    from . import guard
+    guard.check(model_name)
     spec = safetensors_spec(model_name)
     dest = safetensors_dir(model_name)
     if safetensors_downloaded(model_name):
