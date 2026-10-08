@@ -339,8 +339,8 @@ def compare(
     try:
         from .project import compare as CM
         for p in paths:
-            _guided(p, "compare") if (Path(p) / "streamweights.toml").exists() or \
-                (Path(p) / "evals.jsonl").exists() else None
+            if (Path(p) / "streamweights.toml").exists() or (Path(p) / "evals.jsonl").exists():
+                _guided(p, "compare")
         runs = CM.load_runs(paths)
         if len(runs) < 1:
             raise SpillError("no completed runs found there", "spill build <project>")

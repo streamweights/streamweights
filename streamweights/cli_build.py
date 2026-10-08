@@ -581,7 +581,7 @@ def _doctor_impl():
 @app.command(short_help="Create a ready-to-run example folder",
              epilog="Example: spill example banking77 --quick")
 def example(
-    name: str = typer.Argument("banking77", help="which example (banking77, relay)"),
+    name: str = typer.Argument("banking77", help="which example (banking77, snips, relay)"),
     quick: bool = typer.Option(False, "--quick", help="the under-an-hour variant: 100 evals, "
                                                       "500 train rows, student qwen2.5:0.5b"),
     tiny: bool = typer.Option(False, "--tiny", help="the CI-sized variant: 20 evals, 100 train "
@@ -597,6 +597,13 @@ def example(
         folder = ex.create(name, quick, Path("."), force, tiny)
         files = sorted(p.name for p in folder.iterdir())
         typer.echo(f"created {folder}/ with {', '.join(files)}")
-        _next_hint(f"{folder}/relay.sh" if name == "relay" else f"spill build {folder}")
+        if name == "relay":
+            _next_hint(f"{folder}/relay.sh")
+        elif name == "snips":
+            _next_hint(f"spill init {folder}/snips.csv --input text --output json "
+                       f"--schema {folder}/schema.json --project {folder}-project")
+        else:
+            _next_hint(f"spill build {folder}   (or, from the CSV: spill init {folder}/banking77.csv "
+                       f"--input text --output label --project {folder}-project)")
     except Exception as e:
         _fail(e)

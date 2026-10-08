@@ -1,0 +1,53 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artist": {
+      "type": "string"
+    },
+    "best_rating": {
+      "type": "string"
+    },
+    "entity_name": {
+      "type": "string"
+    },
+    "intent": {
+      "enum": [
+        "RateBook",
+        "AddToPlaylist",
+        "SearchCreativeWork"
+      ],
+      "type": "string"
+    },
+    "music_item": {
+      "type": "string"
+    },
+    "object_name": {
+      "type": "string"
+    },
+    "object_part_of_series_type": {
+      "type": "string"
+    },
+    "object_select": {
+      "type": "string"
+    },
+    "object_type": {
+      "type": "string"
+    },
+    "playlist": {
+      "type": "string"
+    },
+    "playlist_owner": {
+      "type": "string"
+    },
+    "rating_unit": {
+      "type": "string"
+    },
+    "rating_value": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "intent"
+  ],
+  "type": "object"
+}

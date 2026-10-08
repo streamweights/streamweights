@@ -28,6 +28,11 @@ EXAMPLES = {
         "quick": {"student": "qwen2.5:0.5b"},
         "tiny": {"student": "qwen2.5:0.5b", "epochs": 2},
     },
+    "snips": {
+        "about": "three assistant intents; turn a request into a JSON object (structured "
+                 "extraction); 1,200 rows",
+        "quick": {}, "tiny": {},
+    },
     "relay": {
         "about": "the tiny banking77 build, started on one machine and finished on another",
     },
@@ -53,6 +58,8 @@ def create(name: str, quick: bool = False, parent: Path = Path("."), force: bool
                          "spill example banking77 --tiny")
     if name == "relay":
         return _create_relay(Path(parent), force)
+    if name == "snips":
+        return _create_snips(Path(parent), quick, tiny, force)
     src = DATA / name
     folder = Path(parent) / (f"{name}-tiny" if tiny else f"{name}-quick" if quick else name)
     if folder.exists() and any(folder.iterdir()) and not force:
@@ -61,17 +68,33 @@ def create(name: str, quick: bool = False, parent: Path = Path("."), force: bool
     folder.mkdir(parents=True, exist_ok=True)
     if tiny or quick:
         q = src / ("tiny" if tiny else "quick")
-        _copy(q, folder, ("evals.jsonl", "train.jsonl"))
+        _copy(q, folder, ("evals.jsonl", "train.jsonl", "banking77.csv"))
         shutil.copyfile(q / "instructions.txt" if (q / "instructions.txt").exists()
                         else src / "instructions.txt", folder / "instructions.txt")
         settings = EXAMPLES[name]["tiny" if tiny else "quick"]
         (folder / "spill.json").write_text(json.dumps(settings, indent=2) + "\n")
         readme = q / "README.md"
     else:
-        _copy(src, folder, ("evals.jsonl", "train.jsonl", "prompts.jsonl", "instructions.txt"))
+        _copy(src, folder, ("evals.jsonl", "train.jsonl", "prompts.jsonl", "instructions.txt",
+                            "banking77.csv"))
         readme = src / "README.md"
     if readme.exists():
         shutil.copyfile(readme, folder / "README.md")
+    return folder
+
+
+def _create_snips(parent: Path, quick: bool, tiny: bool, force: bool) -> Path:
+    if quick and tiny:
+        raise SpillError("--quick and --tiny are two sizes of the same example; pick one",
+                         "spill example snips --tiny")
+    src = DATA / "snips"
+    folder = Path(parent) / ("snips-tiny" if tiny else "snips-quick" if quick else "snips")
+    if folder.exists() and any(folder.iterdir()) and not force:
+        raise SpillError(f"{folder} already exists and is not empty",
+                         f"spill init {folder}/snips.csv --input text --output json")
+    folder.mkdir(parents=True, exist_ok=True)
+    q = src / ("tiny" if tiny else "quick") if (tiny or quick) else src
+    _copy(q, folder, ("snips.csv", "schema.json", "README.md", "LICENSE-CC0.txt"))
     return folder
 
 
