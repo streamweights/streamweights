@@ -69,5 +69,7 @@ The product is the local half of building your own model: run, distill, tune, ev
 
 ## Run-anywhere principle
 
-The design principle: every job is a sequence of normalized quanta. For training, the quantum is one optimizer step. For run, distill and eval, it is one completed row. Any machine with a supported engine can execute the next quantum from a portable checkpoint.
+The design principle: "One complete workflow: bring your examples, build a model, understand the result, export it, and continue the same work on another machine. The project folder is the unit; execution is separable from it."
+
+Under it, every job is a sequence of normalized quanta. For training, the quantum is one optimizer step. For run, distill and eval, it is one completed row. Any machine with a supported engine can execute the next quantum from a portable checkpoint.
 Engines are thin: MLX on Apple silicon, PyTorch everywhere else (CPU and CUDA). Streamweights owns only the streaming ring, the job layer, and the CLI.
