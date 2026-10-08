@@ -58,6 +58,15 @@ def main():
                  "--schema", "snips-tiny/schema.json", "--project", "slots"],
                 ["spill", "plan", "slots"]):
         steps.append(sh(cmd, cwd=run, env=env))
+    if "--journey" in sys.argv:        # the whole CSV journey with the installed wheel's python
+        models = os.environ.get("SPILL_MODELS_FROM", str(ROOT / "models"))
+        j = sh([str(py), str(ROOT / "scripts" / "gates_015.py"), "--home", str(home), "--work",
+                str(work / "journey"), "--out", str(work / "journey.json"), "--engines", "torch-cpu",
+                "--models-from", models, "--no-gguf"], cwd=run, env=env)
+        steps.append(j)
+        jf = work / "journey.json"
+        if jf.exists():
+            shutil.copyfile(jf, os.environ.get("SPILL_JOURNEY_OUT", str(ROOT / "wheel-journey.json")))
     spill_bin = shutil.which("spill", path=env["PATH"])
     summary = {"wheel": wheel.name, "wheel_bytes": wheel.stat().st_size,
                "imported_from": loc, "outside_checkout": ok_loc, "spill_bin": spill_bin,

@@ -106,7 +106,6 @@ def journey(task: str, engine: str, work: Path, env, gguf: bool) -> dict:
 
 
 def hardware() -> dict:
-    sys.path.insert(0, str(ROOT))
     from streamweights import machine
     info = machine.info()
     try:
@@ -143,9 +142,10 @@ def main():
     for n in ("bin", "tools"):
         if (ROOT / n).exists() and not (home / n).exists():
             (home / n).symlink_to(ROOT / n)
-    env = {**os.environ, "SPILL_HOME": str(home), "SPILL_HEADLESS": "0", "SPILL_MIN_FREE_GB": "2",
-           "PYTHONPATH": str(ROOT)}
-    res = {"hardware": hardware(), "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "journeys": []}
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env.update(SPILL_HOME=str(home), SPILL_HEADLESS="0", SPILL_MIN_FREE_GB="2")
+    import streamweights
+    res = {"imported_from": streamweights.__file__, "hardware": hardware(), "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "journeys": []}
     for task in a.tasks:
         for engine in a.engines:
             print(f"== {task} on {engine}", flush=True)
