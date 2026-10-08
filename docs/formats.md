@@ -91,3 +91,107 @@ input that produced it. `spill runs` lists them.
 
 Everything `build` writes lands in the folder (`*.out.jsonl`, `*.distill.jsonl`, `.build/`
 with run manifests and state) or in `~/.streamweights/adapters/<name>`.
+
+## Project folders (`spill init`)
+
+A guided project starts from a CSV or JSONL of labeled examples and lives in one folder. The
+folder is the unit: it holds the configuration, the data, the immutable history and the pointers
+to the model files it was built on. Python never needs to see it twice.
+
+```
+tickets/
+  streamweights.toml        the versioned project config
+  schema.json               JSON Schema (task json only); system.txt if you gave --system
+  data/source/<role>-<file>     your files, copied verbatim, hashed in the config
+  data/{train,val,test}.jsonl   canonical rows with stable ids
+  data/integrity.json           class coverage and conflicting-label report
+  runs/<run id>/            a completed run: immutable
+  exports/<id>/             an export record: immutable once complete
+  tests/<id>/               a final-test record: immutable once complete
+  REPORT.md                 a regenerable index over the above
+  .spill/                   mutable run state: control objects, locks, payloads, attempt staging
+```
+
+### streamweights.toml
+
+`schema_version = 1`. A newer version is refused with a one-line error that names the version
+and says to upgrade; nothing is guessed. Sections:
+
+| section | records |
+|---|---|
+| `[project]` | name, `layout` (`project`, or `legacy-flat` for a migrated flat folder), creation time |
+| `[task]` | `type` (`classification` or `json`), the column mapping (`input`, `output`, optional `group`), optional `system` text |
+| `[contract]` | classification: `labels` and where they came from (declared, or derived from the training rows only) and the label normalization; json: `schema_file`, its sha256, where it came from, and the comparison rules |
+| `[data]` | each source file with its sha256, the canonical files |
+| `[split]` | `mode` (`generated`, `supplied` or `mixed`), `seed`, fractions, the duplicate and group normalization, the sha256 and size of each split |
+| `[model]` | `student`, `teacher` (empty unless you asked), `engine` |
+| `[training]` | epochs, learning rate, LoRA rank and alpha, seed, micro-batch, checkpoint interval |
+| `[evaluation]` | metric and metric version, protocol version, decoding, max tokens, precision, postprocessing |
+| `[baseline]` | the embedding model, pooling, classifier settings (classification) |
+
+Changing data, prompts, the schema or vocabulary, training settings, the evaluation protocol or a
+model's files makes the next build a **new run**. The engine and the machine are not part of a
+run's identity: a documented engine transition continues the same run and is recorded.
+
+Duplicate normalization is Unicode NFKC, casefold, whitespace collapsed, ends stripped. Rows
+whose normalized inputs are equal, or whose normalized group values are equal, are one connected
+component (transitively); a generated split never separates a component, and a supplied split
+that shares one across files is rejected with the file and row of each side.
+
+Classification compares a model's output, normalized the same way, with the vocabulary: an output
+outside it is a failure and stays in the denominator. JSON extraction parses the whole response
+(one optional `json` fence is removed), validates it against the schema, and compares fields:
+strings after NFC and trimming, numbers numerically (booleans are not numbers), objects by key
+set and value, arrays in order unless the schema marks them `x-unordered`. A field missing from
+the output is wrong, a field absent from both is right, an extra top-level field makes the record
+wrong. Unparseable, schema-invalid, failed and truncated outputs all count as wrong.
+
+### Rows and ids
+
+`{"id": "r-<12 hex>", "input": "...", "output": "label" or {...}, "group": "...", "source":
+{"file", "row"}}`. The id is the first 12 hex digits of sha256(input, NUL, output); an identical
+pair gets a `-<n>` suffix. The same example has the same id in any order.
+
+### A completed run, `runs/<id>/`
+
+| file | contents |
+|---|---|
+| `report.md`, `results.json` | the results, counts, durations, failures, artifact locations and next commands |
+| `manifest.json` | identity, resolved config, split fingerprints, model and tokenizer revisions with the sha256 of every file, dependency versions, per-stage producers (engine, hardware, OS, numerics), the evaluation-protocol fingerprint, parent run |
+| `predictions/<comparator>.jsonl` | one line per validation row: gold, raw output, parsed prediction, flags, finish reason |
+| `disagreements.jsonl` | rows where a comparator and the trained student differ: `improvement` or `regression` |
+| `inputs/` | the frozen train and validation rows, config, schema and identity. The final-test rows are not copied; their sha256 is in the manifest |
+| `artifacts/` | the adapter and the training rows with their origin (`own` or `teacher`) |
+
+The run is installed read-only, and only the accepted outputs of the winning owner reach it
+(see [portability](portability.md#completion-is-a-fenced-transition)). `REPORT.md` at the project
+root may change; a run's own report never does.
+
+### Export and test records
+
+`exports/<id>/record.json` names the base model and revision, the tokenizer files and chat-template
+hash, the prompt template, the adapter and how it was merged, each format and its quantization,
+the source run and its evaluation references, the verification (runtime, settings, exact rows,
+load failures, prediction differences, task metrics, the script run once) and the deployment
+measurements with their boundaries and hardware. `tests/<id>/record.json` names the run, the
+test-file hash, the metrics, and how many times the split had been scored before. A failure is a
+record with `"status": "failed"`, never a missing directory. A later verification is a new record
+that references the earlier one.
+
+### Payloads and control state
+
+Under `.spill/runs/<id>/`: `control.json` (one authority per run), `control.lock` (local disk), and
+`payloads/<kind>-g<generation>-s<seq>-<attempt>/` holding the files and a `PAYLOAD.json` manifest
+written last with each file's size and sha256. The control object holds `owner`, `generation`
+(fencing), `lease_expires`, `revision`, `status` (`idle`, `running`, `handoff`, `transferred`,
+`incoming`, `completed`, `bundled`), `checkpoint` (the accepted payload: dir, manifest hash, step,
+cursor, sequence), `stages` (accepted stage payloads), `completed`, `handoff`, `locations` and a
+bounded history. See [portability](portability.md).
+
+### Schema migrations
+
+A flat-layout folder (`evals.jsonl`, `train.jsonl`, `.build/`) opened by a project command gets a
+`streamweights.toml` with `layout = "legacy-flat"` and the hash of each source file, announced in
+one line. Nothing is moved or rewritten, a second open changes nothing, and `.build/` is not
+reinterpreted: `spill build` and `spill resume` keep using it as before. There is one schema
+version, 1; a future change will add a migration here before it adds a version.

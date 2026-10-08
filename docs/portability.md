@@ -154,3 +154,127 @@ On SIGTERM or SIGINT a headless job finishes the current quantum if it ends with
 otherwise abandons it, writes a checkpoint, emits `preempted` and exits with code 75 so that a
 scheduler retries it (see [schedulers.md](schedulers.md)). Measured in the tests: SIGTERM to exit
 in under a second on a tiny model; the deadline is 30 seconds in all cases.
+
+# The guided workflow: projects, authority and handoff
+
+Everything above is about one job. A **project** (`spill init`) is the unit that moves, and
+execution is separable from it: the same stages run on MLX, on torch-cpu or in another process.
+
+## A portable project and an offline bundle
+
+| | portable project | offline bundle |
+|---|---|---|
+| what | the project folder: config, data, runs, records, run state | the folder plus the pinned model files, with a checksummed manifest |
+| models | pinned references (repository, revision, sha256 per file); large weights stay in the cache and are fetched again at that revision | included under `assets/models/` |
+| network | needed once to fetch models | none after `spill bundle --install` |
+| made by | the project is the folder; `spill move` hands it over | `spill bundle <folder> <path>` |
+
+A bundle holds no credentials and no Python dependencies: install streamweights first, then
+`spill bundle --verify <path>` and `spill bundle --install <path> <project dir>`. Bundling an
+active run copies the committed state its control object points at, as a read-only copy
+(status `bundled`). Inspection and inference from a bundle are allowed; a training copy runs
+`spill build <project dir> --new-run`, which forks a new run that names the bundled one as its
+parent, so no second location ever writes the same live run.
+
+## One authoritative location per live run
+
+Each live run has one control object: `<project>/.spill/runs/<id>/control.json` on local disk, or
+the same path under an `s3://` prefix. It is the only authority. Local caches and copies are not.
+Nothing is published without first acquiring the control object, and `spill resume <uri>` does
+exactly that. A manual copy of a project is a different location with its own control object:
+it cannot continue the original run, only fork a new one.
+
+Local disk: every control transition holds an exclusive `flock` on a stable `control.lock`, reads
+the object, validates owner, generation and the transition, and replaces the file atomically
+(write, fsync, rename, fsync the directory) before releasing the lock. Payload computation and
+large writes happen outside that short critical section. A held lock blocks a second acquirer
+(`LockContended` after the timeout) whatever the lease says; a process that dies releases it.
+Only documented local filesystems are accepted (apfs, hfs, ext4, xfs, btrfs, tmpfs, zfs, f2fs,
+overlay and a few others); known network filesystems and unknown types are refused, because a
+lock probe on one machine proves nothing about locks across machines
+([flock(2)](https://man7.org/linux/man-pages/man2/flock.2.html)).
+
+S3: the object is created with `If-None-Match: *` and every later transition replaces that same
+object with `If-Match: <etag>`; it is never deleted and recreated, so the generation never
+resets. The client validates owner, generation and the allowed transition against what it just
+read; the store validates only the ETag
+([conditional writes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html)).
+On a conflict or an uncertain outcome (a timeout, a lost response) it rereads: if it was
+superseded it stops; if the same owner and generation still allow the transition, it rebuilds the
+transition from the newest document, preserving newer accepted state, and never replays an old
+one. A checkpoint's sequence must increase, so a pointer cannot regress.
+
+Leases: the owner writes `lease_expires` from its clock and renews at a third of the lease
+(120 s by default). Neither S3 nor the lock checks it. Expiry only lets a successor compete: the
+successful conditional acquisition creates the next generation, and the old writer's next
+transition fails. This assumes clocks that differ by much less than the lease; it is not a
+real-time guarantee.
+
+A backend that cannot provide these operations is refused before any run state is published.
+The checks use disposable probe objects: S3 must reject a second create, a wrong ETag and a stale
+ETag with HTTP 412; local disk must exclude a second lock holder and replace atomically.
+
+## Immutable payloads and what is current
+
+A checkpoint, a stage's outputs and the completion snapshot are each written once, to a unique
+location `payloads/<kind>-g<generation>-s<seq>-<attempt>/`, with a manifest of sizes and sha256
+written last and verified before anything points at it. A payload is **current** only when the
+control object points at its manifest. Recovery follows that pointer and validates the payload;
+it does not look at the newest directory or listing. A killed or superseded writer leaves
+unreferenced payloads, which stay (garbage collection is a separate, later assignment).
+Recovery prints the last committed step and data cursor. It states how much was redone only when
+that is known; otherwise it gives the checkpoint interval as the bound and says the exact amount
+is unknown.
+
+Locally the payload and control writes are flushed (fsync) before a checkpoint counts as
+committed. The tests kill the process at each point of publication; they do not test losing power
+to the machine.
+
+## Completion is a fenced transition
+
+A run completes by writing its snapshot as a payload and then making one conditional transition
+to `completed`. Only the current owner's transition succeeds, so a stale worker can leave an
+orphaned payload but cannot publish a stage result or a completion or touch `runs/<id>/`. Once
+installed, `runs/<id>/` is read-only and never rewritten. Exports, tests, moves and resumes
+create their own records and never edit it. A completed run cannot resume training.
+
+## spill move: a handoff of committed state
+
+`spill move [<folder>] <uri>` (a folder or `s3://bucket/prefix`):
+
+1. asks the running writer to stop at its next committed boundary and waits (bounded, `--wait`);
+2. takes the run as the mover, under an owner id derived from the transfer id, and records `handoff`;
+3. copies a consistent snapshot (every project file; per run, only the payloads its control object
+   points at) and writes a checksummed manifest; the source files must hash the same afterwards;
+4. reads everything back from the destination and compares sizes and sha256;
+5. creates the destination control objects in state `incoming`, which cannot be acquired;
+6. marks the source `transferred` under a new generation: from here nothing can publish to it;
+7. activates the destination (`incoming` to `idle`) and prints `spill resume <uri>`.
+
+Run it again after any interruption: the transfer id is recorded, files that already verify are
+not copied, a fenced source is never reopened, and at no point can both places be acquired. The
+source bytes are kept. A completed run moves with its bytes unchanged and stays completed. Bulk
+export artifacts stay where they were made unless `--with-exports`.
+
+`spill resume <uri>` makes a working copy of the small project files (a cache, verified against
+the manifest), acquires the remote control object, checks model and tokenizer identity by file
+hash and names every difference, restores the committed checkpoint, and continues with the run's
+own frozen inputs, not the live files. When it completes it publishes the snapshot back.
+
+## Engines and numerics
+
+MLX and torch-cpu read and write the same hardware-neutral checkpoint, so a run stopped on one
+finishes on the other. Training is not claimed to be bit-identical across engines: the manifest
+records, per range of steps, the engine, hardware, OS and numerics (MLX trains with bf16 base
+weights and float32 adapter and optimizer; torch-cpu uses float32 or bf16 by CPU capability), and the
+report lists the transition. Tests kill a run during checkpoint publication on one engine and
+finish it on the other in both directions.
+
+## Limits
+
+Tested: local APFS, a MinIO server (RELEASE.2025-10-15T17-29-55Z locally; the CI log records the
+container's version), macOS arm64 and Linux x86_64 CPU. Not tested: real AWS S3, CUDA, network
+filesystems, power loss, Windows (the local lock needs POSIX `flock`). Not built: garbage
+collection of orphaned payloads, a remote scheduler, transparent multi-writer sync, row-level
+resume inside a stopped eval or distill stage (a stage is accepted whole; a training stage resumes
+from its last checkpoint).

@@ -67,7 +67,8 @@ def verify_dir(tag: str, d: Path) -> dict:
         if not p.exists():
             if name in ("model.safetensors", "config.json", "tokenizer.json"):
                 raise SpillError(f"{tag}: {name} is missing from {d}; re-fetch the pinned "
-                                 f"revision {pin['revision'][:12]}", f"spill models --fetch {tag}")
+                                 f"revision {pin['revision'][:12]}", f"remove {d} and run the command again to "
+                                 f"re-fetch it")
             continue
         if p.stat().st_size != meta["bytes"] or _cached_sha(p) != meta["sha256"]:
             raise SpillError(f"{tag}: {name} in {d} does not match the pinned revision "

@@ -37,10 +37,10 @@ def test_readme_shape():
     assert lines[6].startswith("[Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB "
                                "MacBook Pro.](docs/reports/")
     heads = re.findall(r"^## (.+)$", README, re.M)
-    assert heads == ["Quick start", "Platforms", "How it works in one picture", "Copy or surpass",
-                     "Which path, and how long", "Start anywhere, finish anywhere", "Ship it",
-                     "What build does", "Requirements", "Under the hood",
-                     "Status and roadmap", "Feedback", "License"]
+    assert heads == ["Your examples to a model", "Understanding results",
+                     "Continuing on another machine", "Sample projects", "When a teacher is useful",
+                     "Platforms and explicitly untested paths", "Under the hood", "Prior art",
+                     "Status"]
     assert "shields.io" not in README
     badges = re.findall(r"!\[[^\]]*\]\(([^)]*badge[^)]*)\)", README)       # one badge, for the relay workflow only
     assert badges == ["https://github.com/streamweights/streamweights/actions/workflows/relay.yml/badge.svg"]
@@ -48,7 +48,7 @@ def test_readme_shape():
     assert "uv tool install git+https://github.com/streamweights/streamweights" in README
     assert "docs/linux.md" in README and "issues/1" in README
     assert "arrives with the full proof run" in README
-    first = README.split("## Quick start")[0].lower()
+    first = README.split("\n## ")[0].lower()
     for word in ("fine-tune", "llm", "mac", "linux", "lora", "distill", "70b",
                  "bigger than ram", "local"):
         assert word in first, word
@@ -172,15 +172,17 @@ def test_cli_md_is_the_real_help_output():
 def test_help_lists_commands_in_loop_order_one_line_each():
     out = _cli("--help")
     cmds = re.findall(r"^  (\w+)\s{2,}(.+)$", out, re.M)
-    assert [c for c, _ in cmds] == ["build", "example", "run", "distill", "tune", "eval",
-                                    "export", "models", "adapters", "runs", "status", "tail",
-                                    "resume", "doctor", "check"]
+    assert [c for c, _ in cmds] == ["init", "plan", "build", "report", "compare", "example", "run",
+                                    "distill", "tune", "eval", "export", "test", "bundle", "move",
+                                    "models", "adapters", "runs", "status", "tail", "resume",
+                                    "doctor", "check"]
     assert all(len(d) < 62 for _, d in cmds)
 
 
 def test_every_command_help_ends_with_one_example():
-    for c in ("build", "example", "run", "distill", "tune", "eval", "export", "models",
-              "adapters", "runs", "status", "tail", "resume", "doctor", "check"):
+    for c in ("init", "plan", "build", "report", "compare", "example", "run", "distill", "tune",
+              "eval", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
+              "tail", "resume", "doctor", "check"):
         lines = [l for l in _cli(c, "--help").rstrip().splitlines()]
         assert lines[-1].lstrip().startswith("Example: spill ") or \
             lines[-2].lstrip().startswith("Example: spill "), c
@@ -211,7 +213,7 @@ def test_site_home_is_rendered_from_the_readme_with_working_links():
 
 
 def test_guides_are_answer_shaped():
-    titles = ["Fine-tune an LLM on a Mac", "Run a 70B model on a 48 GB Mac",
+    titles = ["Turn a CSV of examples into an evaluated model", "Fine-tune an LLM on a Mac", "Run a 70B model on a 48 GB Mac",
               "Distill a large model into a small one locally",
               "LoRA fine-tuning without a big GPU",
               "Resume a fine-tuning job on a different machine",

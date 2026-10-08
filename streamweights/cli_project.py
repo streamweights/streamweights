@@ -26,7 +26,7 @@ def _guided(folder, command: str) -> dict:
     return cfg
 
 
-@app.command(short_help="Start a project from a CSV or JSONL of labeled examples",
+@app.command(short_help="Start a project from a CSV or JSONL of examples",
              epilog="Example: spill init tickets.csv --input text --output label")
 def init(
     data: Path = typer.Argument(..., help="a CSV or JSONL of labeled examples"),
@@ -82,7 +82,7 @@ def init(
     _next_hint(f"spill plan {folder}")
 
 
-@app.command(short_help="Show what a build will do, before it does anything",
+@app.command(short_help="Show what a build will do, before it does it",
              epilog="Example: spill plan tickets")
 def plan(
     project: Path = typer.Argument(..., help="a project folder (from spill init)"),
@@ -171,7 +171,7 @@ def project_build(folder, student, teacher, epochs, engine, headless, executor, 
     _next_hint(f"spill report {folder}")
 
 
-@app.command(short_help="Show the report of a project's latest (or a named) run",
+@app.command(short_help="Show a project's latest (or a named) run report",
              epilog="Example: spill report tickets")
 def report(
     project: Path = typer.Argument(..., help="a project folder"),
@@ -205,7 +205,7 @@ def report(
     _next_hint(f"spill export {project}")
 
 
-@app.command(short_help="Hand a project's committed state to another location (a folder or s3://)",
+@app.command(short_help="Hand a project to another folder or s3:// location",
              epilog="Example: spill move tickets s3://my-bucket/tickets")
 def move(
     first: str = typer.Argument(..., help="the project folder, or the destination when it is "
@@ -290,7 +290,7 @@ def project_resume(target, engine, headless, executor, stop_after):
     _next_hint(f"spill report {project}")
 
 
-@app.command(name="test", short_help="Score a run on the final test split, once, as a record",
+@app.command(name="test", short_help="Score a run on the final test split, as a record",
              epilog="Example: spill test tickets")
 def test_cmd(
     project: Path = typer.Argument(..., help="a project folder"),
@@ -325,7 +325,7 @@ def test_cmd(
     _next_hint(f"spill report {project}")
 
 
-@app.command(short_help="Lay runs side by side; rank them only when that is honest",
+@app.command(short_help="Compare runs; rank only when that is honest",
              epilog="Example: spill compare tickets")
 def compare(
     paths: list[Path] = typer.Argument(..., help="project folders (all their runs) and/or run "
@@ -373,7 +373,7 @@ def project_export(project: Path, run: str | None, gguf: str | None, verify_rows
     _next_hint(f"python {project}/exports/{rec['id']}/{first} \"<text>\"")
 
 
-@app.command(short_help="Make, check or install an offline bundle of a project and its models",
+@app.command(short_help="Make, check or install an offline project bundle",
              epilog="Example: spill bundle tickets tickets.bundle")
 def bundle(
     first: Path = typer.Argument(..., help="the project folder (to make a bundle), or the bundle "
