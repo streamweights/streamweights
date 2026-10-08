@@ -162,8 +162,8 @@ class Coordinator:
     # ---- choosing the run
     def _find_resumable(self, plan: P.BuildPlan) -> dict | None:
         for doc in list_runs(self.project):
-            if doc["identity"] == plan.identity and doc["status"] not in (ctl.COMPLETED,
-                                                                          ctl.TRANSFERRED):
+            if doc["identity"] == plan.identity and doc["status"] in (ctl.IDLE, ctl.RUNNING,
+                                                                       ctl.HANDOFF):
                 return doc
         return None
 
@@ -198,9 +198,13 @@ class Coordinator:
             self.say(f"continuing run {doc['run_id']} (same inputs, same settings)")
         else:
             rid = run_id or f"run-{time.strftime('%Y%m%d-%H%M%S')}-{plan.identity[:6]}"
-            rs = RunState.create(self.state_root, rid, plan.identity, self.work_root)
+            if parent is None:
+                prior = [d for d in list_runs_at(self.state_root)
+                         if d["status"] in (ctl.COMPLETED, ctl.BUNDLED)]
+                parent = sorted(prior, key=lambda d: d["run_id"])[-1]["run_id"] if prior else None
+            rs = RunState.create(self.state_root, rid, plan.identity, self.work_root, parent=parent)
             resumed = False
-        return self._execute(rs, plan, resumed, parent)
+        return self._execute(rs, plan, resumed, rs.doc().get("parent"))
 
     def resume(self, run_id: str, engine_override: str | None = None) -> BuildOutcome:
         """Continue an unfinished run with the inputs it was started with (its frozen
@@ -234,7 +238,7 @@ class Coordinator:
                              "the run (spill plan shows it), then resume")
         self.engine = self.engine or plan.engine
         self.say(f"continuing run {run_id} on {plan.engine} (its stages accepted so far are kept)")
-        return self._execute(rs, plan, True, None)
+        return self._execute(rs, plan, True, doc.get("parent"))
 
     def _run_fields(self, run_id: str) -> dict | None:
         rs = RunState.open(self.state_root, run_id, self.work_root)

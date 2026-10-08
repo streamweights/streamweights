@@ -11,6 +11,21 @@ from .cli import _fail, _next_hint, app
 from .errors import SpillError
 
 
+def _guided(folder, command: str) -> dict:
+    """The project's config, migrating a flat-layout folder first (one announced line), and a
+    clear refusal when the command needs a guided project."""
+    from .project import migrate as M
+    cfg = M.ensure_project(folder, say=typer.echo)
+    if cfg is None:
+        raise SpillError(f"{folder} is not a project folder", "spill init <data> --input <col> "
+                         "--output <col>")
+    if not M.is_guided(cfg):
+        raise SpillError(f"{folder} is a flat-layout folder: spill {command} works on a project "
+                         f"made by spill init; spill build and spill resume keep working here",
+                         f"spill build {folder}")
+    return cfg
+
+
 @app.command(short_help="Start a project from a CSV or JSONL of labeled examples",
              epilog="Example: spill init tickets.csv --input text --output label")
 def init(
@@ -85,6 +100,7 @@ def plan(
     try:
         from . import engine_select
         from .project import plan as P
+        _guided(project, "plan")
         if calibrate:
             r = engine_select.measure_rates()
             typer.echo("calibration (synthetic matmul and memory, nothing trained): "
@@ -166,9 +182,13 @@ def report(
     import streamweights.cli as cli
     cli._DEBUG = debug
     try:
-        from .project import config as C
         from .project.index import records, write_index
-        C.load(project)
+        from .project import migrate as MG
+        cfg0 = MG.ensure_project(project, say=typer.echo)
+        if cfg0 is not None and not MG.is_guided(cfg0):
+            _legacy_report(project)
+            return
+        _guided(project, "report")
         runs = records(project, "runs")
         if not runs:
             raise SpillError(f"{project} has no completed run to report", f"spill build {project}")
@@ -204,9 +224,8 @@ def move(
     cli._DEBUG = debug
     folder, target = (Path(first), dest) if dest else (Path("."), first)
     try:
-        from .project import config as C
         from .project import move as M
-        C.load(folder)
+        _guided(folder, "move")
         typer.echo(f"spill move {folder.name if str(folder) != '.' else Path.cwd().name}: hand the "
                    f"committed state to {target}. Source bytes are kept. Cost: $0.")
         r = M.move(folder, target, say=typer.echo, wait_s=wait, with_exports=with_exports)
@@ -287,6 +306,7 @@ def test_cmd(
         from . import runtime
         from .project import report as R
         from .project import testrec
+        _guided(project, "test")
         typer.echo(f"spill test {project.name}: score the frozen run on the final test split. "
                    f"Cost: $0. Record -> {project}/tests/<id>")
         with runtime.job_session("test", engine=engine):
@@ -318,6 +338,9 @@ def compare(
     cli._DEBUG = debug
     try:
         from .project import compare as CM
+        for p in paths:
+            _guided(p, "compare") if (Path(p) / "streamweights.toml").exists() or \
+                (Path(p) / "evals.jsonl").exists() else None
         runs = CM.load_runs(paths)
         if len(runs) < 1:
             raise SpillError("no completed runs found there", "spill build <project>")
@@ -348,3 +371,63 @@ def project_export(project: Path, run: str | None, gguf: str | None, verify_rows
     typer.echo(f"record: {project}/exports/{rec['id']}")
     first = next(iter(rec["scripts"].values()))
     _next_hint(f"python {project}/exports/{rec['id']}/{first} \"<text>\"")
+
+
+@app.command(short_help="Make, check or install an offline bundle of a project and its models",
+             epilog="Example: spill bundle tickets tickets.bundle")
+def bundle(
+    first: Path = typer.Argument(..., help="the project folder (to make a bundle), or the bundle "
+                                           "(with --verify or --install)"),
+    dest: Path = typer.Argument(None, help="the bundle path to create, or the project folder to "
+                                           "copy out with --install"),
+    verify: bool = typer.Option(False, "--verify", help="check every checksum in a bundle"),
+    install: bool = typer.Option(False, "--install", help="verify a bundle, put its models in this "
+                                                          "machine's cache and copy its project to "
+                                                          "<dest>"),
+    with_exports: bool = typer.Option(False, "--with-exports", help="also include bulk export "
+                                                                    "artifacts"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
+):
+    """Everything a workflow needs to run without network access: the project, its run state
+    (a consistent committed snapshot) and the pinned model files, with a checksummed manifest.
+    Python dependencies are installed separately."""
+    import streamweights.cli as cli
+    cli._DEBUG = debug
+    try:
+        from .project import bundle as B
+        if not verify and not install:
+            _guided(first, "bundle")
+        if verify:
+            m = B.verify_bundle(first)
+            typer.echo(f"bundle ok: {len(m['files'])} files, every checksum matches")
+            _next_hint(f"spill bundle --install {first} <project dir>")
+        elif install:
+            if dest is None:
+                raise SpillError("--install needs the project folder to copy out", f"spill bundle "
+                                 f"--install {first} <project dir>")
+            p = B.install_bundle(first, dest, say=typer.echo)
+            typer.echo(f"project copied to {p}; its runs are read-only copies")
+            _next_hint(f"spill build {p} --new-run")
+        else:
+            if dest is None:
+                raise SpillError("bundle needs the path to write", f"spill bundle {first} <path>")
+            typer.echo(f"spill bundle {first.name}: project, run state and pinned models into {dest}. "
+                       f"Cost: $0. Python dependencies are not included.")
+            m = B.create_bundle(first, dest, say=typer.echo, with_exports=with_exports)
+            size = sum(f["bytes"] for f in m["files"].values())
+            typer.echo(f"bundle: {len(m['files'])} files, {size / 1e9:.2f} GB -> {dest}")
+            _next_hint(f"spill bundle --verify {dest}")
+    except Exception as e:
+        _fail(e)
+
+
+def _legacy_report(folder: Path) -> None:
+    """`spill report` on a flat-layout folder: the table its last build recorded."""
+    from . import build as build_mod
+    f = build_mod.read_folder(folder)
+    doc = build_mod.load_state(f)
+    if not doc:
+        raise SpillError(f"{folder} has no build to report", f"spill build {folder}")
+    typer.echo(build_mod.table_from_state(doc))
+    typer.echo(f"\n(flat-layout folder: this is the table spill build recorded in {folder}/.build/)")
+    _next_hint(f"spill export {doc.get('student', '<base>')}+{doc.get('name', '<adapter>')}")

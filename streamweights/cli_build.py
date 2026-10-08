@@ -386,7 +386,8 @@ def build(
     import streamweights.cli as cli
     cli._DEBUG = debug
     from .project import config as project_config
-    if project_config.exists(folder):
+    from .project import migrate as project_migrate
+    if project_config.exists(folder) and project_migrate.is_guided(project_config.load(folder)):
         try:
             from .cli_project import project_build
             project_build(folder, student, teacher, epochs, engine, headless, executor, new_run,
@@ -454,7 +455,8 @@ def export(
     cli._DEBUG = debug
     try:
         from .project import config as project_config
-        if project_config.exists(model):
+        from .project import migrate as project_migrate
+        if project_config.exists(model) and project_migrate.is_guided(project_config.load(model)):
             from .cli_project import project_export
             project_export(Path(model), run, gguf, verify_rows)
             return

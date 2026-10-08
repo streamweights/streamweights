@@ -68,9 +68,9 @@ class RunState:
 
     # ---- lifecycle
     @classmethod
-    def create(cls, state_root, run_id, identity, work_root, **kw) -> "RunState":
+    def create(cls, state_root, run_id, identity, work_root, parent=None, **kw) -> "RunState":
         rs = cls(state_root, run_id, work_root, **kw)
-        ctl.Authority.create(rs.backend, run_id, identity)
+        ctl.Authority.create(rs.backend, run_id, identity, parent=parent)
         return rs
 
     @classmethod

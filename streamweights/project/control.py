@@ -44,8 +44,8 @@ SCHEMA = 1
 LEASE_S = 120.0
 
 # statuses
-IDLE, RUNNING, HANDOFF, TRANSFERRED, INCOMING, COMPLETED, FAILED = (
-    "idle", "running", "handoff", "transferred", "incoming", "completed", "failed")
+IDLE, RUNNING, HANDOFF, TRANSFERRED, INCOMING, COMPLETED, FAILED, BUNDLED = (
+    "idle", "running", "handoff", "transferred", "incoming", "completed", "failed", "bundled")
 
 
 class Conflict(Exception):
@@ -243,8 +243,9 @@ def _enc(doc: dict) -> bytes:
 
 # ------------------------------------------------------------ the authority
 
-def new_doc(run_id: str, identity: str, status: str = IDLE, generation: int = 0) -> dict:
-    return {"schema": SCHEMA, "run_id": run_id, "identity": identity, "revision": 0,
+def new_doc(run_id: str, identity: str, status: str = IDLE, generation: int = 0,
+            parent: str | None = None) -> dict:
+    return {"schema": SCHEMA, "run_id": run_id, "identity": identity, "parent": parent, "revision": 0,
             "generation": generation, "owner": None, "lease_expires": 0.0, "status": status,
             "checkpoint": None, "stages": {}, "completed": None, "handoff": None,
             "quiesce": None, "locations": [], "history": []}
@@ -307,8 +308,8 @@ class Authority:
     # ---- lifecycle
     @staticmethod
     def create(backend, run_id: str, identity: str, status: str = IDLE,
-               generation: int = 0) -> dict:
-        doc = new_doc(run_id, identity, status, generation)
+               generation: int = 0, parent: str | None = None) -> dict:
+        doc = new_doc(run_id, identity, status, generation, parent)
         doc["history"] = [{"rev": 0, "event": "create", "at": time.time()}]
         try:
             backend.create(doc)
@@ -353,6 +354,10 @@ class Authority:
             if doc["status"] == TRANSFERRED:
                 raise NotAllowed(f"this run was handed to {doc['handoff']['dest']}",
                                  f"spill resume {doc['handoff']['dest']}")
+            if doc["status"] == BUNDLED:
+                raise NotAllowed("this run is a read-only copy inside a bundle; a training copy "
+                                 "forks a new run that names it as its parent",
+                                 "spill build <project> --new-run")
             if doc["status"] == INCOMING:
                 raise NotAllowed("this location has not been activated yet; the handoff to it "
                                  "is not committed", "spill move <project> <uri>   (retry)")
