@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -197,7 +198,8 @@ class Coordinator:
             resumed = True
             self.say(f"continuing run {doc['run_id']} (same inputs, same settings)")
         else:
-            rid = run_id or f"run-{time.strftime('%Y%m%d-%H%M%S')}-{plan.identity[:6]}"
+            rid = run_id or (f"run-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:4]}-"
+                             f"{plan.identity[:6]}")
             if parent is None:
                 prior = [d for d in list_runs_at(self.state_root)
                          if d["status"] in (ctl.COMPLETED, ctl.BUNDLED)]

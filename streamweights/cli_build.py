@@ -603,7 +603,6 @@ def example(
             _next_hint(f"spill init {folder}/snips.csv --input text --output json "
                        f"--schema {folder}/schema.json --project {folder}-project")
         else:
-            _next_hint(f"spill build {folder}   (or, from the CSV: spill init {folder}/banking77.csv "
-                       f"--input text --output label --project {folder}-project)")
+            _next_hint(f"spill build {folder}")
     except Exception as e:
         _fail(e)
