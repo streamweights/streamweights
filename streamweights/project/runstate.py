@@ -204,15 +204,14 @@ class RunState:
 
 
 def make_readonly(d: Path) -> None:
-    for p in sorted(Path(d).rglob("*"), reverse=True):
-        try:
-            p.chmod(p.stat().st_mode & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
-        except OSError:
-            pass
-    try:
-        Path(d).chmod(Path(d).stat().st_mode & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
-    except OSError:
-        pass
+    """Files read-only (defense in depth; the fenced completion is the real protection).
+    Directories stay writable so a whole project can still be deleted with rm -rf."""
+    for p in Path(d).rglob("*"):
+        if p.is_file():
+            try:
+                p.chmod(p.stat().st_mode & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
+            except OSError:
+                pass
 
 
 def make_writable(d: Path) -> None:
