@@ -44,6 +44,10 @@ Models: `Qwen/Qwen2.5-0.5B-Instruct` and `sentence-transformers/all-MiniLM-L6-v2
 - A parent run is recorded when a new run follows a completed or bundled one; the new run trains from the base, not from the parent's adapter.
 - The docs harness found that `spill tune <distill file>` failed although the guide said to run it; `spill tune` now accepts a `spill distill` output.
 
+## MinIO
+
+The S3 gates ran in CI (job `object-store`, run 37729069035) against MinIO built from the pinned tag, because the upstream image for it could not be pulled (`unauthorized`): the log reads `minio version DEVELOPMENT.2025-10-15T17-29-55Z (commit-id=9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a)`, and the same commit is what the Homebrew release build `RELEASE.2025-10-15T17-29-55Z` used locally. `tests/test_ownership.py` and `tests/test_move.py` ran there with the S3 cases enabled (41 passed, one skipped: a lost response is not a local-disk failure). Real AWS S3 was not exercised.
+
 ## Untested
 
 Real AWS S3, CUDA, network filesystems, Windows, whole-machine power loss, a 7B or 70B model (none was run), warm-starting from a parent run, and the Linux MLX path (there is none). MLX in the pytest suite runs on the CPU device; the numbers in this report are from the Apple GPU.

@@ -272,8 +272,8 @@ finish it on the other in both directions.
 
 ## Limits
 
-Tested: local APFS, a MinIO server (RELEASE.2025-10-15T17-29-55Z locally; the CI log records the
-container's version), macOS arm64 and Linux x86_64 CPU. Not tested: real AWS S3, CUDA, network
+Tested: local APFS, a MinIO server built from the tag RELEASE.2025-10-15T17-29-55Z (commit
+9e49d5e7a648; the CI log prints `minio --version`), macOS arm64 and Linux x86_64 CPU. Not tested: real AWS S3, CUDA, network
 filesystems, power loss, Windows (the local lock needs POSIX `flock`). Not built: garbage
 collection of orphaned payloads, a remote scheduler, transparent multi-writer sync, row-level
 resume inside a stopped eval or distill stage (a stage is accepted whole; a training stage resumes

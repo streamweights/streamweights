@@ -1,0 +1,811 @@
+{
+ "source": "GitHub Actions run 37729069035, job 'The CSV journey from the built wheel (Linux, torch-cpu, GGUF)'",
+ "gguf_journey": {
+  "imported_from": "/home/runner/work/streamweights/streamweights/streamweights/__init__.py",
+  "hardware": {
+   "host": "runnervm8df0l",
+   "system": "Linux",
+   "os": "Linux",
+   "os_release": "6.17.0-1022-azure",
+   "arch": "x86_64",
+   "ram_gb": 15.6,
+   "cpu": "x86_64",
+   "python": "3.12.14"
+  },
+  "started": "2026-10-08T04:58:20+0000",
+  "journeys": [
+   {
+    "task": "classification",
+    "engine": "torch-cpu",
+    "steps": [
+     {
+      "cmd": "spill example banking77 --tiny",
+      "seconds": 0.3,
+      "exit": 0
+     },
+     {
+      "cmd": "spill init /tmp/gatework/classification-torch-cpu/banking77-tiny/banking77.csv --input text --output label --project /tmp/gatework/classification-torch-cpu/project",
+      "seconds": 0.3,
+      "exit": 0
+     },
+     {
+      "cmd": "spill plan /tmp/gatework/classification-torch-cpu/project --engine torch-cpu",
+      "seconds": 2.0,
+      "exit": 0
+     },
+     {
+      "cmd": "spill build /tmp/gatework/classification-torch-cpu/project --engine torch-cpu",
+      "seconds": 189.4,
+      "exit": 0
+     },
+     {
+      "cmd": "spill report /tmp/gatework/classification-torch-cpu/project",
+      "seconds": 0.2,
+      "exit": 0
+     },
+     {
+      "cmd": "spill test /tmp/gatework/classification-torch-cpu/project --engine torch-cpu",
+      "seconds": 21.2,
+      "exit": 0
+     },
+     {
+      "cmd": "spill export /tmp/gatework/classification-torch-cpu/project --gguf q8_0",
+      "seconds": 55.9,
+      "exit": 0
+     }
+    ],
+    "init": [
+     "   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together",
+     "   warning: 3 of 10 training classes have no validation rows, so their accuracy is not measured",
+     "",
+     "next: spill plan /tmp/gatework/classification-torch-cpu/project"
+    ],
+    "build_exit": 0,
+    "run": {
+     "id": "run-20261008-045824-5dcb-2f0a5e",
+     "metric": "accuracy",
+     "table": [
+      {
+       "accuracy": 1.0,
+       "comparator": "baseline",
+       "inference_failures": 0,
+       "invalid_predictions": 0,
+       "macro_f1": 1.0,
+       "mean_field_accuracy": null,
+       "parseable_rate": null,
+       "primary": 1.0,
+       "records_with_extra_fields": null,
+       "rows": 18,
+       "schema_valid_rate": null,
+       "truncated": null,
+       "whole_record_accuracy": null
+      },
+      {
+       "accuracy": 0.4444444444444444,
+       "comparator": "untrained",
+       "inference_failures": 0,
+       "invalid_predictions": 0,
+       "macro_f1": 0.40793650793650793,
+       "mean_field_accuracy": null,
+       "parseable_rate": null,
+       "primary": 0.4444444444444444,
+       "records_with_extra_fields": null,
+       "rows": 18,
+       "schema_valid_rate": null,
+       "truncated": 0,
+       "whole_record_accuracy": null
+      },
+      {
+       "accuracy": 0.9444444444444444,
+       "comparator": "trained",
+       "inference_failures": 0,
+       "invalid_predictions": 1,
+       "macro_f1": 0.9523809523809524,
+       "mean_field_accuracy": null,
+       "parseable_rate": null,
+       "primary": 0.9444444444444444,
+       "records_with_extra_fields": null,
+       "rows": 18,
+       "schema_valid_rate": null,
+       "truncated": 0,
+       "whole_record_accuracy": null
+      }
+     ],
+     "stages": {
+      "baseline": {
+       "seconds": 3.72,
+       "producers": [
+        {
+         "engine": "torch-cpu",
+         "hardware": "cpu",
+         "host": "runnervm8df0l",
+         "numerics": {
+          "base": "float32"
+         },
+         "os": "Linux x86_64",
+         "system": "Linux"
+        }
+       ]
+      },
+      "eval:trained": {
+       "seconds": 8.59,
+       "producers": [
+        {
+         "engine": "torch-cpu",
+         "hardware": "cpu:AMD EPYC 7763 64-Core Processor",
+         "host": "runnervm8df0l",
+         "numerics": {
+          "adapter": "float32",
+          "base": "float32",
+          "optimizer": "float32"
+         },
+         "os": "Linux x86_64",
+         "quanta": "18 rows",
+         "system": "Linux"
+        }
+       ]
+      },
+      "eval:untrained": {
+       "seconds": 6.87,
+       "producers": [
+        {
+         "engine": "torch-cpu",
+         "hardware": "cpu:AMD EPYC 7763 64-Core Processor",
+         "host": "runnervm8df0l",
+         "numerics": {
+          "adapter": "float32",
+          "base": "float32",
+          "optimizer": "float32"
+         },
+         "os": "Linux x86_64",
+         "quanta": "18 rows",
+         "system": "Linux"
+        }
+       ]
+      },
+      "train": {
+       "seconds": 167.18,
+       "producers": [
+        {
+         "engine": "torch-cpu",
+         "hardware": "cpu:AMD EPYC 7763 64-Core Processor",
+         "host": "runnervm8df0l",
+         "numerics": {
+          "adapter": "float32",
+          "base": "float32",
+          "dropout": 0.0,
+          "optimizer": "float32"
+         },
+         "os": "Linux x86_64",
+         "quanta": "steps 0-42",
+         "system": "Linux"
+        }
+       ]
+      }
+     },
+     "models": {
+      "embedding": {
+       "tag": "embedding:minilm",
+       "repo": "sentence-transformers/all-MiniLM-L6-v2",
+       "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+      },
+      "student": {
+       "tag": "qwen2.5:0.5b",
+       "repo": "Qwen/Qwen2.5-0.5B-Instruct",
+       "revision": "7ae557604adf67be50417f59c2c2f167def9a775"
+      }
+     },
+     "dependencies": {
+      "huggingface-hub": "1.33.0",
+      "jsonschema": "4.26.0",
+      "numpy": "2.5.3",
+      "peft": "0.21.2",
+      "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+      "python": "3.12.14",
+      "safetensors": "0.8.0",
+      "streamweights": "0.1.0",
+      "tokenizers": "0.23.2",
+      "torch": "2.14.1+cpu",
+      "transformers": "5.19.0"
+     },
+     "findings": [
+      "On 18 validation rows, accuracy: embedding baseline (MiniLM + logistic regression): 1.000; student, prompted, untrained: 0.444; student, trained: 0.944.",
+      "The embedding baseline (MiniLM + logistic regression) scored 0.056 higher than the trained student (1 row).",
+      "The trained student scored 0.500 higher than the student, prompted, untrained (9 rows)."
+     ],
+     "protocol_sha256": "085443b415512d8cce31fbd5839734cb6a70bac802fa60a15395e4f60ac9eb8c"
+    },
+    "test": {
+     "table": [
+      {
+       "accuracy": 0.9444444444444444,
+       "comparator": "baseline",
+       "inference_failures": 0,
+       "invalid_predictions": 0,
+       "macro_f1": 0.8518518518518519,
+       "mean_field_accuracy": null,
+       "parseable_rate": null,
+       "primary": 0.9444444444444444,
+       "records_with_extra_fields": null,
+       "rows": 18,
+       "schema_valid_rate": null,
+       "truncated": null,
+       "whole_record_accuracy": null
+      },
+      {
+       "accuracy": 0.3333333333333333,
+       "comparator": "untrained",
+       "inference_failures": 0,
+       "invalid_predictions": 1,
+       "macro_f1": 0.24656084656084656,
+       "mean_field_accuracy": null,
+       "parseable_rate": null,
+       "primary": 0.3333333333333333,
+       "records_with_extra_fields": null,
+       "rows": 18,
+       "schema_valid_rate": null,
+       "truncated": 0,
+       "whole_record_accuracy": null
+      },
+      {
+       "accuracy": 0.8333333333333334,
+       "comparator": "trained",
+       "inference_failures": 0,
+       "invalid_predictions": 1,
+       "macro_f1": 0.7037037037037037,
+       "mean_field_accuracy": null,
+       "parseable_rate": null,
+       "primary": 0.8333333333333334,
+       "records_with_extra_fields": null,
+       "rows": 18,
+       "schema_valid_rate": null,
+       "truncated": 0,
+       "whole_record_accuracy": null
+      }
+     ],
+     "rows": 18,
+     "seconds": 20.2,
+     "holdout_note": "This is use 1 of this project's final test split. It was not consulted before."
+    },
+    "export_exit": 0,
+    "export": {
+     "id": "export-20261008-050154-d5caea",
+     "format": [
+      "safetensors",
+      "gguf:q8_0"
+     ],
+     "status": "completed",
+     "verification": {
+      "gguf:q8_0": {
+       "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+       "diffs": 0,
+       "of": 8,
+       "primary": 1.0,
+       "load_failure": null
+      },
+      "safetensors": {
+       "runtime": "transformers 5.19.0, torch 2.14.1+cpu, float32 on CPU (4 cores)",
+       "diffs": 0,
+       "of": 8,
+       "primary": 1.0,
+       "load_failure": null
+      }
+     },
+     "deployment": {
+      "gguf:q8_0": {
+       "boundaries": {
+        "peak_memory": "peak resident set of the llama-server process tree sampled after each request (a lower bound)",
+        "tokens_per_s": "completion tokens / wall time of the non-streamed request",
+        "ttft": "wall time from request to the first streamed content token, cache_prompt off; cold = the first row, warm = median of the rest"
+       },
+       "hardware": {
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cpu_cores": 4,
+        "gpu": {
+         "bf16_compute": false,
+         "model": null,
+         "vram_bytes": 0
+        },
+        "nvme_seq_read_bytes_per_sec": 7444877513,
+        "os": "Linux 6.17.0-1022-azure (#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026)",
+        "probed_at": "2026-10-08T04:58:28+0000",
+        "ram_total_bytes": 16766410752
+       },
+       "host": {
+        "cpus": 4,
+        "machine": "x86_64",
+        "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+        "system": "Linux"
+       },
+       "input_tokens": [
+        43,
+        38,
+        38,
+        38,
+        40,
+        44,
+        42,
+        36
+       ],
+       "kept_separate_from": "build durations (these are inference measurements)",
+       "load_seconds": 0.704,
+       "output_tokens": [
+        3,
+        4,
+        3,
+        6,
+        4,
+        4,
+        4,
+        4
+       ],
+       "peak_memory_bytes": 665915392,
+       "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+       "tokens_per_s_warm": 12.88,
+       "ttft_cold_s": 0.262,
+       "ttft_warm_s": 0.2338
+      },
+      "safetensors": {
+       "boundaries": {
+        "peak_memory": "ru_maxrss of this process (weights, activations, tokenizer, interpreter)",
+        "tokens_per_s": "completion tokens / wall time of the full generate() including prefill, median over rows after the first",
+        "ttft": "wall time of generate(max_new_tokens=1) including prompt prefill; cold = the first row, warm = median of the rest"
+       },
+       "hardware": {
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cpu_cores": 4,
+        "gpu": {
+         "bf16_compute": false,
+         "model": null,
+         "vram_bytes": 0
+        },
+        "nvme_seq_read_bytes_per_sec": 7444877513,
+        "os": "Linux 6.17.0-1022-azure (#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026)",
+        "probed_at": "2026-10-08T04:58:28+0000",
+        "ram_total_bytes": 16766410752
+       },
+       "host": {
+        "cpus": 4,
+        "machine": "x86_64",
+        "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+        "system": "Linux"
+       },
+       "input_tokens": [
+        43,
+        38,
+        38,
+        38,
+        40,
+        44,
+        42,
+        36
+       ],
+       "kept_separate_from": "build durations (these are inference measurements)",
+       "load_seconds": 0.684,
+       "output_tokens": [
+        3,
+        4,
+        3,
+        6,
+        4,
+        4,
+        4,
+        4
+       ],
+       "peak_memory_bytes": 3432497152,
+       "runtime": "transformers 5.19.0, torch 2.14.1+cpu, float32 on CPU (4 cores)",
+       "tokens_per_s_warm": 6.59,
+       "ttft_cold_s": 0.3499,
+       "ttft_warm_s": 0.3098
+      }
+     },
+     "scripts": {
+      "gguf": {
+       "error": null,
+       "exit_code": 0,
+       "input": "Can I get a new pin number at any ATM using my card?",
+       "output": "change_pin",
+       "script": "run_gguf.py"
+      },
+      "safetensors": {
+       "error": null,
+       "exit_code": 0,
+       "input": "Can I get a new pin number at any ATM using my card?",
+       "output": "change_pin",
+       "script": "run_safetensors.py"
+      }
+     },
+     "seconds": 55.4
+    },
+    "inference": {
+     "gguf": {
+      "input": "Can I get a new pin number at any ATM using my card?",
+      "output": "change_pin",
+      "exit": 0,
+      "seconds": 1.2
+     },
+     "safetensors": {
+      "input": "Can I get a new pin number at any ATM using my card?",
+      "output": "change_pin",
+      "exit": 0,
+      "seconds": 6.2
+     }
+    }
+   },
+   {
+    "task": "json",
+    "engine": "torch-cpu",
+    "steps": [
+     {
+      "cmd": "spill example snips --tiny",
+      "seconds": 0.2,
+      "exit": 0
+     },
+     {
+      "cmd": "spill init /tmp/gatework/json-torch-cpu/snips-tiny/snips.csv --input text --output json --schema /tmp/gatework/json-torch-cpu/snips-tiny/schema.json --project /tmp/gatework/json-torch-cpu/project",
+      "seconds": 0.3,
+      "exit": 0
+     },
+     {
+      "cmd": "spill plan /tmp/gatework/json-torch-cpu/project --engine torch-cpu",
+      "seconds": 2.0,
+      "exit": 0
+     },
+     {
+      "cmd": "spill build /tmp/gatework/json-torch-cpu/project --engine torch-cpu",
+      "seconds": 259.3,
+      "exit": 0
+     },
+     {
+      "cmd": "spill report /tmp/gatework/json-torch-cpu/project",
+      "seconds": 0.2,
+      "exit": 0
+     },
+     {
+      "cmd": "spill test /tmp/gatework/json-torch-cpu/project --engine torch-cpu",
+      "seconds": 74.3,
+      "exit": 0
+     },
+     {
+      "cmd": "spill export /tmp/gatework/json-torch-cpu/project --gguf q8_0",
+      "seconds": 63.2,
+      "exit": 0
+     }
+    ],
+    "init": [
+     "spill init snips.csv: json (all 120 outputs are JSON objects). Train 84, validation 18, final test 18 rows. Cost: $0. Project -> /tmp/gatework/json-torch-cpu/project",
+     "   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together",
+     "",
+     "next: spill plan /tmp/gatework/json-torch-cpu/project"
+    ],
+    "build_exit": 0,
+    "run": {
+     "id": "run-20261008-050301-09df-896b01",
+     "metric": "whole-record accuracy",
+     "table": [
+      {
+       "accuracy": null,
+       "comparator": "untrained",
+       "inference_failures": 0,
+       "invalid_predictions": null,
+       "macro_f1": null,
+       "mean_field_accuracy": 0.2863247863247863,
+       "parseable_rate": 1.0,
+       "primary": 0.0,
+       "records_with_extra_fields": 18,
+       "rows": 18,
+       "schema_valid_rate": 0.6666666666666666,
+       "truncated": 0,
+       "whole_record_accuracy": 0.0
+      },
+      {
+       "accuracy": null,
+       "comparator": "trained",
+       "inference_failures": 0,
+       "invalid_predictions": null,
+       "macro_f1": null,
+       "mean_field_accuracy": 0.9316239316239316,
+       "parseable_rate": 1.0,
+       "primary": 0.4444444444444444,
+       "records_with_extra_fields": 7,
+       "rows": 18,
+       "schema_valid_rate": 1.0,
+       "truncated": 0,
+       "whole_record_accuracy": 0.4444444444444444
+      }
+     ],
+     "stages": {
+      "eval:trained": {
+       "seconds": 15.46,
+       "producers": [
+        {
+         "engine": "torch-cpu",
+         "hardware": "cpu:AMD EPYC 7763 64-Core Processor",
+         "host": "runnervm8df0l",
+         "numerics": {
+          "adapter": "float32",
+          "base": "float32",
+          "optimizer": "float32"
+         },
+         "os": "Linux x86_64",
+         "quanta": "18 rows",
+         "system": "Linux"
+        }
+       ]
+      },
+      "eval:untrained": {
+       "seconds": 48.6,
+       "producers": [
+        {
+         "engine": "torch-cpu",
+         "hardware": "cpu:AMD EPYC 7763 64-Core Processor",
+         "host": "runnervm8df0l",
+         "numerics": {
+          "adapter": "float32",
+          "base": "float32",
+          "optimizer": "float32"
+         },
+         "os": "Linux x86_64",
+         "quanta": "18 rows",
+         "system": "Linux"
+        }
+       ]
+      },
+      "train": {
+       "seconds": 192.36,
+       "producers": [
+        {
+         "engine": "torch-cpu",
+         "hardware": "cpu:AMD EPYC 7763 64-Core Processor",
+         "host": "runnervm8df0l",
+         "numerics": {
+          "adapter": "float32",
+          "base": "float32",
+          "dropout": 0.0,
+          "optimizer": "float32"
+         },
+         "os": "Linux x86_64",
+         "quanta": "steps 0-42",
+         "system": "Linux"
+        }
+       ]
+      }
+     },
+     "models": {
+      "student": {
+       "tag": "qwen2.5:0.5b",
+       "repo": "Qwen/Qwen2.5-0.5B-Instruct",
+       "revision": "7ae557604adf67be50417f59c2c2f167def9a775"
+      }
+     },
+     "dependencies": {
+      "huggingface-hub": "1.33.0",
+      "jsonschema": "4.26.0",
+      "numpy": "2.5.3",
+      "peft": "0.21.2",
+      "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+      "python": "3.12.14",
+      "safetensors": "0.8.0",
+      "streamweights": "0.1.0",
+      "tokenizers": "0.23.2",
+      "torch": "2.14.1+cpu",
+      "transformers": "5.19.0"
+     },
+     "findings": [
+      "On 18 validation rows, whole-record accuracy: student, schema-prompted, untrained (the baseline): 0.000; student, trained: 0.444.",
+      "The trained student scored 0.444 higher than the student, schema-prompted, untrained (the baseline) (8 rows)."
+     ],
+     "protocol_sha256": "d7f6322ff03be31fa212a5fa605ec92b3f4194756c6437a778e0a47d46becf51"
+    },
+    "test": {
+     "table": [
+      {
+       "accuracy": null,
+       "comparator": "untrained",
+       "inference_failures": 0,
+       "invalid_predictions": null,
+       "macro_f1": null,
+       "mean_field_accuracy": 0.21794871794871792,
+       "parseable_rate": 1.0,
+       "primary": 0.0,
+       "records_with_extra_fields": 18,
+       "rows": 18,
+       "schema_valid_rate": 0.8888888888888888,
+       "truncated": 0,
+       "whole_record_accuracy": 0.0
+      },
+      {
+       "accuracy": null,
+       "comparator": "trained",
+       "inference_failures": 0,
+       "invalid_predictions": null,
+       "macro_f1": null,
+       "mean_field_accuracy": 0.9358974358974359,
+       "parseable_rate": 1.0,
+       "primary": 0.5555555555555556,
+       "records_with_extra_fields": 8,
+       "rows": 18,
+       "schema_valid_rate": 1.0,
+       "truncated": 0,
+       "whole_record_accuracy": 0.5555555555555556
+      }
+     ],
+     "rows": 18,
+     "seconds": 73.3,
+     "holdout_note": "This is use 1 of this project's final test split. It was not consulted before."
+    },
+    "export_exit": 0,
+    "export": {
+     "id": "export-20261008-050833-be0784",
+     "format": [
+      "safetensors",
+      "gguf:q8_0"
+     ],
+     "status": "completed",
+     "verification": {
+      "gguf:q8_0": {
+       "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+       "diffs": 3,
+       "of": 8,
+       "primary": 0.625,
+       "load_failure": null
+      },
+      "safetensors": {
+       "runtime": "transformers 5.19.0, torch 2.14.1+cpu, float32 on CPU (4 cores)",
+       "diffs": 3,
+       "of": 8,
+       "primary": 0.375,
+       "load_failure": null
+      }
+     },
+     "deployment": {
+      "gguf:q8_0": {
+       "boundaries": {
+        "peak_memory": "peak resident set of the llama-server process tree sampled after each request (a lower bound)",
+        "tokens_per_s": "completion tokens / wall time of the non-streamed request",
+        "ttft": "wall time from request to the first streamed content token, cache_prompt off; cold = the first row, warm = median of the rest"
+       },
+       "hardware": {
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cpu_cores": 4,
+        "gpu": {
+         "bf16_compute": false,
+         "model": null,
+         "vram_bytes": 0
+        },
+        "nvme_seq_read_bytes_per_sec": 7444877513,
+        "os": "Linux 6.17.0-1022-azure (#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026)",
+        "probed_at": "2026-10-08T04:58:28+0000",
+        "ram_total_bytes": 16766410752
+       },
+       "host": {
+        "cpus": 4,
+        "machine": "x86_64",
+        "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+        "system": "Linux"
+       },
+       "input_tokens": [
+        37,
+        44,
+        38,
+        35,
+        35,
+        37,
+        41,
+        38
+       ],
+       "kept_separate_from": "build durations (these are inference measurements)",
+       "load_seconds": 0.704,
+       "output_tokens": [
+        21,
+        27,
+        32,
+        19,
+        22,
+        25,
+        23,
+        19
+       ],
+       "peak_memory_bytes": 675098624,
+       "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+       "tokens_per_s_warm": 34.47,
+       "ttft_cold_s": 0.2364,
+       "ttft_warm_s": 0.2339
+      },
+      "safetensors": {
+       "boundaries": {
+        "peak_memory": "ru_maxrss of this process (weights, activations, tokenizer, interpreter)",
+        "tokens_per_s": "completion tokens / wall time of the full generate() including prefill, median over rows after the first",
+        "ttft": "wall time of generate(max_new_tokens=1) including prompt prefill; cold = the first row, warm = median of the rest"
+       },
+       "hardware": {
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cpu_cores": 4,
+        "gpu": {
+         "bf16_compute": false,
+         "model": null,
+         "vram_bytes": 0
+        },
+        "nvme_seq_read_bytes_per_sec": 7444877513,
+        "os": "Linux 6.17.0-1022-azure (#22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026)",
+        "probed_at": "2026-10-08T04:58:28+0000",
+        "ram_total_bytes": 16766410752
+       },
+       "host": {
+        "cpus": 4,
+        "machine": "x86_64",
+        "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+        "system": "Linux"
+       },
+       "input_tokens": [
+        37,
+        44,
+        38,
+        35,
+        35,
+        37,
+        41,
+        38
+       ],
+       "kept_separate_from": "build durations (these are inference measurements)",
+       "load_seconds": 0.666,
+       "output_tokens": [
+        21,
+        27,
+        32,
+        15,
+        16,
+        25,
+        23,
+        19
+       ],
+       "peak_memory_bytes": 3432464384,
+       "runtime": "transformers 5.19.0, torch 2.14.1+cpu, float32 on CPU (4 cores)",
+       "tokens_per_s_warm": 8.9,
+       "ttft_cold_s": 0.3067,
+       "ttft_warm_s": 0.3169
+      }
+     },
+     "scripts": {
+      "gguf": {
+       "error": null,
+       "exit_code": 0,
+       "input": "Show me the picture Written in the Stars",
+       "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\",\"object_type\":\"picture\"}",
+       "script": "run_gguf.py"
+      },
+      "safetensors": {
+       "error": null,
+       "exit_code": 0,
+       "input": "Show me the picture Written in the Stars",
+       "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\",\"object_type\":\"picture\"}",
+       "script": "run_safetensors.py"
+      }
+     },
+     "seconds": 62.7
+    },
+    "inference": {
+     "gguf": {
+      "input": "Show me the picture Written in the Stars",
+      "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\",\"object_type\":\"picture\"}",
+      "exit": 0,
+      "seconds": 1.3
+     },
+     "safetensors": {
+      "input": "Show me the picture Written in the Stars",
+      "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\",\"object_type\":\"picture\"}",
+      "exit": 0,
+      "seconds": 7.8
+     }
+    }
+   }
+  ],
+  "finished": "2026-10-08T05:09:45+0000"
+ },
+ "wheel": {
+  "wheel": "streamweights-0.1.0-py3-none-any.whl",
+  "all_ok": true,
+  "outside_checkout": true,
+  "imported_from": "<tmp>/venv/lib/python3.12/site-packages/streamweights/__init__.py"
+ }
+}

@@ -91,5 +91,24 @@ for j in d["journeys"]:
         out.append(f"- {j['task']} / {j['engine']} / {fmt}: `{v['output'][:90]}` in {v['seconds']} s "
                    f"(exit {v['exit']}), input `{v['input'][:60]}`")
 out.append("")
+ci = ROOT / "docs/reports/data/015-ci-linux.json"
+if ci.exists():
+    c = json.loads(ci.read_text())
+    out += ["", "## Linux, from the built wheel (GitHub Actions)", "",
+            f"{c['source']}: the wheel `{c['wheel']['wheel']}` is installed into a clean environment with the "
+            f"`cloud` extra and the CLI is run from outside the checkout (`streamweights` imported from "
+            f"`{c['wheel']['imported_from'].split('site-packages')[-1] and 'site-packages'}`); torch-cpu on the "
+            f"runner's CPU (x86_64), the same tiny examples.", "",
+            "| task | comparator | score | rows |", "|---|---|---|---|"]
+    for j in c["gguf_journey"]["journeys"]:
+        for t in j["run"]["table"]:
+            out.append(f"| {j['task']} | {NAMES.get(t['comparator'], t['comparator'])} | {f(t['primary'])} | {t['rows']} |")
+    out += ["", "| task | artifact | rows that differ from the training engine | warm tokens/s | peak memory |", "|---|---|---|---|---|"]
+    for j in c["gguf_journey"]["journeys"]:
+        for k, v in j["export"]["verification"].items():
+            dep = j["export"]["deployment"][k]
+            out.append(f"| {j['task']} | {k} | {v['diffs']} of {v['of']} | {dep['tokens_per_s_warm']} tokens/s | "
+                       f"{dep['peak_memory_bytes'] / 1e9:.2f} GB |")
+    out.append("")
 out += (ROOT / "scripts" / "report_015_static.md").read_text().splitlines()
 (ROOT / "docs/reports/015-workflow.md").write_text("\n".join(out) + "\n")

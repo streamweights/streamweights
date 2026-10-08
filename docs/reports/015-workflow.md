@@ -105,6 +105,26 @@ Boundaries, Transformers: time to first token is wall time from request to the f
 - json / torch-cpu / safetensors: `{"intent":"SearchCreativeWork","object_name":"Written in the Stars","object_type":"picture` in 3.1 s (exit 0), input `Show me the picture Written in the Stars`
 
 
+## Linux, from the built wheel (GitHub Actions)
+
+GitHub Actions run 37729069035, job 'The CSV journey from the built wheel (Linux, torch-cpu, GGUF)': the wheel `streamweights-0.1.0-py3-none-any.whl` is installed into a clean environment with the `cloud` extra and the CLI is run from outside the checkout (`streamweights` imported from `site-packages`); torch-cpu on the runner's CPU (x86_64), the same tiny examples.
+
+| task | comparator | score | rows |
+|---|---|---|---|
+| classification | embedding baseline | 1.000 | 18 |
+| classification | student, prompted, untrained | 0.444 | 18 |
+| classification | student, trained | 0.944 | 18 |
+| json | student, prompted, untrained | 0.000 | 18 |
+| json | student, trained | 0.444 | 18 |
+
+| task | artifact | rows that differ from the training engine | warm tokens/s | peak memory |
+|---|---|---|---|---|
+| classification | gguf:q8_0 | 0 of 8 | 12.88 tokens/s | 0.67 GB |
+| classification | safetensors | 0 of 8 | 6.59 tokens/s | 3.43 GB |
+| json | gguf:q8_0 | 3 of 8 | 34.47 tokens/s | 0.68 GB |
+| json | safetensors | 3 of 8 | 8.9 tokens/s | 3.43 GB |
+
+
 ## Data and licenses
 
 | example | source | license | what was done to it |
@@ -149,6 +169,10 @@ Models: `Qwen/Qwen2.5-0.5B-Instruct` and `sentence-transformers/all-MiniLM-L6-v2
 - Export verification uses Transformers (float32, CPU) for safetensors and llama.cpp for GGUF, each in its own process; mlx-lm is not used.
 - A parent run is recorded when a new run follows a completed or bundled one; the new run trains from the base, not from the parent's adapter.
 - The docs harness found that `spill tune <distill file>` failed although the guide said to run it; `spill tune` now accepts a `spill distill` output.
+
+## MinIO
+
+The S3 gates ran in CI (job `object-store`, run 37729069035) against MinIO built from the pinned tag, because the upstream image for it could not be pulled (`unauthorized`): the log reads `minio version DEVELOPMENT.2025-10-15T17-29-55Z (commit-id=9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a)`, and the same commit is what the Homebrew release build `RELEASE.2025-10-15T17-29-55Z` used locally. `tests/test_ownership.py` and `tests/test_move.py` ran there with the S3 cases enabled (41 passed, one skipped: a lost response is not a local-disk failure). Real AWS S3 was not exercised.
 
 ## Untested
 
