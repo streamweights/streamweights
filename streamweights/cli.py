@@ -30,8 +30,9 @@ if sys.version_info < (3, 10):  # pragma: no cover
                      "git+https://github.com/streamweights/streamweights\n")
     raise SystemExit(1)
 
-COMMAND_ORDER = ["build", "example", "run", "distill", "tune", "eval", "export",
-                 "models", "adapters", "runs", "status", "tail", "resume", "doctor", "check"]
+COMMAND_ORDER = ["init", "plan", "build", "report", "compare", "example", "run", "distill", "tune",
+                 "eval", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
+                 "tail", "resume", "doctor", "check"]
 
 
 class _LoopOrder(typer.core.TyperGroup):
@@ -1595,6 +1596,7 @@ def models(architectures: bool = typer.Option(False, "--architectures",
 
 
 from . import cli_build  # noqa: E402,F401  (registers build, example, export, doctor)
+from . import cli_project  # noqa: E402,F401  (registers init, plan, report, compare, ...)
 
 if __name__ == "__main__":      # `python -m streamweights.cli`: use the module that has every command
     from streamweights.cli import main as _main_entry
