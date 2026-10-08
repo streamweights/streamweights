@@ -30,8 +30,9 @@ if sys.version_info < (3, 10):  # pragma: no cover
                      "git+https://github.com/streamweights/streamweights\n")
     raise SystemExit(1)
 
-COMMAND_ORDER = ["build", "example", "run", "distill", "tune", "eval", "export",
-                 "models", "adapters", "runs", "status", "tail", "resume", "doctor", "check"]
+COMMAND_ORDER = ["init", "plan", "build", "report", "compare", "example", "run", "distill", "tune",
+                 "eval", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
+                 "tail", "resume", "doctor", "check"]
 
 
 class _LoopOrder(typer.core.TyperGroup):
@@ -1208,6 +1209,12 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
                          "spill example banking77 --quick")
     if path not in ("auto", "resident", "streamed"):
         raise SpillError("--path must be auto, resident or streamed")
+    from .tune.data import distill_as_training, is_distill_file
+    if is_distill_file(train_jsonl):                 # the output of `spill distill` trains as it is
+        import tempfile
+        train_jsonl, n_d = distill_as_training(
+            train_jsonl, Path(tempfile.mkdtemp(prefix="spill-distill-")) / "train.jsonl")
+        typer.echo(f"   training on {n_d} teacher answers from the distill file")
     choice = engine_select.choose_engine(runtime.ENV.engine)
     runtime.set_engine(choice.name)
     tj = _tune_module(choice.name)
@@ -1401,6 +1408,16 @@ def resume(job: str = typer.Argument(None, help="job id or build folder (default
     """Continue the latest or named job from its checkpoint; a folder continues its build."""
     global _DEBUG
     _DEBUG = debug
+    from .cli_project import is_project_target
+    if is_project_target(job):
+        try:
+            from .cli_project import project_resume
+            project_resume(job, engine, headless, "local", stop_after)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
+        return
     is_build = bool(job) and Path(job).is_dir() and (
         (Path(job) / ".build" / "state.json").exists()
         or (state and (Path(job) / "evals.jsonl").exists()))
@@ -1548,7 +1565,7 @@ def status():
         if meta.get("status") == "running" and (d / "live.json").exists():
             try:
                 _LiveRenderer()(json.loads((d / "live.json").read_text()))
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError, KeyError):   # a tune job's or a killed job's live.json
                 pass
     _next_hint("spill tail")
 
@@ -1595,6 +1612,7 @@ def models(architectures: bool = typer.Option(False, "--architectures",
 
 
 from . import cli_build  # noqa: E402,F401  (registers build, example, export, doctor)
+from . import cli_project  # noqa: E402,F401  (registers init, plan, report, compare, ...)
 
 if __name__ == "__main__":      # `python -m streamweights.cli`: use the module that has every command
     from streamweights.cli import main as _main_entry

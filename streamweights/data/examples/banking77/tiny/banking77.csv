@@ -1,0 +1,121 @@
+text,label
+what cards can i use to add money to my account,supported_cards_and_currencies
+Can you change the rate for the item I bought in a different currency as it is wrong?,card_payment_wrong_exchange_rate
+Can I get a new pin number at any ATM using my card?,change_pin
+How do I change the PIN?,change_pin
+"I want to top up by card, what do you support?",supported_cards_and_currencies
+I have a transaction showing up more than once.,transaction_charged_twice
+"My ID verification hasn't gone through yet, but can I use my account anyway?",why_verify_identity
+"While doing a transfer, it says declined.",declined_transfer
+Can I change my PIN at any ATM?,change_pin
+I have a payment that shows twice,transaction_charged_twice
+Machines make mistakes too! The ATM gave me the wrong amount of money. Too much!,wrong_amount_of_cash_received
+How long does it take for a new purchase to stop being considered pending?,pending_card_payment
+Can I use this app for any currency?,supported_cards_and_currencies
+What is the auto top-up limit?,automatic_top_up
+Who do I talk to for transactions debited twice?,transaction_charged_twice
+Is there a location where I can change my PIN?,change_pin
+Why check my identity?,why_verify_identity
+Do you accept Mastercard?,supported_cards_and_currencies
+I think there is a mistake.  I am being charged twice.,transaction_charged_twice
+My currency rate is inaccurate.,card_payment_wrong_exchange_rate
+can i add funds  with a card from the united states,supported_cards_and_currencies
+I think I was double charged,transaction_charged_twice
+how do I speed up identity verification?,why_verify_identity
+i withdrew cash and dont see it reflected on the balance,pending_cash_withdrawal
+I wanted to withdraw $100 from the ATM but I only got $20,wrong_amount_of_cash_received
+Can I change my PIN without going to a bank?,change_pin
+"I think my pin has been compromised, what do I do?",change_pin
+Which currencies do you accept for adding money?,supported_cards_and_currencies
+My cash received does not match what has been requested,wrong_amount_of_cash_received
+I couldn't make a transfer because it was declined,declined_transfer
+What is the limit on Auto top?,automatic_top_up
+How long does a payment usually show as pending? Is it normal that mine is still pending?,pending_card_payment
+how can i get it to add money automatically while travelling,automatic_top_up
+I noticed that there's a payment on my card that's pending.,pending_card_payment
+Why is my ATM withdrawal still pending?,pending_cash_withdrawal
+"I have a cash withdrawal that says it's pending, why?",pending_cash_withdrawal
+I got some items this morning but the payment says pending,pending_card_payment
+Why is the exchange rate different on my recent purchase?,card_payment_wrong_exchange_rate
+Do you need to know my first and last name?,why_verify_identity
+I bought something abroad and the exchange rate applied is wrong,card_payment_wrong_exchange_rate
+My card payment had the wrong exchange rate,card_payment_wrong_exchange_rate
+Can I use my account before my Identity verification has passed?,why_verify_identity
+"Transfer was declined, could not complete request.",declined_transfer
+Why do you need me to do an identity check?,why_verify_identity
+How do I top-up automatically?,automatic_top_up
+It appears my transfer was declined.,declined_transfer
+"What about an auto top-up, is that a option?",automatic_top_up
+What's the reason for needing to verify my identity?,why_verify_identity
+I can't find the auto-top up option.,automatic_top_up
+"Can I change my pin at ATMs?  If so, what ones?",change_pin
+Is there anyway to bypass identity verification?,why_verify_identity
+My account is showing a double charge.,transaction_charged_twice
+Do you have a list of the cards and currencies supported?,supported_cards_and_currencies
+I am not receiving the correct exchange rate on my card.,card_payment_wrong_exchange_rate
+"I made an international purchase, but the exchange rate was wrong",card_payment_wrong_exchange_rate
+Card payment is showing as pending,pending_card_payment
+What is the pending payment on my card about?,pending_card_payment
+I received less cash than the amount I specified in the ATM.,wrong_amount_of_cash_received
+"If the ATM only gave me 10 pounds instead of the 30 I requested, what do I do?",wrong_amount_of_cash_received
+There is a transaction showing up several times.,transaction_charged_twice
+I took out some cash from the ATM but it is still showing the transaction is pending.,pending_cash_withdrawal
+How are cash withdrawals pending?,pending_cash_withdrawal
+I tried withdrawing but my cash is not showing up?,wrong_amount_of_cash_received
+My cash withdrawal shows as pending still.,pending_cash_withdrawal
+Tell me why my transfer was declined.,declined_transfer
+I bought an item then noticed the exchange rate was wrong.,card_payment_wrong_exchange_rate
+Why hasn't my payment gone through?,pending_card_payment
+Why hasn't my card payment cleared yet?,pending_card_payment
+Can I top off with a debit card?,supported_cards_and_currencies
+I made a payment with my card and it hasn't changed. How long do you think this will take?,pending_card_payment
+I wanted to take out $100 but I only got $20.,wrong_amount_of_cash_received
+In my account I noticed my ATM withdrawal is still pending,pending_cash_withdrawal
+Did a WD earlier at an ATM.  The amount showing in the App is more than I got though.,wrong_amount_of_cash_received
+How can I check for an unsupported merchant for my transfer request?,declined_transfer
+Are there any specific cash machines that I have to go to in order to change my PIN?,change_pin
+Can I change my pin number at a cash machine?,change_pin
+How do i set up auto top-up?,automatic_top_up
+can you top up your account automatically,automatic_top_up
+I did not receive all of my cash back,wrong_amount_of_cash_received
+Where do I find the auto top up option?,automatic_top_up
+"Declined, transfer not completed.",declined_transfer
+My account was charged twice for one purchase,transaction_charged_twice
+Why did my transfer get declined?,declined_transfer
+how long until a cash withdrawal will show on my account,pending_cash_withdrawal
+"What do I do with my ""decline"" message on a transfer?",declined_transfer
+The exchange rate from my card payment isn't right.,card_payment_wrong_exchange_rate
+Which credit card top-ups do you accept?,supported_cards_and_currencies
+What currencies can I use?,supported_cards_and_currencies
+How does identity check work?,why_verify_identity
+Why do you have an identity check?,why_verify_identity
+How can I change my PIN without going to the bank?,change_pin
+What is a pending cash withdrawal?,pending_cash_withdrawal
+Why does it still charge me even though I was unable to withdraw money from the ATM?,pending_cash_withdrawal
+I was charged several times for something,transaction_charged_twice
+"My transfer was declined, why is that?",declined_transfer
+The currency exchange rate was wrong for a purchase I made.,card_payment_wrong_exchange_rate
+I bought some things in the morning but the payment shows as pending,pending_card_payment
+I got some cash but it wasn't the right amount.,wrong_amount_of_cash_received
+If I am running low on credit can I auto top up?,automatic_top_up
+Why is there a payment showing twice?,transaction_charged_twice
+Which forms of currency are accepted?,supported_cards_and_currencies
+Do I need to verify my identity each time I wish to use my account?,why_verify_identity
+Why would I be charged more than once for the same transaction?,transaction_charged_twice
+I have a pending payment from stuff I bought this morning.,pending_card_payment
+Please check payments on my card. There is a duplicate and I only bought it once.,transaction_charged_twice
+I have a pending cash withdrawal,pending_cash_withdrawal
+Why was the transfer declined?,declined_transfer
+The exchange rate on my purchase is wrong.,card_payment_wrong_exchange_rate
+why was my transfer declined,declined_transfer
+Cash withdrawal still pending?,pending_cash_withdrawal
+Why did I need to verfiy my identity?,why_verify_identity
+"Hi, I have been overcharged for my payment last Saturday. I guess exchange rate was wrong.",card_payment_wrong_exchange_rate
+How can I change the PIN?  Do I have to go to a real bank?,change_pin
+What does a pending transaction mean?,pending_card_payment
+I didn't get the right amount at the ATM.,wrong_amount_of_cash_received
+I asked for $100 cash but only got $20?,wrong_amount_of_cash_received
+Do you have an auto top-up option?,automatic_top_up
+"If I will be traveling, is there a way to auto top-up my card on certain days?",automatic_top_up
+Can I use my American Express to add money to my account?,supported_cards_and_currencies
+I need to change my PIN. Can I do that at a cash machine?,change_pin

@@ -149,6 +149,8 @@ def fetch(repo: str, dest: Path, patterns: list[str], label: str, revision: str 
           snapshot=None, api=None) -> Path:
     """Download the files of `repo` matching `patterns` into `dest`."""
     say = say or (lambda s: print(s, file=sys.stderr))
+    from . import guard
+    guard.check(repo)
     from huggingface_hub import HfApi, snapshot_download
     snapshot = snapshot or snapshot_download
     dest = Path(dest)

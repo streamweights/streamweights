@@ -172,3 +172,19 @@ def test_real_templates_mask_only_assistant_text(rel, end_tok):
     # nothing before the first assistant reply, and no trailing newline is trained
     assert not any(mask[:ids.index(tok.convert_tokens_to_ids(end_tok))])
     assert mask[-1] == 1 or tok.decode(ids[-1:]).strip() == ""
+
+
+def test_a_distill_file_trains_as_the_teachers_answers(tmp_path):
+    from streamweights.tune.data import distill_as_training, is_distill_file
+    f = tmp_path / "d.jsonl"
+    f.write_text(json.dumps({"custom_id": "a", "messages": [{"role": "user", "content": "q"}],
+                             "completion": " yes "}) + "\n"
+                 + json.dumps({"custom_id": "b", "messages": [{"role": "user", "content": "q2"}],
+                               "completion": ""}) + "\n")
+    assert is_distill_file(f)
+    out, n = distill_as_training(f, tmp_path / "t" / "train.jsonl")
+    rows = [json.loads(l) for l in out.read_text().splitlines()]
+    assert n == 1 and rows[0]["messages"][-1] == {"role": "assistant", "content": "yes"}
+    plain = tmp_path / "p.jsonl"
+    plain.write_text('{"prompt": "a", "answer": "b"}\n')
+    assert not is_distill_file(plain)

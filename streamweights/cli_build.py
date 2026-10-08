@@ -373,13 +373,30 @@ def build(
     reference: str = typer.Option(None, "--reference", help="with --table: the state of an "
                                                             "uninterrupted build, for a "
                                                             "reference column"),
+    new_run: bool = typer.Option(False, "--new-run", help="project folders: build again as a new "
+                                                          "run even if a run already has these "
+                                                          "exact inputs"),
+    executor: str = typer.Option("local", "--executor", hidden=True),
     stop_after: str = typer.Option(None, "--stop-after", hidden=True),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Build your own model from a folder: distill, tune, eval, one table. Runs on MLX on
-    Apple silicon and on PyTorch (CPU or CUDA) everywhere else."""
+    Apple silicon and on PyTorch (CPU or CUDA) everywhere else. A folder made by `spill init`
+    (it has streamweights.toml) builds a run; a folder with evals.jsonl builds as before."""
     import streamweights.cli as cli
     cli._DEBUG = debug
+    from .project import config as project_config
+    from .project import migrate as project_migrate
+    if project_config.exists(folder) and project_migrate.is_guided(project_config.load(folder)):
+        try:
+            from .cli_project import project_build
+            project_build(folder, student, teacher, epochs, engine, headless, executor, new_run,
+                          stop_after, notify)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            _fail(e)
+        return
     if table:
         try:
             _print_table(folder, state, reference)
@@ -426,12 +443,23 @@ def export(
     ollama: bool = typer.Option(False, "--ollama", help="run `ollama create` if ollama is "
                                                         "installed (implies --gguf)"),
     name: str = typer.Option(None, "--name", help="Ollama model name"),
+    run: str = typer.Option(None, "--run", help="project folders: the run to export (default: "
+                                                "the latest completed run)"),
+    verify_rows: int = typer.Option(8, "--verify-rows", help="project folders: validation rows "
+                                                             "the export is verified on"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
-    """Merge the adapter into the base: merged safetensors, optionally GGUF and Ollama."""
+    """Merge the adapter into the base: merged safetensors, optionally GGUF and Ollama. A
+    project folder (from spill init) exports its latest run as a verified export record."""
     import streamweights.cli as cli
     cli._DEBUG = debug
     try:
+        from .project import config as project_config
+        from .project import migrate as project_migrate
+        if project_config.exists(model) and project_migrate.is_guided(project_config.load(model)):
+            from .cli_project import project_export
+            project_export(Path(model), run, gguf, verify_rows)
+            return
         _export_impl(model, out, gguf, ollama, name)
     except Exception as e:
         _fail(e)
@@ -553,7 +581,7 @@ def _doctor_impl():
 @app.command(short_help="Create a ready-to-run example folder",
              epilog="Example: spill example banking77 --quick")
 def example(
-    name: str = typer.Argument("banking77", help="which example (banking77, relay)"),
+    name: str = typer.Argument("banking77", help="which example (banking77, snips, relay)"),
     quick: bool = typer.Option(False, "--quick", help="the under-an-hour variant: 100 evals, "
                                                       "500 train rows, student qwen2.5:0.5b"),
     tiny: bool = typer.Option(False, "--tiny", help="the CI-sized variant: 20 evals, 100 train "
@@ -569,6 +597,12 @@ def example(
         folder = ex.create(name, quick, Path("."), force, tiny)
         files = sorted(p.name for p in folder.iterdir())
         typer.echo(f"created {folder}/ with {', '.join(files)}")
-        _next_hint(f"{folder}/relay.sh" if name == "relay" else f"spill build {folder}")
+        if name == "relay":
+            _next_hint(f"{folder}/relay.sh")
+        elif name == "snips":
+            _next_hint(f"spill init {folder}/snips.csv --input text --output json "
+                       f"--schema {folder}/schema.json --project {folder}-project")
+        else:
+            _next_hint(f"spill build {folder}")
     except Exception as e:
         _fail(e)

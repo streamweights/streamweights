@@ -30,6 +30,7 @@ plugins:
 nav:
   - Home: index.md
   - Guides:
+      - Turn a CSV of examples into an evaluated model: guides/turn-a-csv-of-examples-into-an-evaluated-model.md
       - Fine-tune an LLM on a Mac: guides/finetune-llm-on-a-mac.md
       - Run a 70B model on a 48 GB Mac: guides/run-a-70b-model-on-a-48gb-mac.md
       - Distill a large model into a small one locally: guides/distill-a-large-model-locally.md
@@ -51,6 +52,7 @@ nav:
       - Run anywhere: reports/012-run-anywhere.md
       - Tagline and docs site: reports/013-tagline-seo.md
       - Build anywhere: reports/014-build-anywhere.md
+      - One complete workflow: reports/015-workflow.md
   - Reference:
       - Commands: cli.md
       - Formats: formats.md

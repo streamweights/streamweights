@@ -40,6 +40,7 @@ Inference backends elsewhere are upstream llama.cpp, unmodified, never vendored.
 - `ring.py`: the framework-free streaming ring (safetensors layer index, pread ring, read modes nocache, fadvise, odirect). `engines/torch_common.py`, `torch_stream.py`, `torch_resident.py`: the PyTorch engines (transformers layers on the meta device bound from the ring; CPU and CUDA). `engine_select.py`: mlx, torch-cuda or torch-cpu from the hardware.
 - `portable/`: fsspec stores, the hardware-neutral checkpoint (float32 safetensors plus state.json, COMMIT marker last), row-job segments, weight staging. `headless.py`, `runtime.py`, `jobconfig.py`: JSON-lines events, SIGTERM then exit 75, `--state`, `--config`, `--emit-config`.
 - `tune/torch_job.py`, `tune/torch_train.py`: the PyTorch tune (PEFT resident, streamed saved-input reverse-stream VJP). `gates.py`, `verify_cuda.py`: the identity and resume gates, runnable on a CUDA machine.
+- `project/`: the guided workflow. `config.py` (streamweights.toml, schema_version), `data.py` and `init.py` (intake, validation, leakage-aware splits), `contract.py` (label vocabulary or JSON schema, prompts, scoring), `plan.py`, `stagefns.py` (stage descriptions and what each stage does), `coordinator.py` (owns runs; executors are `LocalExecutor` and the `SubprocessExecutor` test backend, `worker.py`), `control.py` (the fenced control object: local flock or S3 conditional writes), `payloads.py` and `runstate.py` (immutable payloads, accepted stages, completion), `caps.py` (backend capability probes), `move.py` and `remote.py` (handoff, `resume <uri>`), `bundle.py`, `migrate.py`, `report.py`, `compare.py`, `testrec.py`, `exportrec.py`, `verify_export.py`, `baseline.py`, `modelid.py` (pinned model identity), `hooks.py` (deterministic test hooks, SPILL_HOOK_*).
 - `jobs/`: OpenAI-batch-compatible job engine, per-row checkpoint, resume.
 - `tune/`: LoRA training, resident (mlx-lm tuner) and streamed (saved layer inputs, reverse recompute VJP, two weight streams per micro-batch).
 - `build.py`: stage planner and runner over a folder; `export.py` and `safetensors_np.py`: merge adapters with numpy, GGUF via llama.cpp's converter.
@@ -69,5 +70,7 @@ The product is the local half of building your own model: run, distill, tune, ev
 
 ## Run-anywhere principle
 
-The design principle: every job is a sequence of normalized quanta. For training, the quantum is one optimizer step. For run, distill and eval, it is one completed row. Any machine with a supported engine can execute the next quantum from a portable checkpoint.
+The design principle: "One complete workflow: bring your examples, build a model, understand the result, export it, and continue the same work on another machine. The project folder is the unit; execution is separable from it."
+
+Under it, every job is a sequence of normalized quanta. For training, the quantum is one optimizer step. For run, distill and eval, it is one completed row. Any machine with a supported engine can execute the next quantum from a portable checkpoint.
 Engines are thin: MLX on Apple silicon, PyTorch everywhere else (CPU and CUDA). Streamweights owns only the streaming ring, the job layer, and the CLI.

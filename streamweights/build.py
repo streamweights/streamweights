@@ -59,7 +59,7 @@ STATE_DIR = ".build"
 class Folder:
     path: Path
     name: str
-    evals: Path
+    evals: Path | None              # None: a prompts-only folder without labeled validation data
     train: Path | None
     prompts: Path | None
     instructions: str | None
@@ -75,11 +75,12 @@ def read_folder(path: str | Path) -> Folder:
     if not p.is_dir():
         raise SpillError(f"{path} is not a folder", "spill example banking77 --quick")
     ev = p / "evals.jsonl"
-    if not ev.exists():
-        raise SpillError(f"{p.name}/evals.jsonl is missing; build needs your exam (questions "
-                         f"with the right answers)", "spill example banking77 --quick")
     train = p / "train.jsonl"
     prompts = p / "prompts.jsonl"
+    if not ev.exists() and not (prompts.exists() and not train.exists()):
+        raise SpillError(f"{p.name}/evals.jsonl is missing; build needs your exam (questions "
+                         f"with the right answers). A folder with only prompts.jsonl is built "
+                         f"without a quality evaluation", "spill example banking77 --quick")
     ins = p / INSTRUCTIONS
     settings = {}
     if (p / SETTINGS).exists():
@@ -88,7 +89,7 @@ def read_folder(path: str | Path) -> Folder:
         except json.JSONDecodeError as e:
             raise SpillError(f"{p.name}/{SETTINGS} is not valid JSON ({e.msg} at line "
                              f"{e.lineno})")
-    return Folder(p, p.name, ev, train if train.exists() else None,
+    return Folder(p, p.name, ev if ev.exists() else None, train if train.exists() else None,
                   prompts if prompts.exists() else None,
                   ins.read_text().strip() if ins.exists() else None, settings)
 
@@ -164,8 +165,10 @@ def _msgs(obj: dict) -> list[dict]:
     return obj["body"]["messages"] if "body" in obj else obj["messages"]
 
 
-def is_classification(evals_path: Path) -> bool:
+def is_classification(evals_path: Path | None) -> bool:
     """Short expected values on every row (labels, not prose)."""
+    if evals_path is None:
+        return False
     rows = _rows(evals_path)
     return bool(rows) and all(
         isinstance(r.get("expected"), (str, int, float, bool))
@@ -173,8 +176,10 @@ def is_classification(evals_path: Path) -> bool:
         and len(str(r["expected"]).split()) <= SHORT_EXPECTED_WORDS for r in rows)
 
 
-def classification_max_tokens(evals_path: Path) -> int:
+def classification_max_tokens(evals_path: Path | None) -> int:
     """16, unless the longest label would not fit (about 4 characters per token)."""
+    if evals_path is None:
+        return DEFAULT_MAX_TOKENS
     longest = max((len(str(r.get("expected", ""))) for r in _rows(evals_path)), default=0)
     return max(CLASSIFICATION_MAX_TOKENS, math.ceil(longest / 4) + 4)
 
@@ -306,8 +311,9 @@ def make_plan(folder: Folder, student: str, teacher: str, base: str | None,
     tuned = base or student
     tf, tf_src = est.tflops_for(cal, engine, tuned)
     ins = folder.instructions
-    ev_wl_untrained = workload(folder.evals, ins, max_tokens, classification)
-    ev_wl_student = workload(folder.evals, None, max_tokens, classification)
+    labeled = folder.evals is not None                 # without it there is no quality evaluation
+    ev_wl_untrained = workload(folder.evals, ins, max_tokens, classification) if labeled else None
+    ev_wl_student = workload(folder.evals, None, max_tokens, classification) if labeled else None
     stages: list[Stage] = []
 
     def eval_stage(sid, label, model, wl, adapter=False):
@@ -338,22 +344,25 @@ def make_plan(folder: Folder, student: str, teacher: str, base: str | None,
     stages.append(Stage("tune", "tune", f"tune {tuned} -> {tuned}+{folder.name}", tuned,
                         t.seconds, t.detail))
 
-    if kind != "train":
-        eval_stage("eval:base", f"eval {tuned} untrained", tuned, ev_wl_untrained)
-    eval_stage("eval:tuned", f"eval {tuned}+{folder.name}", tuned, ev_wl_student, adapter=True)
-    if kind != "train":
-        if teacher != tuned:
-            eval_stage("eval:teacher", f"eval {teacher} (teacher)", teacher, ev_wl_untrained)
-    for c in compare:
-        if c not in (tuned, teacher if kind != "train" else None):
-            eval_stage(f"eval:compare:{c}", f"eval {c} (compare)", c, ev_wl_untrained)
+    if labeled:
+        if kind != "train":
+            eval_stage("eval:base", f"eval {tuned} untrained", tuned, ev_wl_untrained)
+        eval_stage("eval:tuned", f"eval {tuned}+{folder.name}", tuned, ev_wl_student, adapter=True)
+        if kind != "train":
+            if teacher != tuned:
+                eval_stage("eval:teacher", f"eval {teacher} (teacher)", teacher, ev_wl_untrained)
+        for c in compare:
+            if c not in (tuned, teacher if kind != "train" else None):
+                eval_stage(f"eval:compare:{c}", f"eval {c} (compare)", c, ev_wl_untrained)
 
     # cheap stages first on the train-only path is already the order; for distill paths the
     # teacher stage is the long pole and must come first (the student is trained on it)
     total = sum(s.est_s for s in stages)
-    return Plan(folder, kind, student, teacher, base, compare, weight_own, folder.name,
+    plan = Plan(folder, kind, student, teacher, base, compare, weight_own, folder.name,
                 max_tokens, classification, stages, tf, tf_src, total, epochs, engine=engine,
                 cal=cal)
+    plan.extra["quality_evaluation"] = labeled
+    return plan
 
 
 def pre_run_line(plan: Plan, on_battery: bool = False, state_note: str | None = None) -> str:
@@ -617,8 +626,8 @@ def run_plan(plan: Plan, backend: Backend, say=print, stop_after: str | None = N
     bs = plan.build_state()
     ins = untrained_system(f)
     mt = plan.max_tokens
-    ev_untrained = with_system(f.evals, ins, sd / "evals.untrained.jsonl", mt)
-    ev_student = strip_system(f.evals, sd / "evals.student.jsonl", mt)
+    ev_untrained = with_system(f.evals, ins, sd / "evals.untrained.jsonl", mt) if f.evals else None
+    ev_student = strip_system(f.evals, sd / "evals.student.jsonl", mt) if f.evals else None
     stop_key, stop_n = parse_stop(stop_after)
     table: list[dict] = []
     t_start = time.monotonic()
@@ -807,6 +816,11 @@ def render_provenance(stages: list[Stage]) -> str:
 
 
 def final_lines(res: BuildResult) -> list[str]:
+    if not res.table:
+        return [f"your model: {res.tuned_label}",
+                "quality evaluation: unavailable. There is no labeled validation data "
+                "(evals.jsonl), and the teacher's agreement with the student is not task accuracy. "
+                "Add evals.jsonl to measure it."]
     return [f"your model: {res.tuned_label}"]
 
 

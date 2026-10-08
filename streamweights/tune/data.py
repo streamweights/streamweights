@@ -250,3 +250,36 @@ class BatchPlan:
 
 def steps_for(n_micro_per_epoch: int, grad_accum: int, epochs: float = 1.0) -> int:
     return max(1, int(n_micro_per_epoch * epochs) // max(1, grad_accum))
+
+
+def is_distill_file(path: Path) -> bool:
+    """A `spill distill` output: lines with the prompt `messages` and the teacher's `completion`."""
+    try:
+        with open(path) as f:
+            for line in f:
+                if line.strip():
+                    d = json.loads(line)
+                    return isinstance(d, dict) and "completion" in d and "messages" in d
+    except (OSError, ValueError):
+        pass
+    return False
+
+
+def distill_as_training(path: Path, dest: Path) -> tuple[Path, int]:
+    """Training chat lines from a distill file: the prompt messages plus the teacher's
+    completion as the assistant target. Records with an error or an empty completion are left
+    out. Returns (file, rows)."""
+    rows = []
+    for line in Path(path).read_text().splitlines():
+        if not line.strip():
+            continue
+        d = json.loads(line)
+        comp = d.get("completion")
+        if d.get("error") or comp is None or not str(comp).strip():
+            continue
+        rows.append({"messages": list(d["messages"]) + [{"role": "assistant",
+                                                         "content": str(comp).strip()}]})
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return dest, len(rows)

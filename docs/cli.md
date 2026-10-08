@@ -15,13 +15,20 @@ Options:
   --help  Show this message and exit.
 
 Commands:
+  init      Start a project from a CSV or JSONL of examples
+  plan      Show what a build will do, before it does it
   build     Build your model from a folder: distill, tune, eval
+  report    Show a project's latest (or a named) run report
+  compare   Compare runs; rank only when that is honest
   example   Create a ready-to-run example folder
   run       Run a JSONL of prompts through a model
   distill   Collect a big model's answers to learn from
   tune      Train a LoRA adapter on your data
   eval      Score models on your eval set, one table
   export    Merge an adapter into its base; GGUF and Ollama
+  test      Score a run on the final test split, as a record
+  bundle    Make, check or install an offline project bundle
+  move      Hand a project to another folder or s3:// location
   models    List the models spill knows and what they need
   adapters  List your trained adapters
   runs      List past runs
@@ -40,7 +47,9 @@ Commands:
 Usage: spill build [OPTIONS] {folder}
 
   Build your own model from a folder: distill, tune, eval, one table. Runs on
-  MLX on Apple silicon and on PyTorch (CPU or CUDA) everywhere else.
+  MLX on Apple silicon and on PyTorch (CPU or CUDA) everywhere else. A folder
+  made by `spill init` (it has streamweights.toml) builds a run; a folder with
+  evals.jsonl builds as before.
 
 Arguments:
   folder  a folder with evals.jsonl and train.jsonl and/or prompts.jsonl
@@ -76,6 +85,8 @@ Options:
                         stage) and exit
   --reference <str>     with --table: the state of an uninterrupted build, for
                         a reference column
+  --new-run             project folders: build again as a new run even if a
+                        run already has these exact inputs
   --help                Show this message and exit.
 
   Example: spill build banking77-quick
@@ -90,7 +101,7 @@ Usage: spill example [OPTIONS] [name]
   untrained models).
 
 Arguments:
-  name  which example (banking77, relay)  [default: banking77]
+  name  which example (banking77, snips, relay)  [default: banking77]
 
 Options:
   --quick  the under-an-hour variant: 100 evals, 500 train rows, student
@@ -269,18 +280,25 @@ Options:
 Usage: spill export [OPTIONS] {model}
 
   Merge the adapter into the base: merged safetensors, optionally GGUF and
-  Ollama.
+  Ollama. A project folder (from spill init) exports its latest run as a
+  verified export record.
 
 Arguments:
   model  <base>+<adapter>, e.g. qwen2.5:7b+banking77  [required]
 
 Options:
-  --out <path>  directory for the merged model (default:
-                <data>/exports/<base>+<adapter>)
-  --gguf <str>  also write a GGUF: bf16 | q8_0 | q4_k_m (bare --gguf: q8_0)
-  --ollama      run `ollama create` if ollama is installed (implies --gguf)
-  --name <str>  Ollama model name
-  --help        Show this message and exit.
+  --out <path>         directory for the merged model (default:
+                       <data>/exports/<base>+<adapter>)
+  --gguf <str>         also write a GGUF: bf16 | q8_0 | q4_k_m (bare --gguf:
+                       q8_0)
+  --ollama             run `ollama create` if ollama is installed (implies
+                       --gguf)
+  --name <str>         Ollama model name
+  --run <str>          project folders: the run to export (default: the latest
+                       completed run)
+  --verify-rows <int>  project folders: validation rows the export is verified
+                       on  [default: 8]
+  --help               Show this message and exit.
 
   Example: spill export qwen2.5:0.5b+banking --gguf
 ```

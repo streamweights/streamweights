@@ -1,0 +1,240 @@
+# Every actionable product command in the maintained README and user guides, and what the docs
+# harness does with it (tests/test_docs_commands.py).
+#
+# actions
+#   reference   a command or flag named in prose, or a usage synopsis: not a command to run
+#   setup       installation lines: exercised by scripts/fresh_wheel.py (the fresh-install gate)
+#   exclude     needs hardware, services or a script this harness does not start; the reason says
+#               what covers it instead
+#   parse       the real command is parsed against the real CLI (command, options, required
+#               arguments); nothing is loaded or downloaded. `fill` replaces <placeholders>
+#   run         the real command is parsed, then executed on tiny data with the small models
+#   substitute  the real command is parsed, then the same command is executed with `sub`
+#               replacements (a 7B or 70B model, or a bigger example, replaced by an explicit
+#               tiny equivalent) and `append` flags
+#
+# The harness sets SPILL_ALLOWED_MODELS (qwen2.5:0.5b and the pinned embedding model only), so a
+# command that reached a larger model would fail before any download or load.
+#
+# Historical verbatim directives in docs/paste-sets/ are archived instructions, not executable
+# examples; the inventory never reads them.
+
+[exclusions]
+historical = "docs/paste-sets/ (verbatim directives, archived instructions)"
+generated = "docs/cli.md is generated from --help by scripts/make_cli_docs.py and checked by tests/test_docs.py"
+
+[placeholders]
+folder = "banking77-tiny"
+file = "train.jsonl"
+uri = "s3://bucket/prefix"
+path = "bundle.out"
+"project dir" = "projectcopy"
+model = "qwen2.5:0.5b"
+
+# ---- prose references and synopses
+[[rule]]
+pattern = 'spill [a-z]+( --[a-z-]+)?'
+action = "reference"
+reason = "a command or flag named in prose"
+
+[[rule]]
+pattern = 'spill move \[<folder>\] <uri>'
+action = "reference"
+reason = "usage synopsis with an optional argument"
+
+[[rule]]
+pattern = 'spill resume <uri>'
+action = "parse"
+
+# ---- installation and containers
+[[rule]]
+pattern = 'pip install git\+https://github.com/streamweights/streamweights'
+action = "setup"
+reason = "scripts/fresh_wheel.py installs the built wheel into a clean environment and runs the CLI"
+
+[[rule]]
+pattern = 'docker .*'
+action = "exclude"
+reason = "container images are built and exercised by containers.yml and relay.yml; the harness starts no containers"
+
+[[rule]]
+pattern = '\./relay/relay\.sh|spill example relay && \./relay/relay\.sh'
+action = "exclude"
+reason = "relay.sh starts builds on two machines or in Docker; relay.yml runs it on every push"
+
+# ---- the guided workflow (small model, tiny data)
+[[rule]]
+pattern = 'spill example banking77 --tiny'
+action = "run"
+[[rule]]
+pattern = 'spill example snips --tiny'
+action = "run"
+[[rule]]
+pattern = 'spill example snips'
+action = "run"
+[[rule]]
+pattern = 'spill example banking77'
+action = "run"
+[[rule]]
+pattern = 'spill init banking77-tiny/banking77\.csv --input text --output label --project tickets'
+action = "run"
+[[rule]]
+pattern = 'spill init snips-tiny/snips\.csv --input text --output json --schema snips-tiny/schema\.json'
+action = "substitute"
+sub = {}
+append = "--project slots"
+[[rule]]
+pattern = 'spill plan tickets'
+action = "run"
+[[rule]]
+pattern = 'spill build tickets'
+action = "run"
+[[rule]]
+pattern = 'spill report tickets'
+action = "run"
+[[rule]]
+pattern = 'spill test tickets'
+action = "run"
+[[rule]]
+pattern = 'spill compare tickets'
+action = "run"
+[[rule]]
+pattern = 'spill export tickets --gguf q8_0'
+action = "run"
+needs_env = "SPILL_DOCS_GGUF"
+fallback = "spill export tickets"
+[[rule]]
+pattern = 'spill build tickets --teacher <model>'
+action = "run"
+[[rule]]
+pattern = 'spill bundle <folder> <path>'
+action = "run"
+fill = {folder = "tickets", path = "bundle.out"}
+[[rule]]
+pattern = 'spill bundle --verify <path>'
+action = "run"
+[[rule]]
+pattern = 'spill bundle --install <path> <project dir>'
+action = "run"
+[[rule]]
+pattern = 'spill build <project dir> --new-run'
+action = "run"
+[[rule]]
+pattern = 'spill move tickets s3://my-bucket/tickets'
+action = "tiny"
+tiny = [
+  "spill init banking77-tiny/banking77.csv --input text --output label --project stopped --seed 3",
+  {cmd = "spill build stopped --stop-after train:5", exit = [130]},
+  "spill move stopped {tmp}/moved",
+  "spill resume {tmp}/moved",
+]
+reason = "no bucket here; the same handoff and resume on a local destination (the S3 path runs against MinIO in tests/test_move.py)"
+[[rule]]
+pattern = 'spill resume s3://my-bucket/tickets'
+action = "parse"
+reason = "the tiny equivalent is the resume in the move sequence above"
+
+# ---- the older folder workflow, larger models replaced by explicit tiny equivalents
+[[rule]]
+pattern = 'spill example banking77 --quick && spill build banking77-quick'
+action = "substitute"
+sub = {"--quick" = "--tiny", "banking77-quick" = "banking77-tiny"}
+[[rule]]
+pattern = 'spill build banking77-tiny'
+action = "run"
+[[rule]]
+pattern = 'spill example banking77 --tiny && spill build banking77-tiny --engine torch-cuda'
+action = "parse"
+reason = "needs a CUDA device; untested"
+[[rule]]
+pattern = 'spill build my-folder'
+action = "substitute"
+sub = {"my-folder" = "banking77-tiny"}
+[[rule]]
+pattern = 'spill build <folder>'
+action = "run"
+[[rule]]
+pattern = 'spill build <folder> --state <uri>'
+action = "parse"
+reason = "a bucket is not available; state at a path is exercised by tests/test_build_anywhere.py"
+[[rule]]
+pattern = 'spill resume <folder>( --state <uri>)?'
+action = "parse"
+reason = "placeholders only; resume is exercised in the move sequence and tests/test_build_anywhere.py"
+[[rule]]
+pattern = 'spill example relay'
+action = "run"
+[[rule]]
+pattern = 'spill build relay --state \./relay-state --stop-after tune:20'
+action = "run"
+ok_exit = [0, 130]
+[[rule]]
+pattern = 'spill build relay --state \./relay-state --table'
+action = "run"
+[[rule]]
+pattern = 'spill resume relay --state \./relay-state --engine torch-cpu'
+action = "run"
+[[rule]]
+pattern = 'spill resume relay --state relay-state'
+action = "run"
+[[rule]]
+pattern = 'spill check (train\.jsonl|<file>)'
+action = "run"
+[[rule]]
+pattern = 'spill distill llama3\.3:70b prompts\.jsonl --out prompts\.distill\.jsonl'
+action = "substitute"
+sub = {"llama3.3:70b" = "qwen2.5:0.5b"}
+[[rule]]
+pattern = 'spill tune qwen2\.5:(7b|0\.5b) train\.jsonl --name mine( --state \./state)?'
+action = "substitute"
+sub = {"qwen2.5:7b" = "qwen2.5:0.5b"}
+append = "--epochs 0.3 --overwrite"
+[[rule]]
+pattern = 'spill tune llama3\.3:70b train\.jsonl --name big'
+action = "substitute"
+sub = {"llama3.3:70b" = "qwen2.5:0.5b"}
+append = "--epochs 0.3 --overwrite"
+[[rule]]
+pattern = 'spill tune qwen2\.5:7b prompts\.distill\.jsonl --name mine'
+action = "substitute"
+sub = {"qwen2.5:7b" = "qwen2.5:0.5b"}
+append = "--epochs 0.3 --overwrite"
+[[rule]]
+pattern = 'spill tune qwen2\.5:7b train\.jsonl --name mine --state s3://my-bucket/mine( +# .*)?'
+action = "substitute"
+sub = {"qwen2.5:7b" = "qwen2.5:0.5b", "s3://my-bucket/mine" = "./state-mine"}
+append = "--epochs 0.3 --overwrite"
+[[rule]]
+pattern = 'spill tune qwen2\.5:7b train\.jsonl --name mine --state s3://bucket/state/mine --weights .*'
+action = "parse"
+reason = "needs a bucket of staged weights; --weights and --emit-config are exercised by tests/test_portable.py and tests/test_headless.py"
+[[rule]]
+pattern = 'spill (tune|build) --config .*'
+action = "parse"
+config_supplies = true
+reason = "needs a stored job.json and a bucket; --config is exercised by tests/test_headless.py"
+[[rule]]
+pattern = 'spill build /bucket/data/mine --state /bucket/state/mine( --emit-config build\.json)?'
+action = "parse"
+reason = "scheduler example with a bucket path; --state and --emit-config are exercised by tests/test_build_anywhere.py"
+[[rule]]
+pattern = 'spill eval evals\.jsonl qwen2\.5:7b qwen2\.5:7b\+mine( llama3\.3:70b)?'
+action = "substitute"
+sub = {"qwen2.5:7b" = "qwen2.5:0.5b", "llama3.3:70b" = "qwen2.5:0.5b+big"}
+[[rule]]
+pattern = 'spill export qwen2\.5:0\.5b\+banking77-quick --gguf --ollama'
+action = "substitute"
+sub = {"banking77-quick" = "banking77-tiny"}
+needs_env = "SPILL_DOCS_GGUF"
+fallback = "spill export qwen2.5:0.5b+banking77-tiny"
+[[rule]]
+pattern = 'spill run llama3\.3:70b (sample|prompts\.jsonl --out answers\.jsonl)'
+action = "substitute"
+sub = {"llama3.3:70b" = "qwen2.5:0.5b"}
+[[rule]]
+pattern = 'spill run org/name file\.jsonl'
+action = "parse"
+reason = "an arbitrary Hugging Face repo id; the allow-list would refuse it by design"
+[[rule]]
+pattern = 'spill (models|models --architectures|doctor|runs)'
+action = "run"

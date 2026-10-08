@@ -65,3 +65,129 @@ jobs:
         env:
           SPILL_DEVICE: cpu
           SPILL_REQUIRE_FIXTURE_MODEL: "1"
+
+  object-store:
+    name: S3 ownership and handoff against a pinned MinIO (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MINIO_RELEASE: RELEASE.2025-10-15T17-29-55Z
+      SPILL_DEVICE: cpu
+      SPILL_REQUIRE_FIXTURE_MODEL: "1"
+      SPILL_MIN_FREE_GB: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev,cloud]"
+      - uses: actions/cache@v4
+        with:
+          path: models
+          key: models-qwen05-minilm-v2
+      - name: Download qwen2.5:0.5b at its pinned revision
+        run: python -c "from streamweights.registry import download_safetensors; download_safetensors('qwen2.5:0.5b')"
+      - name: Start the pinned MinIO and log its version
+        run: |
+          IMAGE=quay.io/minio/minio:$MINIO_RELEASE
+          if ! docker pull "$IMAGE"; then
+            echo "the upstream image is not available; building the same release from its source tag"
+            docker build -f docker/minio.Dockerfile --build-arg RELEASE=$MINIO_RELEASE -t spill-minio:$MINIO_RELEASE docker
+            IMAGE=spill-minio:$MINIO_RELEASE
+          fi
+          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=spilltest -e MINIO_ROOT_PASSWORD=spilltest123 "$IMAGE" server /data
+          VERSION=$(docker run --rm --entrypoint minio "$IMAGE" --version | head -1)
+          echo "image: $IMAGE"; echo "$VERSION"
+          { echo "### MinIO used for the S3 gates"; echo; echo "image \`$IMAGE\`"; echo; echo "\`$VERSION\`"; } >> "$GITHUB_STEP_SUMMARY"
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:9000/minio/health/live && break; sleep 1; done
+      - name: Ownership, publication and handoff on MinIO (and local disk)
+        env:
+          AWS_ACCESS_KEY_ID: spilltest
+          AWS_SECRET_ACCESS_KEY: spilltest123
+          AWS_ENDPOINT_URL: http://127.0.0.1:9000
+          AWS_DEFAULT_REGION: us-east-1
+          SPILL_TEST_S3_BUCKET: spill-ci
+        run: |
+          python - <<'PY'
+          import boto3
+          boto3.client("s3").create_bucket(Bucket="spill-ci")
+          PY
+          python -m pytest tests/test_ownership.py tests/test_move.py -v -rs 2>&1 | tee pytest.log
+          if grep -q "no S3 endpoint" pytest.log; then echo "an S3 case was skipped"; exit 1; fi
+          grep -E "passed|failed" pytest.log | tail -1 >> "$GITHUB_STEP_SUMMARY"
+
+  journey:
+    name: The CSV journey from the built wheel (Linux, torch-cpu, GGUF)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SPILL_MIN_FREE_GB: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the tools that build and install the wheel
+        run: |
+          python -m pip install --upgrade pip build uv
+      - uses: actions/cache@v4
+        with:
+          path: models
+          key: models-qwen05-minilm-v2
+      - name: Fresh install of the wheel, then the journey with the installed CLI
+        run: |
+          mkdir -p models
+          export SPILL_MODELS_FROM="$PWD/models" SPILL_JOURNEY_OUT="$PWD/wheel-journey.json"
+          python scripts/fresh_wheel.py --journey --home /tmp/spillhome > wheel.json
+          python - <<'PY'
+          import json
+          d = json.load(open("wheel.json"))
+          print("wheel", d["wheel"], "imported from", d["imported_from"])
+          assert d["all_ok"] and d["outside_checkout"]
+          PY
+      - name: The journey with GGUF export, on the checkout
+        env:
+          SPILL_DEVICE: cpu
+        run: |
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev]"
+          python scripts/gates_015.py --home /tmp/gatehome --work /tmp/gatework --out journey-gguf.json --engines torch-cpu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: journey
+          path: |
+            wheel.json
+            wheel-journey.json
+            journey-gguf.json
+
+  docs-commands:
+    name: Every documented command, parsed, and the small-model ones run (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SPILL_DEVICE: cpu
+      SPILL_MIN_FREE_GB: "2"
+      SPILL_DOCS_RUN: "1"
+      SPILL_REQUIRE_FIXTURE_MODEL: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev]"
+      - uses: actions/cache@v4
+        with:
+          path: models
+          key: models-qwen05-minilm-v2
+      - name: Download qwen2.5:0.5b
+        run: python -c "from streamweights.registry import download_safetensors; download_safetensors('qwen2.5:0.5b')"
+      - name: Documented commands
+        run: python -m pytest tests/test_docs_commands.py tests/test_docs.py -v
