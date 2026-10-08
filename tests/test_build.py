@@ -250,3 +250,25 @@ def test_build_says_which_models_it_has_to_download_first(folder, monkeypatch):
     monkeypatch.setattr(registry, "safetensors_downloaded", lambda tag: tag == "llama3.3:70b")
     missing = cli_build._missing_downloads(plan_for(folder))
     assert [m for m, _ in missing] == ["qwen2.5:7b"] and 14 < missing[0][1] < 16
+
+
+def test_prompts_only_without_labeled_validation_trains_but_reports_quality_unavailable(tmp_path):
+    d = tmp_path / "po"
+    d.mkdir()
+    jl(d / "prompts.jsonl", [{"prompt": f"p{i}"} for i in range(40)])
+    f = B.read_folder(d)
+    assert f.evals is None and f.prompts is not None
+    plan = B.make_plan(f, "qwen2.5:0.5b", "qwen2.5:0.5b", None, [], 2.0, {}, 36 * 1024**3)
+    assert [s.id for s in plan.stages] == ["distill", "tune"]          # no eval stage exists
+    backend = Fake()
+    res = B.run_plan(plan, backend, say=lambda s: None)
+    assert res.table == [] and [c[0] for c in backend.calls] == ["distill", "tune"]
+    lines = B.final_lines(res)
+    assert "quality evaluation: unavailable" in lines[1] and "not task accuracy" in lines[1]
+    assert plan.extra["quality_evaluation"] is False
+    # a folder with neither exam nor prompts is still refused
+    e = tmp_path / "empty"
+    e.mkdir()
+    jl(e / "train.jsonl", [{"prompt": "x", "answer": "y"}])
+    with pytest.raises(SpillError, match="evals.jsonl is missing"):
+        B.read_folder(e)
