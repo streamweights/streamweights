@@ -128,9 +128,13 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     cfg = _config(ctx)
     train = read_jsonl(ctx.inputs_dir / "train.jsonl")
     val = read_jsonl(ctx.inputs_dir / "val.jsonl")
-    answers = _teacher_answers(desc, ctx)
-    rows, manifest = training.build_training(cfg, train, answers, desc.params.get("weight_own",
-                                             training.DEFAULT_WEIGHT_OWN))
+    if desc.params.get("training_rows"):       # `spill test`: the very rows the run trained on
+        rows = read_jsonl(Path(desc.params["training_rows"]))
+        manifest = read_json(Path(desc.params["training_rows"]).with_name("training.manifest.json"))
+    else:
+        answers = _teacher_answers(desc, ctx)
+        rows, manifest = training.build_training(cfg, train, answers, desc.params.get(
+            "weight_own", training.DEFAULT_WEIGHT_OWN))
     emb = modelid.embedding_identity(fetch=True)
     res = B.run_baseline(cfg, rows, val, emb["dir"])
     write_jsonl(ctx.out_dir / "predictions.jsonl",
@@ -227,7 +231,7 @@ def _eval(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     view = "student" if comparator == "trained" else "untrained"
     model = desc.params["model"]
     if comparator == "trained":
-        adapter = ctx.dep_dir("train") / "adapter"
+        adapter = Path(desc.params.get("adapter") or ctx.dep_dir("train") / "adapter")
         model = f"{model}+{adapter}"
     f = ctx.stage_dir / "eval.jsonl"
     write_jsonl(f, _prompt_rows(cfg, schema, val, view, mt))

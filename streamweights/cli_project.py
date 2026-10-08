@@ -269,3 +269,82 @@ def project_resume(target, engine, headless, executor, stop_after):
         raise typer.Exit(130)
     typer.echo(f"run {out.run_id}: completed -> {out.snapshot}")
     _next_hint(f"spill report {project}")
+
+
+@app.command(name="test", short_help="Score a run on the final test split, once, as a record",
+             epilog="Example: spill test tickets")
+def test_cmd(
+    project: Path = typer.Argument(..., help="a project folder"),
+    run: str = typer.Argument(None, help="a run id (default: the latest completed run)"),
+    engine: str = typer.Option(None, "--engine", help="mlx | torch-cpu | torch-cuda"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
+):
+    """The only command that scores the final test labels. It writes tests/<id>/, names the
+    exact frozen run, and counts how often the split has been used."""
+    import streamweights.cli as cli
+    cli._DEBUG = debug
+    try:
+        from . import runtime
+        from .project import report as R
+        from .project import testrec
+        typer.echo(f"spill test {project.name}: score the frozen run on the final test split. "
+                   f"Cost: $0. Record -> {project}/tests/<id>")
+        with runtime.job_session("test", engine=engine):
+            rec = testrec.run_test(project, run, engine, say=typer.echo)
+        names = R.NAMES if True else {}
+        typer.echo("")
+        for t in rec["table"]:
+            v = t["primary"]
+            typer.echo(f"{t['comparator']:<10} {rec['metric']} {'unavailable' if v is None else f'{v:.3f}'} "
+                       f"({t['rows']} rows)")
+        typer.echo(rec["holdout_note"])
+        typer.echo(f"record: {project}/tests/{rec['id']}")
+    except Exception as e:
+        _fail(e)
+        return
+    _next_hint(f"spill report {project}")
+
+
+@app.command(short_help="Lay runs side by side; rank them only when that is honest",
+             epilog="Example: spill compare tickets")
+def compare(
+    paths: list[Path] = typer.Argument(..., help="project folders (all their runs) and/or run "
+                                                 "folders"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
+):
+    """Differences in data, models, training settings, engine and numerics; a ranking only for
+    runs evaluated on the same rows with the same metric definition and protocol."""
+    import streamweights.cli as cli
+    cli._DEBUG = debug
+    try:
+        from .project import compare as CM
+        runs = CM.load_runs(paths)
+        if len(runs) < 1:
+            raise SpillError("no completed runs found there", "spill build <project>")
+        for line in CM.render(CM.compare(runs)):
+            typer.echo(line)
+    except Exception as e:
+        _fail(e)
+        return
+    _next_hint(f"spill export {paths[0]}")
+
+
+def project_export(project: Path, run: str | None, gguf: str | None, verify_rows: int):
+    from .project import exportrec
+    typer.echo(f"spill export {project.name}: merge the run's LoRA adapter into its bf16 base"
+               + (f", convert to GGUF {gguf}" if gguf else "")
+               + f", then load the artifact in an independent runtime on {verify_rows} validation "
+                 f"rows. Cost: $0. Record -> {project}/exports/<id>")
+    rec = exportrec.run_export(project, run, gguf, verify_rows, say=lambda s: typer.echo(f"   {s}"))
+    for label, v in rec["verification"]["runs"].items():
+        d = v["prediction_differences"]
+        typer.echo(f"verified {label}: {v['runtime']}; {d['count']} of {d['of']} predictions differ "
+                   f"from the training engine's; primary metric {v['primary']:.3f} on these rows")
+        dep = rec["deployment"][label]
+        mem = dep["peak_memory_bytes"]
+        typer.echo(f"   time to first token cold {dep['ttft_cold_s']} s, warm {dep['ttft_warm_s']} s; "
+                   f"{dep['tokens_per_s_warm']} tokens/s; peak memory "
+                   f"{'unavailable' if mem == 'unavailable' else f'{mem / 1e9:.2f} GB'}")
+    typer.echo(f"record: {project}/exports/{rec['id']}")
+    first = next(iter(rec["scripts"].values()))
+    _next_hint(f"python {project}/exports/{rec['id']}/{first} \"<text>\"")

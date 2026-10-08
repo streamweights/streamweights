@@ -442,12 +442,22 @@ def export(
     ollama: bool = typer.Option(False, "--ollama", help="run `ollama create` if ollama is "
                                                         "installed (implies --gguf)"),
     name: str = typer.Option(None, "--name", help="Ollama model name"),
+    run: str = typer.Option(None, "--run", help="project folders: the run to export (default: "
+                                                "the latest completed run)"),
+    verify_rows: int = typer.Option(8, "--verify-rows", help="project folders: validation rows "
+                                                             "the export is verified on"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
-    """Merge the adapter into the base: merged safetensors, optionally GGUF and Ollama."""
+    """Merge the adapter into the base: merged safetensors, optionally GGUF and Ollama. A
+    project folder (from spill init) exports its latest run as a verified export record."""
     import streamweights.cli as cli
     cli._DEBUG = debug
     try:
+        from .project import config as project_config
+        if project_config.exists(model):
+            from .cli_project import project_export
+            project_export(Path(model), run, gguf, verify_rows)
+            return
         _export_impl(model, out, gguf, ollama, name)
     except Exception as e:
         _fail(e)
