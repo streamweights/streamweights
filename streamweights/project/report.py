@@ -220,10 +220,8 @@ def assemble(dest: Path, *, project: Path, run_id: str, cfg: dict, plan_fields: 
     prod = stage_results.get("train", {}).get("producers", [])
     for a, b in zip(prod, prod[1:]):
         if a.get("engine") != b.get("engine") or a.get("numerics") != b.get("numerics"):
-            trans.append(f"{a.get('engine')} (steps {a.get('range', ['?', '?'])[0]}-"
-                         f"{a.get('range', ['?', '?'])[1]}, numerics {json.dumps(a.get('numerics'))}) -> "
-                         f"{b.get('engine')} (steps {b.get('range', ['?', '?'])[0]}-"
-                         f"{b.get('range', ['?', '?'])[1]}, numerics {json.dumps(b.get('numerics'))})")
+            trans.append(f"{a.get('engine')} ({a.get('quanta')}, numerics {json.dumps(a.get('numerics'))}) "
+                         f"-> {b.get('engine')} ({b.get('quanta')}, numerics {json.dumps(b.get('numerics'))})")
     if "train" in accepted:
         shutil.copytree(accepted["train"] / "adapter", dest / "artifacts" / "adapter",
                         dirs_exist_ok=True)
