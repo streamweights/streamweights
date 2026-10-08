@@ -216,3 +216,24 @@ def test_completed_runs_move_without_becoming_trainable(tmp_path):
         RunState.open(dest_state(dst), out.run_id, tmp_path / "w").acquire()
     src = read_json(proj / ".spill" / "runs" / out.run_id / "control.json")
     assert src["status"] == "completed" and src["locations"][-1]["moved_to"] == dst
+
+
+def test_a_stale_writer_cannot_publish_to_the_source_after_the_handoff(dest, tmp_path):
+    proj, rid = stopped_project(tmp_path)
+    stale = RunState.open(str(proj / ".spill"), rid, tmp_path / "stale-work")
+    stale.auth.lease_s = 0.05
+    stale.acquire(heartbeat=False)                       # a writer that then stalls
+    import time
+    time.sleep(0.2)
+    M.move(proj, dest, say=lambda s: None, wait_s=5)
+    ck = tmp_path / "ck"
+    ck.mkdir()
+    (ck / "f").write_text("x")
+    with pytest.raises(SpillError) as e:
+        stale.publish_checkpoint(ck, 99, {"step": 99})
+    assert "handed to" in e.value.message or "superseded" in e.value.message
+    with pytest.raises(SpillError):
+        stale.complete(ck)
+    d = dest_doc(dest, rid)
+    assert d["status"] == "idle" and d["checkpoint"]["step"] == 4       # the destination is untouched
+    assert read_json(proj / ".spill" / "runs" / rid / "control.json")["checkpoint"]["step"] == 4
