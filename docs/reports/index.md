@@ -21,3 +21,4 @@ Every number in the README and the guides comes from one of these reports, measu
 | [013 Tagline, README, docs site](013-tagline-seo.md) | the tagline, the rewrite, the site and the decisions behind them (no measurements) |
 | [014 Build anywhere](014-build-anywhere.md) | build on every engine, a build that moves between machines, the CI relay |
 | [015 One complete workflow](015-workflow.md) | init, plan, build, report, test, export and inference per task and engine; verified exports; the ownership and handoff gates |
+| [016 Closing the 015 gaps](016-close-gaps.md) | the offline bundle gate with the network blocked, MLX-on-Metal continuation in both directions, merge hygiene |
