@@ -1,0 +1,599 @@
+{
+ "device": {
+  "mlx_default_device": "Device(gpu, 0)",
+  "mlx": "unknown"
+ },
+ "started": "2026-10-09T10:48:02-0700",
+ "hardware": {
+  "host": "Amrishs-MacBook-Pro.local",
+  "system": "Darwin",
+  "os": "macOS",
+  "os_release": "24.6.0",
+  "arch": "arm64",
+  "cpu": "Apple M4 Pro"
+ },
+ "reference": {
+  "trained_accuracy": 0.8888888888888888,
+  "rows": 18,
+  "untrained_accuracy": 0.3333333333333333,
+  "baseline_accuracy": 1.0,
+  "train_producers": [
+   {
+    "engine": "mlx",
+    "numerics": {
+     "adapter": "float32",
+     "base": "bf16",
+     "dropout": 0.0,
+     "optimizer": "float32"
+    },
+    "quanta": "steps 0-42"
+   }
+  ],
+  "engine_transitions": [],
+  "engine_check": [
+   "mlx"
+  ]
+ },
+ "chains": [
+  {
+   "name": "chain-a",
+   "engines": [
+    "mlx",
+    "torch-cpu",
+    "mlx"
+   ],
+   "steps": [
+    {
+     "engine": "mlx",
+     "killed_after_published_step": 10,
+     "cursor": {
+      "micro_batch_index": 10,
+      "step": 10
+     }
+    },
+    {
+     "engine": "torch-cpu",
+     "restored_step": 10,
+     "killed_after_published_step": 15,
+     "cursor": {
+      "micro_batch_index": 15,
+      "step": 15
+     }
+    },
+    {
+     "engine": "mlx",
+     "restored_step": 15,
+     "restore_line_seen": true
+    }
+   ],
+   "carry_over_problems": [],
+   "published_checkpoints": [
+    [
+     5,
+     5
+    ],
+    [
+     10,
+     10
+    ],
+    [
+     15,
+     15
+    ],
+    [
+     20,
+     20
+    ],
+    [
+     25,
+     25
+    ],
+    [
+     30,
+     30
+    ],
+    [
+     35,
+     35
+    ],
+    [
+     40,
+     40
+    ],
+    [
+     42,
+     42
+    ]
+   ],
+   "recorded_producers": [
+    "mlx",
+    "torch-cpu",
+    "mlx"
+   ],
+   "engine_transitions": [
+    "mlx (steps 0-10, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> torch-cpu (steps 10-15, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})",
+    "torch-cpu (steps 10-15, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> mlx (steps 15-42, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})"
+   ],
+   "final": {
+    "trained_accuracy": 0.8888888888888888,
+    "rows": 18,
+    "untrained_accuracy": 0.3333333333333333,
+    "baseline_accuracy": 1.0,
+    "train_producers": [
+     {
+      "engine": "mlx",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 0-10"
+     },
+     {
+      "engine": "torch-cpu",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 10-15"
+     },
+     {
+      "engine": "mlx",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 15-42"
+     }
+    ],
+    "engine_transitions": [
+     "mlx (steps 0-10, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> torch-cpu (steps 10-15, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})",
+     "torch-cpu (steps 10-15, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> mlx (steps 15-42, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})"
+    ]
+   },
+   "reference_trained_accuracy": 0.8888888888888888,
+   "ok": true
+  },
+  {
+   "name": "chain-b",
+   "engines": [
+    "torch-cpu",
+    "mlx",
+    "torch-cpu"
+   ],
+   "steps": [
+    {
+     "engine": "torch-cpu",
+     "killed_after_published_step": 10,
+     "cursor": {
+      "micro_batch_index": 10,
+      "step": 10
+     }
+    },
+    {
+     "engine": "mlx",
+     "restored_step": 10,
+     "killed_after_published_step": 15,
+     "cursor": {
+      "micro_batch_index": 15,
+      "step": 15
+     }
+    },
+    {
+     "engine": "torch-cpu",
+     "restored_step": 15,
+     "restore_line_seen": true
+    }
+   ],
+   "carry_over_problems": [],
+   "published_checkpoints": [
+    [
+     5,
+     5
+    ],
+    [
+     10,
+     10
+    ],
+    [
+     15,
+     15
+    ],
+    [
+     20,
+     20
+    ],
+    [
+     25,
+     25
+    ],
+    [
+     30,
+     30
+    ],
+    [
+     35,
+     35
+    ],
+    [
+     40,
+     40
+    ],
+    [
+     42,
+     42
+    ]
+   ],
+   "recorded_producers": [
+    "torch-cpu",
+    "mlx",
+    "torch-cpu"
+   ],
+   "engine_transitions": [
+    "torch-cpu (steps 0-10, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> mlx (steps 10-15, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})",
+    "mlx (steps 10-15, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> torch-cpu (steps 15-42, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})"
+   ],
+   "final": {
+    "trained_accuracy": 0.9444444444444444,
+    "rows": 18,
+    "untrained_accuracy": 0.4444444444444444,
+    "baseline_accuracy": 1.0,
+    "train_producers": [
+     {
+      "engine": "torch-cpu",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 0-10"
+     },
+     {
+      "engine": "mlx",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 10-15"
+     },
+     {
+      "engine": "torch-cpu",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 15-42"
+     }
+    ],
+    "engine_transitions": [
+     "torch-cpu (steps 0-10, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> mlx (steps 10-15, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})",
+     "mlx (steps 10-15, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> torch-cpu (steps 15-42, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})"
+    ]
+   },
+   "reference_trained_accuracy": 0.8888888888888888,
+   "ok": true
+  }
+ ],
+ "moves": [
+  {
+   "name": "move-local-mlx-torch-cpu",
+   "move": "local",
+   "dest": "<scratch>/metalwork/moved-mlx-to-torch-cpu/p",
+   "from": "mlx",
+   "to": "torch-cpu",
+   "published_step_before_move": 10,
+   "source_status_after_move": "transferred",
+   "move_seconds": 2.3,
+   "carry_over_problems": [],
+   "published_checkpoints": [
+    [
+     10,
+     10
+    ],
+    [
+     15,
+     15
+    ],
+    [
+     20,
+     20
+    ],
+    [
+     25,
+     25
+    ],
+    [
+     30,
+     30
+    ],
+    [
+     35,
+     35
+    ],
+    [
+     40,
+     40
+    ],
+    [
+     42,
+     42
+    ]
+   ],
+   "final": {
+    "trained_accuracy": 0.8888888888888888,
+    "rows": 18,
+    "untrained_accuracy": 0.4444444444444444,
+    "baseline_accuracy": 1.0,
+    "train_producers": [
+     {
+      "engine": "mlx",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 0-10"
+     },
+     {
+      "engine": "torch-cpu",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 10-42"
+     }
+    ],
+    "engine_transitions": [
+     "mlx (steps 0-10, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> torch-cpu (steps 10-42, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "move-s3-mlx-torch-cpu",
+   "move": "s3",
+   "dest": "s3://spill-probe/metal/mlx-torch-cpu-1791568204",
+   "from": "mlx",
+   "to": "torch-cpu",
+   "published_step_before_move": 10,
+   "source_status_after_move": "transferred",
+   "move_seconds": 2.9,
+   "carry_over_problems": [],
+   "published_checkpoints": [
+    [
+     10,
+     10
+    ],
+    [
+     15,
+     15
+    ],
+    [
+     20,
+     20
+    ],
+    [
+     25,
+     25
+    ],
+    [
+     30,
+     30
+    ],
+    [
+     35,
+     35
+    ],
+    [
+     40,
+     40
+    ],
+    [
+     42,
+     42
+    ]
+   ],
+   "final": {
+    "trained_accuracy": 0.8888888888888888,
+    "rows": 18,
+    "untrained_accuracy": 0.4444444444444444,
+    "baseline_accuracy": 1.0,
+    "train_producers": [
+     {
+      "engine": "mlx",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 0-10"
+     },
+     {
+      "engine": "torch-cpu",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 10-42"
+     }
+    ],
+    "engine_transitions": [
+     "mlx (steps 0-10, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> torch-cpu (steps 10-42, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "move-local-torch-cpu-mlx",
+   "move": "local",
+   "dest": "<scratch>/metalwork/moved-torch-cpu-to-mlx/p",
+   "from": "torch-cpu",
+   "to": "mlx",
+   "published_step_before_move": 10,
+   "source_status_after_move": "transferred",
+   "move_seconds": 2.4,
+   "carry_over_problems": [],
+   "published_checkpoints": [
+    [
+     10,
+     10
+    ],
+    [
+     15,
+     15
+    ],
+    [
+     20,
+     20
+    ],
+    [
+     25,
+     25
+    ],
+    [
+     30,
+     30
+    ],
+    [
+     35,
+     35
+    ],
+    [
+     40,
+     40
+    ],
+    [
+     42,
+     42
+    ]
+   ],
+   "final": {
+    "trained_accuracy": 0.9444444444444444,
+    "rows": 18,
+    "untrained_accuracy": 0.3333333333333333,
+    "baseline_accuracy": 1.0,
+    "train_producers": [
+     {
+      "engine": "torch-cpu",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 0-10"
+     },
+     {
+      "engine": "mlx",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 10-42"
+     }
+    ],
+    "engine_transitions": [
+     "torch-cpu (steps 0-10, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> mlx (steps 10-42, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "move-s3-torch-cpu-mlx",
+   "move": "s3",
+   "dest": "s3://spill-probe/metal/torch-cpu-mlx-1791568268",
+   "from": "torch-cpu",
+   "to": "mlx",
+   "published_step_before_move": 10,
+   "source_status_after_move": "transferred",
+   "move_seconds": 2.9,
+   "carry_over_problems": [],
+   "published_checkpoints": [
+    [
+     10,
+     10
+    ],
+    [
+     15,
+     15
+    ],
+    [
+     20,
+     20
+    ],
+    [
+     25,
+     25
+    ],
+    [
+     30,
+     30
+    ],
+    [
+     35,
+     35
+    ],
+    [
+     40,
+     40
+    ],
+    [
+     42,
+     42
+    ]
+   ],
+   "final": {
+    "trained_accuracy": 0.9444444444444444,
+    "rows": 18,
+    "untrained_accuracy": 0.3333333333333333,
+    "baseline_accuracy": 1.0,
+    "train_producers": [
+     {
+      "engine": "torch-cpu",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 0-10"
+     },
+     {
+      "engine": "mlx",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16",
+       "dropout": 0.0,
+       "optimizer": "float32"
+      },
+      "quanta": "steps 10-42"
+     }
+    ],
+    "engine_transitions": [
+     "torch-cpu (steps 0-10, numerics {\"base\": \"float32\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0}) -> mlx (steps 10-42, numerics {\"base\": \"bf16\", \"adapter\": \"float32\", \"optimizer\": \"float32\", \"dropout\": 0.0})"
+    ]
+   },
+   "ok": true
+  }
+ ],
+ "finished": "2026-10-09T10:51:35-0700",
+ "all_ok": true
+}
