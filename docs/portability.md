@@ -278,3 +278,7 @@ filesystems, power loss, Windows (the local lock needs POSIX `flock`). Not built
 collection of orphaned payloads, a remote scheduler, transparent multi-writer sync, row-level
 resume inside a stopped eval or distill stage (a stage is accepted whole; a training stage resumes
 from its last checkpoint).
+
+## Addendum: what 016 added
+
+The offline bundle was installed, inferred from, forked and trained with the network blocked (a Linux container started with `--network none`, and a macOS `sandbox-exec` profile), and a build killed while publishing a checkpoint was finished on the other engine in both directions on the MLX Metal GPU, including through local and MinIO moves: see [report 016](reports/016-close-gaps.md). The limits above still stand: real AWS S3, CUDA, network filesystems, Windows and power loss are untested.

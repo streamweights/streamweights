@@ -177,3 +177,7 @@ The S3 gates ran in CI (job `object-store`, run 37729069035) against MinIO built
 ## Untested
 
 Real AWS S3, CUDA, network filesystems, Windows, whole-machine power loss, a 7B or 70B model (none was run), warm-starting from a parent run, and the Linux MLX path (there is none). MLX in the pytest suite runs on the CPU device; the numbers in this report are from the Apple GPU.
+
+## Addendum (directive 016)
+
+The gaps this report left open were closed afterwards and are reported in [016](016-close-gaps.md): the offline bundle gate with the network blocked (Linux container with `--network none`, and a macOS sandbox), and the continuation between MLX on the Metal GPU and torch-cpu in both directions, through local and MinIO moves. The numbers above are unchanged.

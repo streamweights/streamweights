@@ -28,10 +28,10 @@ The report compares, on the validation rows, an embedding baseline (MiniLM plus 
 
 | task | engine | embedding baseline | student, untrained | student, trained | build time |
 |---|---|---|---|---|---|
-| classification (accuracy, 18 rows) | mlx | 1.000 | 0.333 | 0.889 | 13.8 s |
-| classification (accuracy, 18 rows) | torch-cpu | 1.000 | 0.444 | 0.944 | 36.5 s |
-| JSON extraction (whole-record accuracy, 18 rows) | mlx | n/a | 0.000 | 0.500 | 17.9 s |
-| JSON extraction (whole-record accuracy, 18 rows) | torch-cpu | n/a | 0.000 | 0.444 | 53.7 s |
+| classification (accuracy) | mlx | 1.000 (18 validation rows) | 0.333 (18 rows) | 0.889 (18 rows) | 13.8 s |
+| classification (accuracy) | torch-cpu | 1.000 (18 validation rows) | 0.444 (18 rows) | 0.944 (18 rows) | 36.5 s |
+| JSON extraction (whole-record accuracy) | mlx | n/a | 0.000 (18 rows) | 0.500 (18 rows) | 17.9 s |
+| JSON extraction (whole-record accuracy) | torch-cpu | n/a | 0.000 (18 rows) | 0.444 (18 rows) | 53.7 s |
 
 Here the embedding baseline scored higher than the trained student, and the report says that; it does not prescribe more training. Eighteen rows is small and no significance test is run: a difference is an observed difference on those rows. Invalid, unparseable and failed outputs count as wrong. `disagreements.jsonl` lists the rows where a comparator and the trained student differ. `spill compare` ranks runs only when they used the same rows, metric and protocol, and otherwise explains why not. The final test is scored only by `spill test`, which records every use, so a split consulted repeatedly is not presented as untouched.
 
@@ -61,9 +61,10 @@ A live run has one authoritative control object (a file under `.spill/` or an S3
 
 | platform | status |
 |---|---|
-| Apple silicon, MLX | tested: M4 Pro, 48 GB (report 015 and earlier reports) |
+| Apple silicon, MLX on the GPU | tested: M4 Pro, 48 GB. A tiny build killed while publishing a checkpoint was finished on the other engine, MLX to torch-cpu to MLX and the reverse, and moved to a local folder and to a local MinIO in both directions, on the Metal GPU ([report 016](docs/reports/016-close-gaps.md)); the pytest version of the continuation test runs MLX on the CPU device |
 | macOS and Linux CPU, PyTorch | tested: this Mac's CPU, and GitHub Linux and macOS runners on every push |
-| S3 | tested against a MinIO server in Linux CI (version in the log); real AWS S3 is untested |
+| offline use | a bundle was installed, inferred from, forked and trained with the network blocked: in a Linux container started with `--network none` (CI) and, on this Mac, under a `sandbox-exec` profile that denies network access ([report 016](docs/reports/016-close-gaps.md)); the tiny 120-row classification project and qwen2.5:0.5b only |
+| S3 | tested against a MinIO server (built from its release tag in Linux CI; a Homebrew build of the same release locally); real AWS S3 is untested |
 | NVIDIA CUDA | built, untested ([docs/linux.md](docs/linux.md), [issue #1](https://github.com/streamweights/streamweights/issues/1)) |
 | network filesystems, Windows | untested; a network filesystem is refused for a live run |
 | power loss | untested; the tests terminate the process |

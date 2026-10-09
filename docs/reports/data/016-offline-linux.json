@@ -1,0 +1,145 @@
+{
+ "started": "2026-10-09T18:07:37+0000",
+ "checks": [
+  {
+   "name": "the environment has no network",
+   "ok": true,
+   "detail": "connect to 1.1.1.1:443 failed: [Errno 101] Network is unreachable"
+  },
+  {
+   "name": "DNS is unavailable",
+   "ok": true,
+   "detail": "[Errno -3] Temporary failure in name resolution"
+  },
+  {
+   "name": "SPILL_HOME and the Hugging Face cache start empty",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "bundle verifies (checksums)",
+   "ok": true,
+   "detail": "exit 0 in 1.2 s"
+  },
+  {
+   "name": "bundle installs into the empty cache and the project is copied out",
+   "ok": true,
+   "detail": "exit 0 in 2.2 s"
+  },
+  {
+   "name": "installed qwen2.5-0.5b/bf16-st/model.safetensors",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "installed embedding-minilm/model.safetensors",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "report from the bundled project",
+   "ok": true,
+   "detail": "exit 0 in 0.2 s"
+  },
+  {
+   "name": "plan needs nothing from the network",
+   "ok": true,
+   "detail": "exit 0 in 1.2 s"
+  },
+  {
+   "name": "inference from the bundle (base plus the bundled adapter)",
+   "ok": true,
+   "detail": "exit 0 in 32.7 s"
+  },
+  {
+   "name": "inference produced one answer per row",
+   "ok": true,
+   "detail": "['change_pin', 'change_pin', 'automatic_top_up']"
+  },
+  {
+   "name": "fork a new run and complete a training run offline",
+   "ok": true,
+   "detail": "exit 0 in 56.2 s"
+  },
+  {
+   "name": "a new completed run exists next to the bundled one",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "the fork names the bundled run as its parent",
+   "ok": true,
+   "detail": "run-20261009-180456-7a10-2f0a5e"
+  },
+  {
+   "name": "a corrupted asset is rejected",
+   "ok": true,
+   "detail": "exit 1 in 1.1 s"
+  },
+  {
+   "name": "a corrupted bundle is refused by install too",
+   "ok": true,
+   "detail": "exit 1 in 1.2 s"
+  },
+  {
+   "name": "a missing asset is rejected",
+   "ok": true,
+   "detail": "exit 1 in 1.1 s"
+  },
+  {
+   "name": "no network call was attempted by any spill process",
+   "ok": true,
+   "detail": "[]"
+  }
+ ],
+ "imported_from": "/usr/local/lib/python3.12/site-packages/streamweights/__init__.py",
+ "fork_table": [
+  {
+   "accuracy": 1.0,
+   "comparator": "baseline",
+   "inference_failures": 0,
+   "invalid_predictions": 0,
+   "macro_f1": 1.0,
+   "mean_field_accuracy": null,
+   "parseable_rate": null,
+   "primary": 1.0,
+   "records_with_extra_fields": null,
+   "rows": 18,
+   "schema_valid_rate": null,
+   "truncated": null,
+   "whole_record_accuracy": null
+  },
+  {
+   "accuracy": 0.3333333333333333,
+   "comparator": "untrained",
+   "inference_failures": 0,
+   "invalid_predictions": 1,
+   "macro_f1": 0.2698412698412698,
+   "mean_field_accuracy": null,
+   "parseable_rate": null,
+   "primary": 0.3333333333333333,
+   "records_with_extra_fields": null,
+   "rows": 18,
+   "schema_valid_rate": null,
+   "truncated": 0,
+   "whole_record_accuracy": null
+  },
+  {
+   "accuracy": 0.9444444444444444,
+   "comparator": "trained",
+   "inference_failures": 0,
+   "invalid_predictions": 1,
+   "macro_f1": 0.9523809523809524,
+   "mean_field_accuracy": null,
+   "parseable_rate": null,
+   "primary": 0.9444444444444444,
+   "records_with_extra_fields": null,
+   "rows": 18,
+   "schema_valid_rate": null,
+   "truncated": 0,
+   "whole_record_accuracy": null
+  }
+ ],
+ "finished": "2026-10-09T18:09:14+0000",
+ "all_ok": true
+}

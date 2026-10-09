@@ -191,3 +191,69 @@ jobs:
         run: python -c "from streamweights.registry import download_safetensors; download_safetensors('qwen2.5:0.5b')"
       - name: Documented commands
         run: python -m pytest tests/test_docs_commands.py tests/test_docs.py -v
+
+  offline-bundle:
+    name: Offline bundle gate (container with --network none)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SPILL_MIN_FREE_GB: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: models
+          key: models-qwen05-minilm-v2
+      - name: Build the tiny project, its bundle and the wheel (online)
+        run: |
+          python -m pip install --upgrade pip build
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev]"
+          python -c "from streamweights.registry import download_safetensors; download_safetensors('qwen2.5:0.5b')"
+          python scripts/gate_offline_bundle.py prepare --work /tmp/off
+      - name: Runtime dependencies image
+        run: docker build -f docker/offline.Dockerfile -t spill-offline-deps .
+      - name: "Offline, no network: install the wheel from a file, import the bundle, infer, fork, train, reject corruption"
+        run: |
+          mkdir -p /tmp/offout
+          docker run --rm --network none \
+            -v /tmp/off/dist:/in/dist:ro -v /tmp/off/bundle:/in/bundle:ro \
+            -v "$PWD/scripts":/scripts:ro -v /tmp/offout:/out \
+            spill-offline-deps sh -c 'pip install --no-deps --no-index /in/dist/*.whl && python /scripts/gate_offline_bundle.py offline --bundle /in/bundle --work /tmp/gate --out /out/result.json'
+          python - <<'PY'
+          import json
+          d = json.load(open("/tmp/offout/result.json"))
+          print(json.dumps([(c["name"], c["ok"]) for c in d["checks"]], indent=1))
+          assert d["all_ok"], "an offline check failed"
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline-bundle
+          path: /tmp/offout/result.json
+
+  resolution:
+    name: boto3 and s3fs resolution (clean venv and both images)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Clean venv with the cloud extra
+        run: |
+          python -m venv /tmp/v && /tmp/v/bin/pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+          /tmp/v/bin/pip install -q ".[cloud]"
+          /tmp/v/bin/pip list 2>/dev/null | grep -iE "^(boto3|botocore|aiobotocore|s3fs) " | tee /tmp/venv-versions.txt
+          cat /tmp/venv-versions.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: CPU and CUDA images resolve the same extra
+        run: |
+          docker build -f docker/cpu.Dockerfile -t spill-cpu .
+          docker run --rm --entrypoint pip spill-cpu list 2>/dev/null | grep -iE "^(boto3|botocore|aiobotocore|s3fs) " | tee /tmp/cpu-versions.txt
+          sed -n '/pip install/,/^$/p' docker/cuda.Dockerfile
+          docker build -f docker/cuda.Dockerfile -t spill-cuda . 2>&1 | tail -3
+          docker run --rm --entrypoint pip spill-cuda list 2>/dev/null | grep -iE "^(boto3|botocore|aiobotocore|s3fs) " | tee /tmp/cuda-versions.txt
+          { echo "cpu image"; cat /tmp/cpu-versions.txt; echo "cuda image"; cat /tmp/cuda-versions.txt; } >> "$GITHUB_STEP_SUMMARY"

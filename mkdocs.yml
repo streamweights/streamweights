@@ -53,6 +53,7 @@ nav:
       - Tagline and docs site: reports/013-tagline-seo.md
       - Build anywhere: reports/014-build-anywhere.md
       - One complete workflow: reports/015-workflow.md
+      - Closing the 015 gaps: reports/016-close-gaps.md
   - Reference:
       - Commands: cli.md
       - Formats: formats.md
