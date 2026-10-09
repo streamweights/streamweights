@@ -216,7 +216,7 @@ jobs:
           python scripts/gate_offline_bundle.py prepare --work /tmp/off
       - name: Runtime dependencies image
         run: docker build -f docker/offline.Dockerfile -t spill-offline-deps .
-      - name: Offline: install the wheel from a file, import the bundle, infer, fork, train, reject corruption
+      - name: "Offline, no network: install the wheel from a file, import the bundle, infer, fork, train, reject corruption"
         run: |
           mkdir -p /tmp/offout
           docker run --rm --network none \
