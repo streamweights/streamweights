@@ -74,6 +74,27 @@ def test_merged_model_equals_base_plus_adapter(tiny, tmp_path):
             assert a["token_id"] == b["token_id"] and abs(a["logprob"] - b["logprob"]) < 1e-3
 
 
+def test_float32_merge_writes_float32_everywhere_and_the_default_is_unchanged(tiny, tmp_path):
+    from streamweights import safetensors_np as snp
+    base, ad_dir = tiny
+    adapter = load_adapter_dir(ad_dir)
+    f32 = ex.merge_adapter(base, adapter, tmp_path / "f32", merge_dtype="float32")
+    b16 = ex.merge_adapter(base, adapter, tmp_path / "b16")                   # default
+    assert f32["dtype"] == "F32" and f32["modules"] == b16["modules"]
+    dts32 = {dt for shard in (tmp_path / "f32").glob("*.safetensors") for _n, dt, _s, _r in snp.tensors(shard)}
+    dts16 = {dt for shard in (tmp_path / "b16").glob("*.safetensors") for _n, dt, _s, _r in snp.tensors(shard)}
+    dtsb = {dt for shard in base.glob("*.safetensors") for _n, dt, _s, _r in snp.tensors(shard)}
+    assert dts32 == {"F32"} and dts16 == dtsb            # the default keeps the base's dtype (bf16 for qwen)
+    assert json.loads((tmp_path / "f32" / "config.json").read_text()).get("torch_dtype", "float32") == "float32"
+    assert json.loads((tmp_path / "f32" / "merge.json").read_text())["merge_dtype"] == "float32"
+    # the float32 merge is the exact float32 sum; the bf16 merge is that sum rounded to bf16
+    a = {n: snp.to_f32(r, dt) for shard in sorted((tmp_path / "f32").glob("*.safetensors")) for n, dt, _s, r in snp.tensors(shard)}
+    b = {n: snp.to_f32(r, dt) for shard in sorted((tmp_path / "b16").glob("*.safetensors")) for n, dt, _s, r in snp.tensors(shard)}
+    assert set(a) == set(b) and max(float(abs(a[k] - b[k]).max()) for k in a) < 0.01
+    with pytest.raises(SpillError, match="--merge-dtype"):
+        ex.merge_adapter(base, adapter, tmp_path / "x", merge_dtype="fp8")
+
+
 def test_merge_rejects_wrong_base_and_quantized(tiny, tmp_path):
     base, _ = tiny
     cfg = json.loads((base / "config.json").read_text())
