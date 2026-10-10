@@ -225,7 +225,7 @@ def test_execute_the_small_model_commands_on_tiny_data(tmp_path):
             if line in done:
                 continue
             if line.startswith("python "):
-                p = subprocess.run(["bash", "-c", line], capture_output=True, text=True, cwd=work, env=env,
+                p = subprocess.run(["bash", "-c", line.replace("python ", f"{sys.executable} ", 1)], capture_output=True, text=True, cwd=work, env=env,
                                    timeout=1800)
                 done.add(line)
                 if p.returncode != 0 or not p.stdout.strip():
