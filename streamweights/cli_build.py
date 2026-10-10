@@ -356,7 +356,7 @@ def build(
     quiet: bool = typer.Option(False, "--quiet", help="one progress line per stage"),
     state: str = typer.Option(None, "--state", help="portable build state: a path, s3://, gs://, "
                                                     "az:// (default: <folder>/.build/); the build "
-                                                    "continues from it on any machine and engine"),
+                                                    "continues from it on any supported machine and engine"),
     engine: str = typer.Option(None, "--engine", help="mlx | torch-cpu | torch-cuda "
                                                       "(default: chosen from the hardware)"),
     headless: bool = typer.Option(False, "--headless", help="JSON-lines events on stdout, exit "
@@ -447,6 +447,9 @@ def export(
                                                 "the latest completed run)"),
     verify_rows: int = typer.Option(8, "--verify-rows", help="project folders: validation rows "
                                                              "the export is verified on"),
+    merge_dtype: str = typer.Option(None, "--merge-dtype", help="project folders: float32 | bf16, "
+                                                                "what the merged weights are written "
+                                                                "as (default: see docs/formats.md)"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Merge the adapter into the base: merged safetensors, optionally GGUF and Ollama. A
@@ -458,7 +461,7 @@ def export(
         from .project import migrate as project_migrate
         if project_config.exists(model) and project_migrate.is_guided(project_config.load(model)):
             from .cli_project import project_export
-            project_export(Path(model), run, gguf, verify_rows)
+            project_export(Path(model), run, gguf, verify_rows, merge_dtype)
             return
         _export_impl(model, out, gguf, ollama, name)
     except Exception as e:

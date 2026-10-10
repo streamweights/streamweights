@@ -170,11 +170,12 @@ root may change; a run's own report never does.
 ### Export and test records
 
 `exports/<id>/record.json` names the base model and revision, the tokenizer files and chat-template
-hash, the prompt template, the adapter and how it was merged, each format and its quantization,
+hash, the prompt template, the adapter and how it was merged (`--merge-dtype float32|bf16`, default bf16), each format and its quantization,
 the source run and its evaluation references, the verification (runtime, settings, exact rows,
 load failures, prediction differences, task metrics, the script run once) and the deployment
 measurements with their boundaries and hardware. `tests/<id>/record.json` names the run, the
-test-file hash, the metrics, and how many times the split had been scored before. A failure is a
+test-file hash, the metrics, and how many times the split had been scored before. In an export record, `quality_delta` in each verification run shows the source engine's score and the artifact's score on the same rows, the text-disagreement rate and, for JSON, the schema-valid rate. An export that
+verified loaded and ran; it does not mean quality was preserved. A failure is a
 record with `"status": "failed"`, never a missing directory. A later verification is a new record
 that references the earlier one.
 
@@ -189,6 +190,35 @@ cursor, sequence), `stages` (accepted stage payloads), `completed`, `handoff`, `
 bounded history. See [portability](portability.md).
 
 ### Schema migrations
+
+### Metrics, protocol and evaluation records
+
+`evaluation.metric` in streamweights.toml selects the primary metric; it must be one the task
+supports (classification: `accuracy`, `macro_f1`; json: `whole_record_accuracy`,
+`mean_field_accuracy`, `schema_valid_rate`, `parseable_rate`) or the build refuses with a message
+naming the choices. Metric versions: classification 1, JSON 2. JSON version 2 changed one rule: an
+output that parses but fails the schema earns no credit at all (no field-level and no whole-record
+credit; trimming and number equality never rescue it) but still counts toward the parseable rate.
+Version 1 compared fields before checking validity. Runs built with different metric versions are
+not ranked together.
+
+The evaluation protocol (rows, prompts, contract, decoding, max tokens, postprocessing, metric and its
+version, requested precision) is fingerprinted. Its decoding block records `temperature`, `top_p`,
+`stop`, `greedy` and `seed`; every one is put in each request body, and the MLX and PyTorch engines,
+which decode greedily with no sampling and no stop sequences, refuse a request for a setting they
+cannot apply, naming the engine and the setting, before anything runs. Each result row echoes the
+settings as applied (`streamweights.decoding`).
+
+What an evaluation actually ran under is recorded apart from the requested precision policy:
+`conditions` holds the engine, device, actual numerics (weight, adapter and compute dtypes),
+runtime and library versions and the decoding as applied. The run's original evaluation has the id
+`<run id>/original`. `spill evaluate <run> --engine <engine>` writes `evaluations/<id>/record.json`
+(immutable, references the run, uses the frozen validation rows only, shows the original scores next
+to the new ones with both metric versions). `spill compare` labels each comparison common evaluator,
+cross-runtime or incompatible, and takes `--use <run id>=<evaluation id>`.
+
+A `parent` on a run records experiment lineage only: the new run trained from the base model, not from
+the parent's weights.
 
 A flat-layout folder (`evals.jsonl`, `train.jsonl`, `.build/`) opened by a project command gets a
 `streamweights.toml` with `layout = "legacy-flat"` and the hash of each source file, announced in

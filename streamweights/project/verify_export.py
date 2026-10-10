@@ -34,11 +34,18 @@ def run_transformers(spec: dict) -> dict:
     t0 = time.perf_counter()
     tok = AutoTokenizer.from_pretrained(path)
     model = AutoModelForCausalLM.from_pretrained(path, dtype=torch.float32).eval()
+    if spec.get("peft_adapter"):                      # the unmerged adapter on the base
+        from peft import PeftModel
+        model = PeftModel.from_pretrained(model, spec["peft_adapter"]).eval()
     load_s = time.perf_counter() - t0
     preds, ttft, tps = [], [], []
     for i, r in enumerate(spec["rows"]):
-        ids = tok.apply_chat_template(r["messages"], add_generation_prompt=True, return_tensors="pt",
-                                      return_dict=True)
+        if r.get("prompt_ids"):                       # identical tokenization across runtimes
+            t = torch.tensor([r["prompt_ids"]])
+            ids = {"input_ids": t, "attention_mask": torch.ones_like(t)}
+        else:
+            ids = tok.apply_chat_template(r["messages"], add_generation_prompt=True, return_tensors="pt",
+                                          return_dict=True)
         n_in = int(ids["input_ids"].shape[1])
         with torch.no_grad():
             t1 = time.perf_counter()
@@ -80,7 +87,8 @@ def run_llamacpp(spec: dict) -> dict:
     port = s.getsockname()[1]
     s.close()
     cmd = [server, "-m", spec["path"], "-c", "4096", "--port", str(port), "--host", "127.0.0.1",
-           "--no-webui", "--parallel", "1", "-ngl", "0" if sys.platform != "darwin" else "999"]
+           "--no-webui", "--parallel", "1", "-ngl",
+           str(spec["ngl"]) if "ngl" in spec else ("0" if sys.platform != "darwin" else "999")]
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                             start_new_session=True)
@@ -111,6 +119,19 @@ def run_llamacpp(spec: dict) -> dict:
                 pass
         preds, ttft, tps = [], [], []
         for r in spec["rows"]:
+            if r.get("prompt_ids"):                   # raw token ids: the same tokenization as Transformers
+                t2 = time.perf_counter()
+                resp = httpx.post(f"{base}/completion", json={
+                    "prompt": r["prompt_ids"], "n_predict": r["max_tokens"], "temperature": 0, "top_k": 1,
+                    "seed": 0, "cache_prompt": False}, timeout=900).json()
+                full = time.perf_counter() - t2
+                rss()
+                preds.append({"id": r["id"], "text": resp.get("content", "").strip(),
+                              "prompt_tokens": resp.get("tokens_evaluated"),
+                              "completion_tokens": resp.get("tokens_predicted", 0), "seconds": round(full, 4)})
+                ttft.append(None)
+                tps.append(resp.get("tokens_predicted", 0) / full if full > 0 else None)
+                continue
             body = {"messages": r["messages"], "max_tokens": r["max_tokens"], "temperature": 0,
                     "top_k": 1, "seed": 0, "cache_prompt": False}
             t1 = time.perf_counter()
@@ -146,7 +167,8 @@ def run_llamacpp(spec: dict) -> dict:
                 "peak_rss_bytes": peak or None,
                 "runtime": f"llama.cpp {(vline[0] if vline else 'unknown version')[:80]}",
                 "settings": {"temperature": 0, "top_k": 1, "seed": 0, "context": 4096,
-                             "gpu_layers": "all (Metal)" if sys.platform == "darwin" else "0 (CPU)",
+                             "gpu_layers": (str(spec["ngl"]) if "ngl" in spec else
+                                            ("all (Metal)" if sys.platform == "darwin" else "0 (CPU)")),
                              "chat_template": "the GGUF's embedded template"},
                 "boundaries": {"ttft": "wall time from request to the first streamed content "
                                        "token, cache_prompt off; cold = the first row, warm = median "

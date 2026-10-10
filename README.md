@@ -1,14 +1,12 @@
 # streamweights
 
-**A 70B model doesn't fit on your laptop. Build your own model from it anyway.**
+**Build a small model for your task, on hardware you control.**
 
-Distill, fine-tune and evaluate on whatever hardware you have. Start a job anywhere, finish it anywhere.
+Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux.
 
-[Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB MacBook Pro.](docs/reports/002-phase1.md)
+streamweights (command: `spill`) turns a CSV of labeled examples into a small fine-tuned model (LoRA on `qwen2.5:0.5b`) and shows how it compares with an embedding baseline and the untrained model on rows it never saw. It runs on a Mac (MLX) or on Linux and macOS CPUs (PyTorch). Data stays local by default; remote storage is used when explicitly configured.
 
-streamweights (command: `spill`) fine-tunes and evaluates a LLM locally with LoRA, on a Mac (MLX) or a Linux box (PyTorch), and can stream a full-precision 70B teacher from disk when you ask for one, even when it is bigger than RAM. Bring a CSV of labeled examples, build a small model, see how it compares with simple baselines on rows it never saw, export it, and continue the same work on another machine. Everything runs locally and no data leaves it.
-
-## Your examples to a model
+## Quickstart: your examples to a model that answers
 
 ```
 pip install git+https://github.com/streamweights/streamweights
@@ -18,31 +16,50 @@ spill plan tickets
 spill build tickets
 spill report tickets
 spill export tickets --gguf q8_0
+python tickets/exports/*/run_gguf.py "Can I change my PIN at any ATM?"
 ```
 
-Or as a tool: `uv tool install git+https://github.com/streamweights/streamweights`. `init` validates every row (file, row, problem, fix), suggests the task (`classification` or `json`, never guessed from free text), freezes the label vocabulary or JSON schema from the training rows, and splits train, validation and final test by seed without separating duplicate inputs or shared `--group` values. `plan` states models, engine, downloads, disk and a time per stage, each labeled a measurement, an assumption or unknown, and loads nothing. `build` trains a small student (`qwen2.5:0.5b`, bf16) with LoRA; a teacher runs only if you ask. `export` merges the adapter, writes safetensors and GGUF, and loads each artifact in an independent runtime before it records the export. [Guide](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md), [formats](docs/formats.md), [commands](docs/cli.md).
+Or install it as a tool: `uv tool install git+https://github.com/streamweights/streamweights`. `init` validates every row (file, row, problem, fix), suggests the task (`classification` or `json`, never guessed from free text), freezes the label vocabulary or JSON schema from the training rows, and splits train, validation and final test by seed without separating duplicate inputs or shared `--group` values. `plan` states models, engine, downloads, disk and a time per stage, each labeled a measurement, an assumption or unknown, and loads nothing. `build` trains a small student (`qwen2.5:0.5b`, bf16) with LoRA; a teacher runs only if you ask. `export` merges the adapter, writes safetensors and GGUF, and loads each artifact in an independent runtime on validation rows before it records the export.
+
+What `spill build` ends with and what the exported model answers, on an M4 Pro with MLX (tiny example, 18 validation rows; the full report is `tickets/runs/<id>/report.md`):
+
+```
+embedding baseline (MiniLM + logistic regression)  accuracy 1.000  (18 rows)
+student, prompted, untrained                       accuracy 0.333  (18 rows)
+student, trained                                   accuracy 0.889  (18 rows)
+
+$ python tickets/exports/*/run_gguf.py "Can I change my PIN at any ATM?"
+change_pin
+```
+
+The model answered with a label from the vocabulary. [Guide](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md), [formats](docs/formats.md), [commands](docs/cli.md).
 
 ## Understanding results
 
-The report compares, on the validation rows, an embedding baseline (MiniLM plus logistic regression, classification), the prompted untrained student, the trained student and the teacher if used. Measured on an M4 Pro, 48 GB, from the tiny example, one run each ([report 015](docs/reports/015-workflow.md)):
+These are workflow checks on a 120-row example, not a benchmark: 18 validation rows, one run each, measured on an M4 Pro, 48 GB ([report 017](docs/reports/017-scorer-and-protocol.md)). A larger, representative result is future work.
 
 | task | engine | embedding baseline | student, untrained | student, trained | build time |
 |---|---|---|---|---|---|
-| classification (accuracy) | mlx | 1.000 (18 validation rows) | 0.333 (18 rows) | 0.889 (18 rows) | 13.8 s |
-| classification (accuracy) | torch-cpu | 1.000 (18 validation rows) | 0.444 (18 rows) | 0.944 (18 rows) | 36.5 s |
-| JSON extraction (whole-record accuracy) | mlx | n/a | 0.000 (18 rows) | 0.500 (18 rows) | 17.9 s |
-| JSON extraction (whole-record accuracy) | torch-cpu | n/a | 0.000 (18 rows) | 0.444 (18 rows) | 53.7 s |
+| classification (accuracy) | mlx | 1.000 (18 validation rows) | 0.333 (18 rows) | 0.889 (18 rows) | 13.7 s |
+| classification (accuracy) | torch-cpu | 1.000 (18 validation rows) | 0.444 (18 rows) | 0.944 (18 rows) | 32.2 s |
+| JSON extraction (whole-record accuracy) | mlx | n/a | 0.000 (18 rows) | 0.500 (18 rows) | 17.8 s |
+| JSON extraction (whole-record accuracy) | torch-cpu | n/a | 0.000 (18 rows) | 0.444 (18 rows) | 38.1 s |
 
-Here the embedding baseline scored higher than the trained student, and the report says that; it does not prescribe more training. Eighteen rows is small and no significance test is run: a difference is an observed difference on those rows. Invalid, unparseable and failed outputs count as wrong. `disagreements.jsonl` lists the rows where a comparator and the trained student differ. `spill compare` ranks runs only when they used the same rows, metric and protocol, and otherwise explains why not. The final test is scored only by `spill test`, which records every use, so a split consulted repeatedly is not presented as untouched.
+The embedding baseline scored higher than the trained student on classification, and the report says so without prescribing more training. No significance test is run: a difference is an observed difference on those rows. An output that is not in the label vocabulary, does not parse, or does not satisfy the JSON schema counts as wrong and stays in the denominator. `spill compare` labels every comparison: common evaluator, cross-runtime (ranked, with the differences and a caution that evaluation-runtime effects may be in the numbers) or incompatible (not ranked, and why). `spill evaluate` re-scores a run on its frozen validation rows under another engine as a separate record. An export that verified loaded and ran; each export record shows the quality change on the verification rows next to it, because loading is not the same as keeping quality ([export diagnosis](docs/reports/017-export-diagnosis.md)). The final test is scored only by `spill test`, which records every use.
 
 ## Continuing on another machine
 
+A run that was interrupted can be moved and resumed; a completed run cannot resume training. The S3 commands need the cloud extra:
+
 ```
-spill move tickets s3://my-bucket/tickets
-spill resume s3://my-bucket/tickets
+pip install "streamweights[cloud] @ git+https://github.com/streamweights/streamweights"
+spill init banking77-tiny/banking77.csv --input text --output label --project tickets2 --seed 3
+spill build tickets2 --stop-after train:12
+spill move tickets2 s3://my-bucket/tickets2
+spill resume s3://my-bucket/tickets2
 ```
 
-A live run has one authoritative control object (a file under `.spill/` or an S3 object written with conditional writes); `move` quiesces the writer, copies a verified snapshot, fences the source and only then activates the destination, and can be re-run after any interruption. `resume` acquires ownership first, then continues from the committed checkpoint on any engine; MLX and torch-cpu runs were killed mid-training and finished on the other engine in both directions, with the transition recorded ([portability](docs/portability.md)). `spill bundle` packs the project and its pinned models for use without a network. A build started on Linux and finished on macOS, and the reverse, runs on every push: [relay workflow](https://github.com/streamweights/streamweights/actions/workflows/relay.yml).
+`--stop-after train:12` interrupts the build after step 12 (Ctrl-C at a checkpoint does the same). A live run has one authoritative control object (a file under `.spill/` or an S3 object written with conditional writes); `move` quiesces the writer, copies a verified snapshot, fences the source and only then activates the destination, and can be re-run after any interruption. `resume` acquires ownership first, then continues from the committed checkpoint on any supported engine: MLX and torch-cpu runs were killed mid-training and finished on the other engine in both directions, with the transition recorded, and moved through a local folder and MinIO ([portability](docs/portability.md), [report 016](docs/reports/016-close-gaps.md)). A run that continues a parent records experiment lineage only: it trained from the base model, not from the parent's weights. `spill bundle` packs a project and its pinned models for use with the network blocked. A build started on Linux and finished on macOS, and the reverse, runs on every push: [relay workflow](https://github.com/streamweights/streamweights/actions/workflows/relay.yml).
 
 [![Relay workflow status: a build started on one OS and finished on the other, every push](https://github.com/streamweights/streamweights/actions/workflows/relay.yml/badge.svg)](https://github.com/streamweights/streamweights/actions/workflows/relay.yml)
 
@@ -55,7 +72,11 @@ A live run has one authoritative control object (a file under `.spill/` or an S3
 
 ## When a teacher is useful
 
-`spill build tickets --teacher <model>` has the teacher answer the training prompts and trains the student on those answers next to yours (your labels count twice, the teacher's once): sequence-level distillation from teacher answers, not logit or KL distillation. Teachers see training rows only. Use one when you have prompts without labels or want to see whether a larger model's answers help; its score is shown next to the others. A folder with only `prompts.jsonl` still builds, and its report says quality evaluation is unavailable: the teacher's agreement is not task accuracy. The older folder workflow (`evals.jsonl`, `train.jsonl`, `prompts.jsonl`, `spill build <folder>`) keeps working; a 70B teacher streamed from disk was measured earlier ([docs/reports](docs/reports/index.md)).
+`spill build tickets --teacher <model>` has the teacher answer the training prompts and trains the student on those answers next to yours (your labels count twice, the teacher's once): sequence-level distillation from teacher answers, not logit or KL distillation. Teachers see training rows only. Use one when you have prompts without labels or want to see whether a larger model's answers help; its score is shown next to the others. A folder with only `prompts.jsonl` still builds, and its report says quality evaluation is unavailable: the teacher's agreement is not task accuracy. The older folder workflow (`evals.jsonl`, `train.jsonl`, `prompts.jsonl`, `spill build <folder>`) keeps working.
+
+### Large teachers, streamed from disk
+
+This is the capability the project started with and it is optional. A teacher bigger than RAM is read from disk in layer order, one forward pass reading every weight once whatever the batch size: [Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB MacBook Pro.](docs/reports/002-phase1.md) mmap reached only 11 to 13% of the disk rate on a model 1.5x RAM, the streaming runner 79.2%. A teacher this size is a 70B-class run on large hardware and many hours; the guided examples here use none.
 
 ## Platforms and explicitly untested paths
 
@@ -73,7 +94,7 @@ Python 3.10 or newer; models are fetched at pinned revisions, and downloads neve
 
 ## Under the hood
 
-Training and inference stream the bf16 weights from disk in layer order when a model does not fit: one forward pass reads every weight once whatever the batch size, so a 70B model runs at full precision in 48 GB. mmap reached only 11 to 13% of the disk rate on a model 1.5x RAM, the streaming runner 79.2% ([report 002](docs/reports/002-phase1.md)). Engines are thin: MLX on Apple silicon, PyTorch (transformers layers bound from the same ring) elsewhere, upstream llama.cpp for GGUF. streamweights owns the ring, the job layer (a hardware-neutral float32 checkpoint with a commit marker), the project layer (config, fenced run state, immutable records) and the CLI. Stages are serializable descriptions run by an executor (local, or a separate process); only the coordinator publishes.
+Engines are thin: MLX on Apple silicon, PyTorch (transformers layers bound from the same ring) elsewhere, upstream llama.cpp for GGUF. streamweights owns the streaming ring, the job layer (a hardware-neutral float32 checkpoint with a commit marker), the project layer (config, fenced run state, immutable records) and the CLI. Stages are serializable descriptions run by an executor (local, or a separate process); only the coordinator publishes. The engines decode greedily; a request for a sampling or stop setting they cannot apply is refused before anything runs.
 
 ## Prior art
 
@@ -87,6 +108,6 @@ What streamweights adds to these is the workflow around the streaming idea, not 
 
 ## Status
 
-Done: run, distill (sequence-level), tune, eval, build and export on Apple silicon and PyTorch; the guided project workflow above with immutable runs, final-test records, verified exports, bundles and fenced handoff; portable jobs, headless mode, containers and scheduler examples ([examples/schedulers](examples/schedulers)). Open: the CUDA gates on a real GPU, real AWS S3, the 70B and 7B proof run (its banking77 table arrives with the full proof run), then a release. Deferred to separate assignments: logit or KL distillation, more quantization, free-text quality evaluation, garbage collection of orphaned payloads, remote execution services ([docs/plan.md](docs/plan.md)). Reports are in [docs/reports](docs/reports/index.md); guides at https://streamweights.github.io/streamweights/. Feedback: [Discussions](https://github.com/streamweights/streamweights/discussions) or an issue, with `spill doctor` output for hardware reports.
+Done: run, distill (sequence-level), tune, eval, build and export on Apple silicon and PyTorch; the guided project workflow above with immutable runs, evaluation and final-test records, verified exports, bundles and fenced handoff; portable jobs, headless mode, containers and scheduler examples ([examples/schedulers](examples/schedulers)). Open: the CUDA gates on a real GPU, real AWS S3, a larger representative evaluation than the 120-row examples, the 70B and 7B proof run (its banking77 table arrives with the full proof run), then a release. Deferred to separate assignments: logit or KL distillation, more quantization, free-text quality evaluation, garbage collection of orphaned payloads, remote execution services ([docs/plan.md](docs/plan.md)). Reports are in [docs/reports](docs/reports/index.md); guides at https://streamweights.github.io/streamweights/. Feedback: [Discussions](https://github.com/streamweights/streamweights/discussions) or an issue, with `spill doctor` output for hardware reports.
 
 Apache-2.0. Example data licenses are in the examples' READMEs.

@@ -51,7 +51,13 @@ class FakeExecutor:
     """Runs a stage without a model. `calls` records every stage it was asked to run."""
     name = "fake"
 
-    def __init__(self, interrupt_train_at=None, train_steps=6):
+    def __init__(self, interrupt_train_at=None, train_steps=6, conditions=None):
+        self.conditions = conditions or {"engine": "torch-cpu", "engine_impl": "torch_resident", "device": "cpu",
+                                         "numerics": {"base": "float32", "adapter": "float32"},
+                                         "weight_dtype": "float32", "adapter_dtype": "float32",
+                                         "compute_dtype": "float32",
+                                         "versions": {"torch": "2.0", "transformers": "5.0"},
+                                         "decoding_applied": {"temperature": 0.0, "greedy": True}}
         self.calls = []
         self.interrupt_train_at = interrupt_train_at
         self.train_steps = train_steps
@@ -83,7 +89,7 @@ class FakeExecutor:
             m["truncated"] = 0
             write_jsonl(out / "predictions.jsonl", preds)
             write_json(out / "metrics.json", m)
-            return StageOutcome("done", m, prod, 0.1)
+            return StageOutcome("done", m, prod, 0.1, notes={"conditions": self.conditions})
         if desc.kind == "train":
             start = 0
             lat = ctx.stage_dir / "state" / "ckpt" / "LATEST"

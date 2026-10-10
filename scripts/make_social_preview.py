@@ -54,12 +54,12 @@ def arrow(x0, y0, x1, y1, color=LINE):
 
 
 text((64, 40), "streamweights", 40, ACCENT, bold=True)
-text((64, 100), "A 70B model doesn't fit on your laptop.", 54, INK, bold=True)
-text((64, 166), "Build your own model from it anyway.", 54, INK, bold=True)
-text((64, 250), "Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB MacBook Pro.", 27, MUTE)
+text((64, 100), "Build a small model for your task,", 54, INK, bold=True)
+text((64, 166), "on hardware you control.", 54, INK, bold=True)
+text((64, 250), "Bring labeled examples. Fine-tune locally, compare against baselines, export.", 27, MUTE)
 
-for i, (name, sub) in enumerate((("evals.jsonl", "the exam"), ("train.jsonl", "your answers"),
-                                 ("prompts.jsonl", "questions only"))):
+for i, (name, sub) in enumerate((("examples.csv", "labeled rows"), ("baselines", "embedding, untrained"),
+                                 ("validation rows", "held out"))):
     y = 335 + i * 88
     box(64, y, 324, y + 72, CARD, LINE, 2, 10)
     text((84, y + 12), name, 28, INK, bold=True)
@@ -68,16 +68,16 @@ for i, (name, sub) in enumerate((("evals.jsonl", "the exam"), ("train.jsonl", "y
 
 box(430, 350, 700, 580, ACCENT_BG, ACCENT, 3)
 text((565, 440), "spill build", 36, INK, bold=True, anchor="ma")
-text((565, 492), "tune, then grade", 22, MUTE, anchor="ma")
+text((565, 492), "train, compare, report", 22, MUTE, anchor="ma")
 
 dashed_box(820, 335, 1216, 410, BIG_BG, BIG)
-text((1018, 352), "70B teacher", 30, INK, bold=True, anchor="ma")
+text((1018, 352), "large teacher", 30, INK, bold=True, anchor="ma")
 text((1018, 386), "optional", 18, MUTE, anchor="ma")
 arrow(820, 372, 704, 400, BIG)
 
 box(820, 450, 1216, 580, ACCENT_BG, ACCENT, 3)
 text((1018, 490), "your model", 36, INK, bold=True, anchor="ma")
-text((1018, 536), "base + adapter", 22, MUTE, anchor="ma")
+text((1018, 536), "GGUF or safetensors", 22, MUTE, anchor="ma")
 arrow(700, 515, 820, 515)
 
 OUT.parent.mkdir(parents=True, exist_ok=True)

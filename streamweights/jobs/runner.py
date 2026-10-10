@@ -16,7 +16,8 @@ from .engine import Job, Progress
 
 
 def result_row(cr: CompletedRow, job: Job, engine_name: str,
-               prov: dict | None = None, producer: dict | None = None) -> dict:
+               prov: dict | None = None, producer: dict | None = None,
+               decoding: dict | None = None) -> dict:
     ok = cr.error is None
     body = {
         "choices": [{"finish_reason": cr.finish_reason, "index": 0,
@@ -39,6 +40,7 @@ def result_row(cr: CompletedRow, job: Job, engine_name: str,
             "tokens": {"prompt": cr.prompt_tokens, "completion": cr.completion_tokens},
             "latency_s": cr.latency_s,
             **({"provenance": prov} if prov else {}),
+            **({"decoding": decoding} if decoding else {}),
             **({k: producer[k] for k in ("hardware", "numerics", "host", "system", "os")
                 if k in producer} if producer else {}),
         },
@@ -109,6 +111,9 @@ def run_job(job: Job, engine, spec: ModelSpec, budget: MemoryBudget,
             if r["custom_id"] not in done:
                 rows.append(r)
 
+    from .. import decoding as dec
+    dec.check_rows(engine.name, rows)               # refuse a setting the engine cannot apply, up front
+    bodies = {r["custom_id"]: r.get("body", {}) for r in rows}
     prog = Progress(total=job.total, done=len(done))
     stop_event = env.stop if env.guard is not None else threading.Event()
     spec.extra["stop_event"] = stop_event
@@ -132,7 +137,8 @@ def run_job(job: Job, engine, spec: ModelSpec, budget: MemoryBudget,
     try:
         try:
             for cr in gen:
-                results.write(json.dumps(result_row(cr, job, engine.name, prov, producer)) + "\n")
+                results.write(json.dumps(result_row(cr, job, engine.name, prov, producer,
+                                                  dec.applied(bodies.get(cr.custom_id, {})))) + "\n")
                 results.flush()
                 ckpt.write(cr.custom_id + "\n")
                 ckpt.flush()

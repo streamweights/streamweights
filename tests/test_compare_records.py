@@ -51,44 +51,73 @@ def built(proj):
     return CO.Coordinator(proj, FakeExecutor(), "torch-cpu", say=lambda s: None).build(plan)
 
 
-def test_runs_with_different_training_data_but_the_same_rows_and_protocol_are_ranked(tmp_path):
+def views(*snaps, uses=None):
+    return CM.load_views([s for s in snaps], uses)
+
+
+def test_common_evaluator_ranks_runs_with_different_training_data(tmp_path):
     a = built(project(tmp_path, "a", train=(0, 80)))
     b = built(project(tmp_path, "b", train=(0, 100)))
-    runs = CM.load_runs([a.snapshot, b.snapshot])
-    res = CM.compare(runs)
-    assert res["ranked"] and set(res["ranked"][0]) == {a.run_id, b.run_id} and not res["refusals"]
+    res = CM.compare(views(a.snapshot, b.snapshot))
+    assert [o["label"] for o in res["outcomes"]] == ["common evaluator"] and not res["incompatible"]
+    assert len(res["outcomes"][0]["ranked"]) == 2
     diffs = next(iter(res["differences"].values()))
     assert "data" in diffs and any("train_sha256" in x for x in diffs["data"])
     text = "\n".join(CM.render(res))
-    assert "ranking (same evaluation rows, metric and protocol)" in text and "not a statistical claim" in text
+    assert "common evaluator: ranked by" in text and "not a statistical claim" in text
+    assert "(the run's original evaluation; no --use given)" in text
 
 
-def test_different_evaluation_rows_get_an_explanation_and_no_winner(tmp_path):
+def test_cross_runtime_is_ranked_with_the_differences_and_a_caution(tmp_path):
     a = built(project(tmp_path, "a"))
-    b = built(project(tmp_path, "b", val=(210, 240)))
-    res = CM.compare(CM.load_runs([a.snapshot, b.snapshot]))
-    assert not res["ranked"] and res["refusals"]
-    assert "the evaluation rows differ" in res["refusals"][0]["reasons"][0]
-    assert "no ranking" in "\n".join(CM.render(res))
+    other = {"engine": "mlx", "engine_impl": "mlx_resident", "device": "apple-gpu", "numerics": {"base": "bf16"},
+             "weight_dtype": "bf16", "adapter_dtype": "float32", "compute_dtype": "bf16",
+             "versions": {"mlx": "0.32", "torch": "2.0", "transformers": "5.0"}, "decoding_applied": {}}
+    plan = P.make_plan(project(tmp_path, "b"), engine="torch-cpu")
+    b = CO.Coordinator(tmp_path / "b", FakeExecutor(conditions=other), "torch-cpu", say=lambda s: None).build(plan)
+    res = CM.compare(views(a.snapshot, b.snapshot))
+    o = res["outcomes"][0]
+    assert o["label"] == "cross-runtime" and not res["incompatible"]
+    assert any(c.startswith("engine: torch-cpu vs mlx") for c in o["condition_differences"])
+    assert any("weight_dtype" in c for c in o["condition_differences"])
+    text = "\n".join(CM.render(res))
+    assert "cross-runtime: ranked by" in text and "evaluation-runtime effects" in text
 
 
-def test_different_prompts_or_vocabulary_are_a_different_protocol(tmp_path):
-    a = built(project(tmp_path, "a"))
-    b = built(project(tmp_path, "b", system="Answer with the department only."))
-    res = CM.compare(CM.load_runs([a.snapshot, b.snapshot]))
-    assert not res["ranked"]
-    assert "the evaluation protocols differ in" in res["refusals"][0]["reasons"][0]
-    assert "prompts" in res["refusals"][0]["reasons"][0]
+def reasons_for(tmp_path, tweak, name):
+    a = built(project(tmp_path, f"a-{name}"))
+    pb = project(tmp_path, f"b-{name}", system="x" if name == "prompts" else None,
+                 val=(210, 240) if name == "rows" else (200, 224))
+    cfg = C.load(pb)
+    tweak(cfg)
+    C.save(pb, cfg)
+    b = CO.Coordinator(pb, FakeExecutor(), "torch-cpu", say=lambda s: None).build(P.make_plan(pb, engine="torch-cpu"))
+    return CM.compare(views(a.snapshot, b.snapshot))
 
 
-def test_a_changed_metric_definition_is_refused(tmp_path):
+def test_incompatible_pairs_get_no_ranking_and_say_why(tmp_path):
+    cases = {
+        "rows": (lambda c: None, "the evaluation rows differ"),
+        "prompts": (lambda c: None, "the prompts differ"),
+        "decoding": (lambda c: c["evaluation"]["decoding"].update(seed=9), "the decoding policy differs"),
+        "metric": (lambda c: c["evaluation"].update(metric="macro_f1"), "the metric definition or version differs"),
+    }
+    for name, (tweak, want) in cases.items():
+        res = reasons_for(tmp_path, tweak, name)
+        assert not res["outcomes"] and res["incompatible"], name
+        assert any(want in r for r in res["incompatible"][0]["reasons"]), (name, res["incompatible"])
+        assert "incompatible: no ranking" in "\n".join(CM.render(res))
+
+
+def test_a_metric_version_change_is_incompatible(tmp_path):
     a = built(project(tmp_path, "a"))
     b = built(project(tmp_path, "b"))
-    ma, mb = (read_json(x.snapshot / "manifest.json") for x in (a, b))
-    mb["metric_definition"]["metric_version"] = "2"
-    mb["metric_version"] = "2"
-    res = CM.compare([{**ma, "_dir": "a"}, {**mb, "_dir": "b"}])
-    assert not res["ranked"] and "metric definitions differ" in res["refusals"][0]["reasons"][0]
+    va, vb = views(a.snapshot, b.snapshot)
+    vb["protocol"] = json.loads(json.dumps(vb["protocol"]))
+    vb["protocol"]["fields"]["metric_version"] = "2"
+    vb["protocol"]["sha256"] = "x"
+    res = CM.compare([va, vb])
+    assert not res["outcomes"] and "metric definition or version differs" in res["incompatible"][0]["reasons"][0]
 
 
 def fake_run_stage(desc, ctx):
@@ -107,7 +136,65 @@ def fake_run_stage(desc, ctx):
     m["truncated"] = 0
     ctx.out_dir.mkdir(parents=True, exist_ok=True)
     (ctx.out_dir / "predictions.jsonl").write_text("".join(json.dumps(p) + "\n" for p in preds))
-    return StageOutcome("done", m, [{"engine": "fake"}], 0.1)
+    return StageOutcome("done", m, [{"engine": "fake"}], 0.1,
+                        notes={"conditions": {"engine": "torch-cpu", "device": "cpu", "numerics": {"base": "float32"},
+                                              "weight_dtype": "float32", "versions": {"torch": "2.0"},
+                                              "decoding_applied": {"temperature": 0.0}}})
+
+
+def test_evaluate_makes_a_separate_record_from_validation_rows_only_and_leaves_the_run_identical(tmp_path, monkeypatch):
+    from streamweights.project import evalrec
+    proj = project(tmp_path, "a")
+    out = built(proj)
+    before = tree_digest(out.snapshot)
+    seen = []
+    def spy(desc, ctx):
+        seen.append(sha := __import__("streamweights.project.common", fromlist=["x"]).sha_file(ctx.inputs_dir / "val.jsonl"))
+        return fake_run_stage(desc, ctx)
+    monkeypatch.setattr(testrec, "run_stage", spy)
+    rec = evalrec.run_evaluate(proj, say=lambda s: None)
+    assert rec["status"] == "completed" and rec["id"].startswith("eval-") and rec["source_run"] == out.run_id
+    assert set(seen) == {rec["val_sha256"]} and rec["val_sha256"] != read_json(out.snapshot / "manifest.json")["data"]["test_sha256"]
+    assert rec["rows_source"] == "the run's frozen validation inputs"
+    assert rec["comparators"]["trained"]["conditions"]["engine"] == "torch-cpu"
+    assert set(rec["vs_original"]) == {"baseline", "untrained", "trained"} and rec["original_metric_version"] == "1"
+    assert tree_digest(out.snapshot) == before
+    d = proj / "evaluations" / rec["id"]
+    with pytest.raises(PermissionError):
+        (d / "record.json").write_text("{}")
+    from streamweights.project.index import test_uses
+    assert sum(test_uses(proj).values()) == 0                              # not a use of the final test
+    assert rec["id"] in (proj / "REPORT.md").read_text()
+
+
+def test_compare_uses_an_explicitly_selected_evaluation_and_says_what_it_used(tmp_path, monkeypatch):
+    from streamweights.project import evalrec
+    proj = project(tmp_path, "a")
+    out = built(proj)
+    other = built(project(tmp_path, "b", train=(0, 100)))
+    monkeypatch.setattr(testrec, "run_stage", fake_run_stage)
+    rec = evalrec.run_evaluate(proj, say=lambda s: None)
+    default = CM.compare(views(out.snapshot, other.snapshot))
+    text = "\n".join(CM.render(default))
+    assert f"evaluation used for {out.run_id}: {out.run_id}/original (the run's original evaluation; no --use given; others exist: {rec['id']})" in text
+    chosen = CM.compare(CM.load_views([proj, other.snapshot], {out.run_id: rec["id"]}))
+    text2 = "\n".join(CM.render(chosen))
+    assert f"evaluation used for {out.run_id}: {rec['id']} (chosen with --use)" in text2
+    assert any(r["evaluation"] == rec["id"] and r["explicit"] for r in chosen["rows"])
+    with pytest.raises(ValueError) as e:
+        CM.load_views([proj], {out.run_id: "eval-nope"})
+    assert "has no completed evaluation" in str(e.value)
+
+
+def test_a_parent_is_described_as_lineage_only(tmp_path):
+    proj = project(tmp_path, "a")
+    first = built(proj)
+    plan = P.make_plan(proj, engine="torch-cpu")
+    second = CO.Coordinator(proj, FakeExecutor(), "torch-cpu", say=lambda s: None).build(plan, new_run=True)
+    assert "experiment lineage only" in (second.snapshot / "report.md").read_text()
+    assert "not from the parent's weights" in (second.snapshot / "report.md").read_text()
+    text = "\n".join(CM.render(CM.compare(CM.load_views([proj]))))
+    assert f"has parent {first.run_id}: experiment lineage only" in text
 
 
 def test_test_creates_a_separate_immutable_record_and_counts_each_use(tmp_path, monkeypatch):

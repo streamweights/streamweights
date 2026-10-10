@@ -31,7 +31,7 @@ if sys.version_info < (3, 10):  # pragma: no cover
     raise SystemExit(1)
 
 COMMAND_ORDER = ["init", "plan", "build", "report", "compare", "example", "run", "distill", "tune",
-                 "eval", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
+                 "eval", "evaluate", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
                  "tail", "resume", "doctor", "check"]
 
 
@@ -52,7 +52,7 @@ _DEBUG = False
 
 @app.callback()
 def _main(ctx: typer.Context):
-    """A 70B model doesn't fit on your laptop. Build your own model from it anyway."""
+    """Build a small model for your task, on hardware you control."""
     if ctx.invoked_subcommand in ("resume", "doctor", None) or "--help" in sys.argv:
         return
     try:

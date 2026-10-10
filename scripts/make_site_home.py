@@ -14,10 +14,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 GITHUB = "https://github.com/streamweights/streamweights/blob/main/"
 TREE = "https://github.com/streamweights/streamweights/tree/main/"
-TITLE = "streamweights: fine-tune and distill an LLM from a 70B model on a Mac or Linux"
-DESCRIPTION = ("Build your own LLM from a 70B model bigger than your RAM: distill, LoRA "
-               "fine-tune and evaluate locally on Apple silicon (MLX) or Linux (PyTorch). "
-               "Jobs checkpoint portably and resume on any machine.")
+TITLE = "streamweights: build a small model for your task, on hardware you control"
+DESCRIPTION = ("Build a small model for your task, on hardware you control. Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux.")
 GUIDES = [
     ("Fine-tune an LLM on a Mac", "guides/finetune-llm-on-a-mac.md"),
     ("Run a 70B model on a 48 GB Mac", "guides/run-a-70b-model-on-a-48gb-mac.md"),

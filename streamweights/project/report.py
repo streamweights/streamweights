@@ -13,6 +13,8 @@ from pathlib import Path
 from . import config as C
 from .common import canon, read_json, read_jsonl, sha_file, sha_obj, write_json, write_jsonl
 
+LINEAGE_NOTE = ("the parent is recorded as experiment lineage only: this run trained from the base "
+                "model, not from the parent's weights")
 COMPARATORS = ["baseline", "untrained", "trained", "teacher"]
 NAMES = {"baseline": "embedding baseline (MiniLM + logistic regression)",
          "untrained": "student, prompted, untrained", "trained": "student, trained",
@@ -20,12 +22,25 @@ NAMES = {"baseline": "embedding baseline (MiniLM + logistic regression)",
 JSON_NAMES = {**NAMES, "untrained": "student, schema-prompted, untrained (the baseline)"}
 
 
-def primary(task: str, metrics: dict) -> float | None:
-    return metrics.get("accuracy") if task == "classification" else metrics.get("whole_record_accuracy")
+def metric_key(cfg: dict) -> str:
+    """The selected primary metric, from the config (validated against the task)."""
+    return C.check_metric(cfg["task"]["type"], cfg["evaluation"]["metric"])
 
 
-def primary_name(task: str) -> str:
-    return "accuracy" if task == "classification" else "whole-record accuracy"
+def primary(metric: str, metrics: dict) -> float | None:
+    return metrics.get(metric)
+
+
+def primary_name(metric: str) -> str:
+    return C.METRIC_LABELS.get(metric, metric)
+
+
+_LABEL_TO_KEY = {v: k for k, v in C.METRIC_LABELS.items()}
+
+
+def key_of(label_or_key: str) -> str:
+    """A metric key from either a key or a label stored by an older manifest."""
+    return label_or_key if label_or_key in C.METRIC_LABELS else _LABEL_TO_KEY.get(label_or_key, label_or_key)
 
 
 def protocol_fingerprint(cfg: dict, schema: dict | None, val_sha: str, val_ids: list[str]) -> dict:
@@ -44,14 +59,14 @@ def protocol_fingerprint(cfg: dict, schema: dict | None, val_sha: str, val_ids: 
                     "student": K.messages_student(cfg, "{input}")},
         "decoding": ev["decoding"], "max_tokens": ev["max_tokens"],
         "postprocessing": ev["postprocessing"], "metric": ev["metric"],
-        "metric_version": ev["metric_version"], "protocol_version": ev["protocol_version"],
+        "metric_version": C.metric_version(cfg), "protocol_version": C.PROTOCOL_VERSION,
         "precision": ev["precision"]}
     return {"sha256": sha_obj(body), "fields": body}
 
 
 def metric_definition(cfg: dict) -> dict:
     ev = cfg["evaluation"]
-    return {"metric": ev["metric"], "metric_version": ev["metric_version"],
+    return {"metric": ev["metric"], "metric_version": C.metric_version(cfg),
             "contract": (cfg["contract"]["label_normalization"] if cfg["task"]["type"]
                          == "classification" else cfg["contract"]["rules"])}
 
@@ -74,13 +89,13 @@ def disagreements(task: str, preds: dict[str, list[dict]]) -> list[dict]:
     return out
 
 
-def table(task: str, comps: dict) -> list[dict]:
+def table(task: str, comps: dict, metric: str) -> list[dict]:
     rows = []
     for name in COMPARATORS:
         if name not in comps:
             continue
         m = comps[name]["metrics"]
-        rows.append({"comparator": name, "primary": primary(task, m), **{k: m.get(k) for k in (
+        rows.append({"comparator": name, "primary": primary(metric, m), **{k: m.get(k) for k in (
             "rows", "accuracy", "macro_f1", "invalid_predictions", "inference_failures",
             "truncated", "parseable_rate", "schema_valid_rate", "whole_record_accuracy",
             "mean_field_accuracy", "records_with_extra_fields")}})
@@ -97,8 +112,10 @@ def render_md(m: dict) -> str:
     task = m["task"]["type"]
     names = NAMES if task == "classification" else JSON_NAMES
     lines = [f"# Run {m['run_id']}: {m['project']}", "",
-             f"Task: {task}. Metric: {primary_name(task)} (version {m['metric_version']}). "
+             f"Task: {task}. Metric: {primary_name(m['metric_key'])} (metric version {m['metric_version']}). "
              f"Validation rows: {m['protocol']['fields']['rows']['n']}. Status: completed.", ""]
+    if m.get("lineage"):
+        lines += [f"Parent run: {m['lineage']['parent']} ({m['lineage']['note']}).", ""]
     lines += ["## Results", ""]
     if task == "classification":
         lines += ["| comparator | accuracy | macro-F1 | rows | invalid predictions | failures | truncated |",
@@ -167,12 +184,12 @@ def render_md(m: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def findings(task: str, comps: dict) -> list[str]:
+def findings(task: str, comps: dict, metric: str) -> list[str]:
     names = NAMES if task == "classification" else JSON_NAMES
-    sc = {k: primary(task, v["metrics"]) for k, v in comps.items()}
+    sc = {k: primary(metric, v["metrics"]) for k, v in comps.items()}
     n = next(iter(comps.values()))["metrics"]["rows"]
     parts = [f"{names[k]}: {_f(v)}" for k, v in sc.items() if v is not None]
-    out = [f"On {n} validation rows, {primary_name(task)}: " + "; ".join(parts) + "."]
+    out = [f"On {n} validation rows, {primary_name(metric)}: " + "; ".join(parts) + "."]
     t = sc.get("trained")
     for k in ("baseline", "untrained", "teacher"):
         if k in sc and t is not None and sc[k] is not None:
@@ -214,7 +231,13 @@ def assemble(dest: Path, *, project: Path, run_id: str, cfg: dict, plan_fields: 
     protocol = protocol_fingerprint(cfg, schema, val_sha, val_ids)
     dis = disagreements(task, preds)
     write_jsonl(dest / "disagreements.jsonl", dis)
-    tbl = table(task, comps)
+    metric = metric_key(cfg)
+    tbl = table(task, comps, metric)
+    conditions = {}
+    for sid, r in stage_results.items():
+        cmp = "baseline" if sid == "baseline" else sid.split(":", 1)[1] if sid.startswith("eval:") else None
+        if cmp and (r.get("notes") or {}).get("conditions"):
+            conditions[cmp] = r["notes"]["conditions"]
     # engine transitions from the training producers
     trans = []
     prod = stage_results.get("train", {}).get("producers", [])
@@ -234,8 +257,13 @@ def assemble(dest: Path, *, project: Path, run_id: str, cfg: dict, plan_fields: 
                        if p.is_file()}
     manifest = {
         "schema": 1, "run_id": run_id, "project": cfg["project"]["name"], "parent": parent,
-        "identity": identity, "task": cfg["task"], "metric": primary_name(task),
-        "metric_version": cfg["evaluation"]["metric_version"],
+        "identity": identity, "task": cfg["task"], "metric": metric, "metric_key": metric,
+        "metric_label": primary_name(metric),
+        "lineage": ({"parent": parent, "note": LINEAGE_NOTE} if parent else None),
+        "evaluation": {"id": f"{run_id}/original", "kind": "original",
+                       "note": "the evaluation this run was built with; spill evaluate adds more",
+                       "conditions": conditions},
+        "metric_version": C.metric_version(cfg),
         "metric_definition": metric_definition(cfg), "protocol": protocol,
         "data": {"sizes": cfg["split"].get("sizes", {}), "split_mode": cfg["split"]["mode"],
                  "seed": cfg["split"]["seed"], "fingerprints": plan_fields["split"]["fingerprints"],
@@ -243,7 +271,7 @@ def assemble(dest: Path, *, project: Path, run_id: str, cfg: dict, plan_fields: 
                  "duplicate_normalization": cfg["split"]["duplicate_normalization"],
                  "warnings": warnings},
         "models": models, "dependencies": deps, "comparators": comps, "table": tbl,
-        "findings": findings(task, comps),
+        "findings": findings(task, comps, metric),
         "stages": {sid: {"status": r.get("status"), "seconds": r.get("seconds"),
                          "producers": r.get("producers", []), "metrics_keys": sorted(r.get("metrics", {})),
                          "notes": r.get("notes", {})} for sid, r in stage_results.items()},
@@ -260,6 +288,6 @@ def assemble(dest: Path, *, project: Path, run_id: str, cfg: dict, plan_fields: 
     }
     (dest / "report.md").write_text(render_md(manifest))
     write_json(dest / "manifest.json", manifest)
-    write_json(dest / "results.json", {"run_id": run_id, "task": task, "metric": primary_name(task),
+    write_json(dest / "results.json", {"run_id": run_id, "task": task, "metric": metric,
                                        "protocol_sha256": protocol["sha256"], "table": tbl})
     return manifest

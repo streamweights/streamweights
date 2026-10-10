@@ -1,0 +1,16 @@
+run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine
+run-20261009-181324-a4dd-c29d25  run-20261009-181324-a4dd-c29d25/original  accuracy v1  0.889  1.000  0.333  18  e27bc6d29acf  mlx
+run-20261009-181414-a1d6-c29d25  run-20261009-181414-a1d6-c29d25/original  accuracy v1  0.944  1.000  0.444  18  e27bc6d29acf  torch-cpu
+evaluation used for run-20261009-181324-a4dd-c29d25: run-20261009-181324-a4dd-c29d25/original (the run's original evaluation; no --use given; others exist: eval-20261009-181342-51423d)
+evaluation used for run-20261009-181414-a1d6-c29d25: run-20261009-181414-a1d6-c29d25/original (the run's original evaluation; no --use given; others exist: eval-20261009-181453-4e3661)
+
+cross-runtime: ranked by the trained model's accuracy: run-20261009-181414-a1d6-c29d25 (run-20261009-181414-a1d6-c29d25/original) > run-20261009-181324-a4dd-c29d25 (run-20261009-181324-a4dd-c29d25/original)
+   the evaluators differ: compute_dtype: bf16 vs float32; device: apple-gpu:Apple M4 Pro vs cpu:Apple M4 Pro; engine: mlx vs torch-cpu; weight_dtype: bf16 vs float32
+   caution: score differences may include evaluation-runtime effects, not only differences between the models
+   a higher number is an observed difference on these rows, not a statistical claim
+
+differences run-20261009-181324-a4dd-c29d25 vs run-20261009-181414-a1d6-c29d25:
+   engine: engine
+   numerics: numerics
+
+next: spill export classification-mlx/project

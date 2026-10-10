@@ -55,3 +55,7 @@ Real AWS S3, CUDA, network filesystems, Windows, whole-machine power loss, a 7B 
 ## Addendum (directive 016)
 
 The gaps this report left open were closed afterwards and are reported in [016](016-close-gaps.md): the offline bundle gate with the network blocked (Linux container with `--network none`, and a macOS sandbox), and the continuation between MLX on the Metal GPU and torch-cpu in both directions, through local and MinIO moves. The numbers above are unchanged.
+
+## Update (directive 017)
+
+The JSON results in this report were scored with metric version 1, which credited some schema-invalid outputs. They are marked **not rescorable** (no per-example predictions were saved) in [017](017-scorer-and-protocol.md), which also holds a replication under metric version 2; classification results are unaffected. The deployment measurement descriptions above were corrected there: the Transformers path now uses its own description, and sampled process memory is described as a lower bound.

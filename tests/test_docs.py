@@ -32,12 +32,14 @@ def test_no_placeholders_or_em_dashes():
 def test_readme_shape():
     lines = README.splitlines()
     assert len(lines) < 170
-    assert lines[2] == "**A 70B model doesn't fit on your laptop. Build your own model from it anyway.**"
-    assert lines[4].startswith("Distill, fine-tune and evaluate on whatever hardware you have.")
-    assert lines[6].startswith("[Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB "
-                               "MacBook Pro.](docs/reports/")
+    assert lines[2] == "**Build a small model for your task, on hardware you control.**"
+    assert lines[4] == ("Bring labeled examples. Fine-tune locally, compare against simple baselines, and "
+                        "export to GGUF or safetensors. Pause and resume supported training runs across "
+                        "Mac and Linux.")
+    assert "[Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB MacBook Pro.](docs/reports/" in README
+    assert README.index("## Quickstart") < README.index("Measured: Llama 3.3 70B")
     heads = re.findall(r"^## (.+)$", README, re.M)
-    assert heads == ["Your examples to a model", "Understanding results",
+    assert heads == ["Quickstart: your examples to a model that answers", "Understanding results",
                      "Continuing on another machine", "Sample projects", "When a teacher is useful",
                      "Platforms and explicitly untested paths", "Under the hood", "Prior art",
                      "Status"]
@@ -49,8 +51,7 @@ def test_readme_shape():
     assert "docs/linux.md" in README and "issues/1" in README
     assert "arrives with the full proof run" in README
     first = README.split("\n## ")[0].lower()
-    for word in ("fine-tune", "llm", "mac", "linux", "lora", "distill", "70b",
-                 "bigger than ram", "local"):
+    for word in ("fine-tune", "mac", "linux", "lora", "local", "gguf", "safetensors", "baseline"):
         assert word in first, word
     for img in re.findall(r"!\[([^\]]*)\]", README):
         assert len(img) > 20, "image alt text must be descriptive"
@@ -173,7 +174,7 @@ def test_help_lists_commands_in_loop_order_one_line_each():
     out = _cli("--help")
     cmds = re.findall(r"^  (\w+)\s{2,}(.+)$", out, re.M)
     assert [c for c, _ in cmds] == ["init", "plan", "build", "report", "compare", "example", "run",
-                                    "distill", "tune", "eval", "export", "test", "bundle", "move",
+                                    "distill", "tune", "eval", "evaluate", "export", "test", "bundle", "move",
                                     "models", "adapters", "runs", "status", "tail", "resume",
                                     "doctor", "check"]
     assert all(len(d) < 62 for _, d in cmds)
@@ -181,7 +182,7 @@ def test_help_lists_commands_in_loop_order_one_line_each():
 
 def test_every_command_help_ends_with_one_example():
     for c in ("init", "plan", "build", "report", "compare", "example", "run", "distill", "tune",
-              "eval", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
+              "eval", "evaluate", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
               "tail", "resume", "doctor", "check"):
         lines = [l for l in _cli(c, "--help").rstrip().splitlines()]
         assert lines[-1].lstrip().startswith("Example: spill ") or \

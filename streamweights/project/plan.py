@@ -110,11 +110,14 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
     project = Path(project)
     cfg, shas = load_project(project, frozen)
     contract = cfg["contract"]
+    C.check_metric(cfg["task"]["type"], cfg["evaluation"]["metric"])
     data_dir = Path(frozen) if frozen is not None else project / "data"
     path_of = (lambda n: data_dir / f"{n}.jsonl")
     t = cfg["training"]
     task = cfg["task"]["type"]
     eng, why = engine_pick(engine or (cfg["model"].get("engine") if cfg["model"].get("engine") not in (None, "", "auto") else None))
+    from .. import decoding as dec_mod
+    dec_mod.check_decoding(eng, {**C.DEFAULT_DECODING, **cfg["evaluation"].get("decoding", {})})
     student_tag = cfg["model"]["student"]
     teacher_tag = cfg["model"].get("teacher") or ""
     sid = modelid.student_identity(student_tag, fetch=fetch)

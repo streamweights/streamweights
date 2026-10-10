@@ -4,7 +4,7 @@ description: Turn a CSV of labeled examples into a small model you can measure a
 
 # Turn a CSV of examples into an evaluated model
 
-Give `spill init` a CSV or JSONL with an input column and an answer column; `spill build` trains a small model on it, compares it with an embedding baseline and with the untrained model on rows it never saw, and `spill export` writes a verified GGUF or safetensors model. The same run can stop on one machine and finish on another ([report 015](../reports/015-workflow.md)).
+Give `spill init` a CSV or JSONL with an input column and an answer column; `spill build` trains a small model on it, compares it with an embedding baseline and with the untrained model on rows it never saw, and `spill export` writes a GGUF or safetensors model that was loaded and run in an independent runtime. An interrupted run can be moved and finished on another supported machine ([report 015](../reports/015-workflow.md)).
 
 ## The steps
 
@@ -48,23 +48,28 @@ Give `spill init` a CSV or JSONL with an input column and an answer column; `spi
 
    `report` prints `runs/<id>/report.md` and refreshes the index `REPORT.md`. The final test labels are touched by nothing else; `spill test` writes its own record and counts how often the split has been used.
 
-6. Compare runs and export:
+6. Compare runs, re-evaluate, and export:
 
    ```
+   spill evaluate tickets --engine torch-cpu
    spill compare tickets
    spill export tickets --gguf q8_0
+   python tickets/exports/*/run_gguf.py "Can I change my PIN at any ATM?"
    ```
 
-   `compare` ranks runs only if they were evaluated on the same rows with the same metric and protocol, and otherwise says why not. `export` merges the adapter, converts to GGUF, loads each artifact in an independent runtime (Transformers, llama.cpp) on validation rows, records where its predictions differ from the training engine's, and measures time to first token, tokens per second and peak memory. The record includes a script that loads the artifact and runs one input.
+   `evaluate` scores the run again on its frozen validation rows under the engine you name and writes a separate record; the run is untouched. `compare` labels each comparison common evaluator, cross-runtime (ranked, with the differences and a caution that evaluation-runtime effects may be in the numbers) or incompatible (not ranked, and why); it uses each run's original evaluation unless you choose a record with `--use <run id>=<evaluation id>`. `export` merges the adapter (`--merge-dtype float32|bf16`), converts to GGUF, loads each artifact in an independent runtime (Transformers, llama.cpp) on validation rows, records where its predictions differ from the training engine's, and measures time to first token, tokens per second and peak memory. The record shows the quality change on those rows next to the result. **Verified means the artifact loaded and ran; it does not mean quality was preserved.** The last line runs the exported model on one input; the record includes the script.
 
-7. Continue on another machine:
+7. Continue on another machine. A completed run cannot resume training, so interrupt one first. The S3 commands need the cloud extra:
 
    ```
-   spill move tickets s3://my-bucket/tickets
-   spill resume s3://my-bucket/tickets
+   pip install "streamweights[cloud] @ git+https://github.com/streamweights/streamweights"
+   spill init banking77-tiny/banking77.csv --input text --output label --project tickets2 --seed 3
+   spill build tickets2 --stop-after train:12
+   spill move tickets2 s3://my-bucket/tickets2
+   spill resume s3://my-bucket/tickets2
    ```
 
-   `move` stops the writer at a committed boundary, copies a verified snapshot, fences the source and then activates the destination; `resume` takes ownership there and continues from the committed checkpoint, on any engine. [Portability](../portability.md) says exactly what is guaranteed and what is not tested.
+   `--stop-after train:12` interrupts the build after step 12. `move` stops the writer at a committed boundary, copies a verified snapshot, fences the source and then activates the destination; `resume` takes ownership there and continues from the committed checkpoint on any supported engine. A new run that follows another records the parent as experiment lineage only: it trained from the base model, not from the parent's weights. [Portability](../portability.md) says exactly what is guaranteed and what is not tested.
 
 For text to JSON, `spill example snips --tiny` and `spill init snips-tiny/snips.csv --input text --output json --schema snips-tiny/schema.json`; the report then gives parseable rate, schema-valid rate, per-field accuracy and whole-record accuracy.
 

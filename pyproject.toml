@@ -1,7 +1,7 @@
 [project]
 name = "streamweights"
 version = "0.1.0"
-description = "A 70B model doesn't fit on your laptop. Build your own model from it anyway."
+description = "Build a small model for your task, on hardware you control."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"

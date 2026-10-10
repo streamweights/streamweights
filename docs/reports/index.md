@@ -22,3 +22,5 @@ Every number in the README and the guides comes from one of these reports, measu
 | [014 Build anywhere](014-build-anywhere.md) | build on every engine, a build that moves between machines, the CI relay |
 | [015 One complete workflow](015-workflow.md) | init, plan, build, report, test, export and inference per task and engine; verified exports; the ownership and handoff gates |
 | [016 Closing the 015 gaps](016-close-gaps.md) | the offline bundle gate with the network blocked, MLX-on-Metal continuation in both directions, merge hygiene |
+| [017 Scorer and protocol](017-scorer-and-protocol.md) | JSON scorer version 2, historical JSON accounting, decoding settings applied, evaluation records, compare outcomes, replication |
+| [017 Export diagnosis](017-export-diagnosis.md) | controlled merge, runtime and quantization comparison for JSON and classification exports; the merge-dtype default |

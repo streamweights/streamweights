@@ -234,30 +234,38 @@ def schema_fields(schema: dict, golds: list[dict]) -> list[str]:
 
 
 def score_json(text: str | None, gold: dict, schema: dict, validator=None) -> dict:
+    """Metric version 2. Order of evidence: the output must parse, then it must satisfy the
+    schema, and only then are its fields compared. A parseable but schema-invalid output counts
+    toward the parseable rate and nothing else: no field-level and no whole-record credit, and
+    field normalization (trimming, number equality) never rescues it. (Version 1 compared fields
+    first and ignored validity for correctness.)"""
+    base = {"failed": False, "parseable": False, "schema_valid": False, "record": False,
+            "fields": {}, "extra": [], "pred": None}
     if text is None:
-        return {"failed": True, "parseable": False, "schema_valid": False, "record": False,
-                "fields": {}, "extra": [], "pred": None}
+        return {**base, "failed": True}
     try:
         pred = parse_strict(text)
     except (json.JSONDecodeError, ValueError):
-        return {"failed": False, "parseable": False, "schema_valid": False, "record": False,
-                "fields": {}, "extra": [], "pred": None}
+        return base
     validator = validator or Draft202012Validator(schema)
     valid = validator.is_valid(pred)
-    if not isinstance(pred, dict):
-        return {"failed": False, "parseable": True, "schema_valid": False, "record": False,
-                "fields": {}, "extra": [], "pred": pred}
+    out = {**base, "parseable": True, "schema_valid": valid, "pred": pred}
+    names = schema_fields(schema, [gold])
+    if not valid or not isinstance(pred, dict):
+        out["fields"] = {k: False for k in names}          # no credit of any kind
+        out["extra"] = sorted(k for k in pred if k not in gold) if isinstance(pred, dict) else []
+        return out
     props = schema.get("properties", {})
     fields = {}
-    for k in schema_fields(schema, [gold]):
+    for k in names:
         if k in gold and k in pred:
             fields[k] = _eq(pred[k], gold[k], props.get(k))
         else:
             fields[k] = k not in gold and k not in pred
     extra = sorted(k for k in pred if k not in gold)
-    record = not extra and all(fields.values()) and _eq(pred, gold, schema)
-    return {"failed": False, "parseable": True, "schema_valid": valid, "record": record,
-            "fields": fields, "extra": extra, "pred": pred}
+    out.update(fields=fields, extra=extra,
+               record=not extra and all(fields.values()) and _eq(pred, gold, schema))
+    return out
 
 
 def agg_json(items: list[dict], schema: dict, golds: list[dict]) -> dict:

@@ -1,0 +1,116 @@
+{
+ "mlx_default_device": "Device(gpu, 0)",
+ "engines": {
+  "mlx": {
+   "exit": 0,
+   "request_as_sent": {
+    "messages": [
+     {
+      "role": "user",
+      "content": "Say hi."
+     }
+    ],
+    "temperature": 0,
+    "top_p": 1.0,
+    "stop": [],
+    "seed": 3,
+    "greedy": true,
+    "max_tokens": 5
+   },
+   "applied_per_row": [
+    {
+     "temperature": 0.0,
+     "top_p": 1.0,
+     "stop": [],
+     "greedy": true,
+     "max_tokens": 5,
+     "seed": 3,
+     "requested": {
+      "temperature": 0,
+      "top_p": 1.0,
+      "stop": [],
+      "seed": 3,
+      "greedy": true
+     }
+    },
+    {
+     "temperature": 0.0,
+     "top_p": 1.0,
+     "stop": [],
+     "greedy": true,
+     "max_tokens": 5,
+     "seed": 3,
+     "requested": {
+      "temperature": 0,
+      "top_p": 1.0,
+      "stop": [],
+      "seed": 3,
+      "greedy": true
+     }
+    }
+   ],
+   "engine_impl": "mlx_resident",
+   "hardware": "apple-gpu:Apple M4 Pro",
+   "max_completion_tokens": 5,
+   "unsupported_request_exit": 1,
+   "unsupported_request_message": "spill: engine mlx cannot apply the request's decoding setting temperature=0.7 (this engine decodes greedily; only temperature 0 is applied) (row c). Try: send temperature 0, top_p 1 and no stop",
+   "unsupported_wrote_output": false
+  },
+  "torch-cpu": {
+   "exit": 0,
+   "request_as_sent": {
+    "messages": [
+     {
+      "role": "user",
+      "content": "Say hi."
+     }
+    ],
+    "temperature": 0,
+    "top_p": 1.0,
+    "stop": [],
+    "seed": 3,
+    "greedy": true,
+    "max_tokens": 5
+   },
+   "applied_per_row": [
+    {
+     "temperature": 0.0,
+     "top_p": 1.0,
+     "stop": [],
+     "greedy": true,
+     "max_tokens": 5,
+     "seed": 3,
+     "requested": {
+      "temperature": 0,
+      "top_p": 1.0,
+      "stop": [],
+      "seed": 3,
+      "greedy": true
+     }
+    },
+    {
+     "temperature": 0.0,
+     "top_p": 1.0,
+     "stop": [],
+     "greedy": true,
+     "max_tokens": 5,
+     "seed": 3,
+     "requested": {
+      "temperature": 0,
+      "top_p": 1.0,
+      "stop": [],
+      "seed": 3,
+      "greedy": true
+     }
+    }
+   ],
+   "engine_impl": "torch_resident",
+   "hardware": "cpu:Apple M4 Pro",
+   "max_completion_tokens": 5,
+   "unsupported_request_exit": 1,
+   "unsupported_request_message": "spill: engine torch-cpu cannot apply the request's decoding setting temperature=0.7 (this engine decodes greedily; only temperature 0 is applied) (row c). Try: send temperature 0, top_p 1 and no stop",
+   "unsupported_wrote_output": false
+  }
+ },
+ "ok": true
+}

@@ -1,8 +1,6 @@
 site_name: streamweights
 site_description: >-
-  Build your own LLM from a 70B model bigger than your RAM: distill, LoRA fine-tune and
-  evaluate locally on Apple silicon (MLX) or Linux (PyTorch). Jobs checkpoint portably and
-  resume on any machine.
+  Build a small model for your task, on hardware you control. Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux.
 site_url: https://streamweights.github.io/streamweights/
 repo_url: https://github.com/streamweights/streamweights
 repo_name: streamweights/streamweights
@@ -54,6 +52,8 @@ nav:
       - Build anywhere: reports/014-build-anywhere.md
       - One complete workflow: reports/015-workflow.md
       - Closing the 015 gaps: reports/016-close-gaps.md
+      - Scorer and protocol: reports/017-scorer-and-protocol.md
+      - Export diagnosis: reports/017-export-diagnosis.md
   - Reference:
       - Commands: cli.md
       - Formats: formats.md

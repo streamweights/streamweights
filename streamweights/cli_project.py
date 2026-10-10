@@ -165,7 +165,7 @@ def project_build(folder, student, teacher, epochs, engine, headless, executor, 
         w = max(len(names[r["comparator"]]) for r in out.table)
         for r in out.table:
             v = r["primary"]
-            typer.echo(f"{names[r['comparator']].ljust(w)}  {R.primary_name(task)} "
+            typer.echo(f"{names[r['comparator']].ljust(w)}  {R.primary_name(R.metric_key(plan.cfg))} "
                        f"{'unavailable' if v is None else f'{v:.3f}'}  ({r['rows']} rows)")
     typer.echo(f"run {out.run_id}: {out.snapshot}")
     _next_hint(f"spill report {folder}")
@@ -330,10 +330,14 @@ def test_cmd(
 def compare(
     paths: list[Path] = typer.Argument(..., help="project folders (all their runs) and/or run "
                                                  "folders"),
+    use: list[str] = typer.Option(None, "--use", help="<run id>=<evaluation id>: compare that run "
+                                                      "through an evaluation record (default: its "
+                                                      "original evaluation); repeatable"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
-    """Differences in data, models, training settings, engine and numerics; a ranking only for
-    runs evaluated on the same rows with the same metric definition and protocol."""
+    """Differences in data, models, training settings, engine and numerics. Each comparison is
+    labeled common evaluator, cross-runtime (ranked, with the differences and a caution) or
+    incompatible (not ranked, and why)."""
     import streamweights.cli as cli
     cli._DEBUG = debug
     try:
@@ -341,10 +345,19 @@ def compare(
         for p in paths:
             if (Path(p) / "streamweights.toml").exists() or (Path(p) / "evals.jsonl").exists():
                 _guided(p, "compare")
-        runs = CM.load_runs(paths)
-        if len(runs) < 1:
+        uses = {}
+        for u in use or []:
+            run, sep, ev = u.partition("=")
+            if not sep:
+                raise SpillError(f"--use {u!r} must be <run id>=<evaluation id>", "spill compare --help")
+            uses[run] = ev
+        try:
+            views = CM.load_views(paths, uses)
+        except ValueError as e:
+            raise SpillError(str(e), "spill compare <project>")
+        if len(views) < 1:
             raise SpillError("no completed runs found there", "spill build <project>")
-        for line in CM.render(CM.compare(runs)):
+        for line in CM.render(CM.compare(views)):
             typer.echo(line)
     except Exception as e:
         _fail(e)
@@ -352,17 +365,58 @@ def compare(
     _next_hint(f"spill export {paths[0]}")
 
 
-def project_export(project: Path, run: str | None, gguf: str | None, verify_rows: int):
+@app.command(short_help="Re-evaluate a run on its validation rows, as a record",
+             epilog="Example: spill evaluate tickets --engine torch-cpu")
+def evaluate(
+    project: Path = typer.Argument(..., help="a project folder"),
+    run: str = typer.Argument(None, help="a run id (default: the latest completed run)"),
+    engine: str = typer.Option(None, "--engine", help="mlx | torch-cpu | torch-cuda: the evaluator"),
+    debug: bool = typer.Option(False, "--debug", hidden=True),
+):
+    """Score the run's exact model and adapter again on its frozen validation rows under the
+    chosen engine. Creates evaluations/<id>/ and never touches the run. The final test stays with
+    `spill test`."""
+    import streamweights.cli as cli
+    cli._DEBUG = debug
+    try:
+        from . import runtime
+        from .project import evalrec
+        _guided(project, "evaluate")
+        typer.echo(f"spill evaluate {project.name}: re-score the run on its frozen validation rows"
+                   f"{' on ' + engine if engine else ''}. Cost: $0. Record -> {project}/evaluations/<id>")
+        with runtime.job_session("evaluate", engine=engine):
+            rec = evalrec.run_evaluate(project, run, engine, say=typer.echo)
+        typer.echo("")
+        fmt = lambda x: "unavailable" if x is None else f"{x:.3f}"
+        for t in rec["table"]:
+            ch = rec["vs_original"][t["comparator"]]
+            typer.echo(f"{t['comparator']:<10} {rec['metric']} {fmt(t['primary'])} "
+                       f"(original {fmt(ch['original'])}, {rec['rows']} rows)")
+        typer.echo(f"record: {project}/evaluations/{rec['id']}")
+    except Exception as e:
+        _fail(e)
+        return
+    _next_hint(f"spill compare {project} --use {rec['source_run']}={rec['id']}")
+
+
+def project_export(project: Path, run: str | None, gguf: str | None, verify_rows: int,
+                   merge_dtype: str | None = None):
     from .project import exportrec
     typer.echo(f"spill export {project.name}: merge the run's LoRA adapter into its bf16 base"
                + (f", convert to GGUF {gguf}" if gguf else "")
                + f", then load the artifact in an independent runtime on {verify_rows} validation "
                  f"rows. Cost: $0. Record -> {project}/exports/<id>")
-    rec = exportrec.run_export(project, run, gguf, verify_rows, say=lambda s: typer.echo(f"   {s}"))
+    from .project import exportrec as _ex
+    md = merge_dtype or _ex.DEFAULT_MERGE_DTYPE
+    rec = exportrec.run_export(project, run, gguf, verify_rows, say=lambda s: typer.echo(f"   {s}"),
+                               merge_dtype=md)
     for label, v in rec["verification"]["runs"].items():
         d = v["prediction_differences"]
+        q = v["quality_delta"]
         typer.echo(f"verified {label}: {v['runtime']}; {d['count']} of {d['of']} predictions differ "
-                   f"from the training engine's; primary metric {v['primary']:.3f} on these rows")
+                   f"from the training engine's. Quality on these {q['rows']} rows ({q['metric']}): source "
+                   f"engine {q['source_engine_score']:.3f}, artifact {q['artifact_score']:.3f}, "
+                   f"change {q['delta']:+.3f}. Verified means it loaded and ran, not that quality was kept")
         dep = rec["deployment"][label]
         mem = dep["peak_memory_bytes"]
         typer.echo(f"   time to first token cold {dep['ttft_cold_s']} s, warm {dep['ttft_warm_s']} s; "

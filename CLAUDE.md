@@ -2,7 +2,7 @@
 
 Package `streamweights`, CLI `spill`. Repo: https://github.com/streamweights/streamweights
 
-**Purpose:** a 70B model doesn't fit on your laptop; build your own model from it anyway. Distill, fine-tune and evaluate on whatever hardware you have, and start a job anywhere and finish it anywhere. Fine-tune and distill from a 70B teacher locally with MLX, even when the model is bigger than RAM. Everything runs on the user's machine, for free, with no data leaving it.
+**Purpose:** Build a small model for your task, on hardware you control. Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux. Fine-tune and distill from a 70B teacher locally with MLX, even when the model is bigger than RAM. Data stays local by default; remote storage is used when explicitly configured.
 
 ## Never-stop rules (binding in every session)
 

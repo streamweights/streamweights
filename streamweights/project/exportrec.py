@@ -31,6 +31,7 @@ from .runstate import make_readonly
 from .testrec import pick_run
 
 VERIFY_ROWS = 8
+DEFAULT_MERGE_DTYPE = "bf16"       # set by the pre-stated rule in docs/reports/017-export-default-rule.md
 
 
 def _files_sha(d: Path, skip=()) -> dict:
@@ -101,7 +102,7 @@ finally:
 
 
 def run_export(project: Path, run_id: str | None = None, gguf: str | None = None,
-               verify_rows: int = VERIFY_ROWS, say=print) -> dict:
+               verify_rows: int = VERIFY_ROWS, say=print, merge_dtype: str = "bf16") -> dict:
     from .. import export as ex
     from ..adapters import load_adapter_dir
     from . import modelid
@@ -135,7 +136,8 @@ def run_export(project: Path, run_id: str | None = None, gguf: str | None = None
         base = Path(sid["dir"])
         adapter = load_adapter_dir(rdir / "artifacts" / "adapter", numpy=True)
         say("merging the adapter into the bf16 base (float32 arithmetic, rounded back to bf16)")
-        info = ex.merge_adapter(base, adapter, stg / "artifacts" / "merged", say=say)
+        info = ex.merge_adapter(base, adapter, stg / "artifacts" / "merged", say=say,
+                                merge_dtype=merge_dtype)
         merged = stg / "artifacts" / "merged"
         tok_files = {n: v for n, v in _files_sha(merged).items()
                      if n.startswith("tokenizer") or n in ("vocab.json", "merges.txt")}
@@ -148,10 +150,11 @@ def run_export(project: Path, run_id: str | None = None, gguf: str | None = None
                                   "rendered_with": "the tokenizer's chat template, "
                                                    "add_generation_prompt=True"}
         rec["adapter"] = {"files_sha256": m["adapter_files_sha256"], "rank": adapter.rank,
-                          "modules_merged": info["modules"], "merged": True,
-                          "merge": "W' = W + (alpha/r) * (A @ B)^T per adapted linear, float32, "
-                                   "written back as " + str(info["dtype"])}
-        rec["quantization"] = {"safetensors": "none (bf16)"}
+                          "modules_merged": info["modules"], "merged": True, "merge_dtype": merge_dtype,
+                          "merge": "W' = W + (alpha/r) * (A @ B)^T per adapted linear, computed in float32, "
+                                   "written as " + str(info["dtype"]) + (" (every tensor float32)" if merge_dtype == "float32"
+                                                                       else " (the base's dtype: the delta is rounded into bf16)")}
+        rec["quantization"] = {"safetensors": f"none ({'float32' if merge_dtype == 'float32' else 'bf16'} weights)"}
         arts = {"safetensors": {"path": "artifacts/merged", "files": _files_sha(merged)}}
         runtimes = [("transformers", str(merged), "safetensors")]
         if gguf:
@@ -224,8 +227,22 @@ def run_export(project: Path, run_id: str | None = None, gguf: str | None = None
                     golds.append(r["output"])
                 metrics = (K.agg_class(items, golds, cfg["contract"]["labels"]) if task == "classification"
                            else K.agg_json(items, schema, golds))
+                src_items = [K.score_class(tr.get(r["id"], {}).get("text"), r["output"], cfg["contract"]["labels"])
+                             if task == "classification" else
+                             K.score_json(tr.get(r["id"], {}).get("text"), r["output"], schema) for r in val]
+                src_metrics = (K.agg_class(src_items, golds, cfg["contract"]["labels"]) if task == "classification"
+                               else K.agg_json(src_items, schema, golds))
+                mk = R.metric_key(cfg)
+                src_p, art_p = R.primary(mk, src_metrics), R.primary(mk, metrics)
                 entry.update(prediction_differences={"count": len(diffs), "of": len(val), "rows": diffs},
-                             metrics=metrics, primary=R.primary(task, metrics))
+                             metrics=metrics, primary=art_p,
+                             quality_delta={"metric": R.primary_name(mk), "rows": len(val),
+                                            "source_engine_score": src_p, "artifact_score": art_p,
+                                            "delta": (None if src_p is None or art_p is None else round(art_p - src_p, 6)),
+                                            "text_disagreement_rate": len(diffs) / max(1, len(val)),
+                                            "schema_valid_rate": metrics.get("schema_valid_rate"),
+                                            "note": "same rows, same prompts and decoding; the source engine's "
+                                                    "outputs are the run's saved predictions, rescored now"})
                 rec.setdefault("deployment", {})[label] = {
                     "hardware": hw, "host": res["host"], "runtime": res["runtime"],
                     "input_tokens": [p["prompt_tokens"] for p in res["predictions"]],
@@ -249,6 +266,8 @@ def run_export(project: Path, run_id: str | None = None, gguf: str | None = None
             for f in ("spec", ):
                 (stg / f"verify-{rt}.{f}.json").unlink(missing_ok=True)
         rec["verification"] = ver
+        rec["completion_means"] = ("the artifact loaded and verification ran; it does not mean quality was "
+                                   "preserved: read quality_delta in each verification run")
         rec.update(status="completed" if ok_all else "failed",
                    seconds=round(time.monotonic() - t0, 1),
                    finished=time.strftime("%Y-%m-%dT%H:%M:%S%z"))
