@@ -142,7 +142,6 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
                 [{**p, "comparator": "baseline"} for p in res["predictions"]])
     metrics = {**res["metrics"], "settings": res["settings"], "training": manifest}
     write_json(ctx.out_dir / "metrics.json", metrics)
-    from . import modelid
     v = modelid.dependency_versions()
     return StageOutcome("done", metrics, [{"engine": "torch-cpu", "hardware": "cpu",
                                             "numerics": {"base": "float32"}}],

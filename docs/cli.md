@@ -9,7 +9,7 @@ Generated from the real `--help` output by `scripts/make_cli_docs.py`; `tests/te
 ```
 Usage: spill [OPTIONS] COMMAND [ARGS]...
 
-  A 70B model doesn't fit on your laptop. Build your own model from it anyway.
+  Build a small model for your task, on hardware you control.
 
 Options:
   --help  Show this message and exit.
@@ -25,6 +25,7 @@ Commands:
   distill   Collect a big model's answers to learn from
   tune      Train a LoRA adapter on your data
   eval      Score models on your eval set, one table
+  evaluate  Re-evaluate a run on its validation rows, as a record
   export    Merge an adapter into its base; GGUF and Ollama
   test      Score a run on the final test split, as a record
   bundle    Make, check or install an offline project bundle
@@ -73,7 +74,7 @@ Options:
   --quiet               one progress line per stage
   --state <str>         portable build state: a path, s3://, gs://, az://
                         (default: <folder>/.build/); the build continues from
-                        it on any machine and engine
+                        it on any supported machine and engine
   --engine <str>        mlx | torch-cpu | torch-cuda (default: chosen from the
                         hardware)
   --headless            JSON-lines events on stdout, exit 75 when preempted
@@ -298,6 +299,8 @@ Options:
                        completed run)
   --verify-rows <int>  project folders: validation rows the export is verified
                        on  [default: 8]
+  --merge-dtype <str>  project folders: float32 | bf16, what the merged
+                       weights are written as (default: see docs/formats.md)
   --help               Show this message and exit.
 
   Example: spill export qwen2.5:0.5b+banking --gguf

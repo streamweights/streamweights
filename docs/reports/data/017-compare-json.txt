@@ -1,0 +1,16 @@
+run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine
+run-20261009-181522-f353-ba19bd  run-20261009-181522-f353-ba19bd/original  whole-record accuracy v2  0.500  unavailable  0.000  18  d31102a80fef  mlx
+run-20261009-181635-8b56-ba19bd  run-20261009-181635-8b56-ba19bd/original  whole-record accuracy v2  0.444  unavailable  0.000  18  d31102a80fef  torch-cpu
+evaluation used for run-20261009-181522-f353-ba19bd: run-20261009-181522-f353-ba19bd/original (the run's original evaluation; no --use given; others exist: eval-20261009-181547-0d5c09)
+evaluation used for run-20261009-181635-8b56-ba19bd: run-20261009-181635-8b56-ba19bd/original (the run's original evaluation; no --use given; others exist: eval-20261009-181732-e5a1ae)
+
+cross-runtime: ranked by the trained model's whole-record accuracy: run-20261009-181522-f353-ba19bd (run-20261009-181522-f353-ba19bd/original) > run-20261009-181635-8b56-ba19bd (run-20261009-181635-8b56-ba19bd/original)
+   the evaluators differ: compute_dtype: bf16 vs float32; device: apple-gpu:Apple M4 Pro vs cpu:Apple M4 Pro; engine: mlx vs torch-cpu; weight_dtype: bf16 vs float32
+   caution: score differences may include evaluation-runtime effects, not only differences between the models
+   a higher number is an observed difference on these rows, not a statistical claim
+
+differences run-20261009-181522-f353-ba19bd vs run-20261009-181635-8b56-ba19bd:
+   engine: engine
+   numerics: numerics
+
+next: spill export json-mlx/project

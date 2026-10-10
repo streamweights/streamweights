@@ -27,7 +27,7 @@ from . import safetensors_np as snp
 from .errors import SpillError
 from .registry import REPO_ROOT
 
-GGUF_TYPES = ("bf16", "q8_0", "q4_k_m")
+GGUF_TYPES = ("bf16", "q8_0", "q4_k_m", "f32")
 EXPORTS_DIR = REPO_ROOT / "exports"
 TOOLS_DIR = REPO_ROOT / "tools"
 LLAMACPP_RELEASE = "b11311"
@@ -204,7 +204,7 @@ def convert_gguf(merged_dir: Path, name: str, kind: str, say=lambda s: None,
                          f"spill export ... --gguf q8_0")
     py, script = ensure_converter(say, runner)
     out = Path(merged_dir) / f"{name}-{kind}.gguf"
-    direct = "bf16" if kind in ("bf16", "q4_k_m") else "q8_0"
+    direct = {"bf16": "bf16", "q4_k_m": "bf16", "q8_0": "q8_0", "f32": "f32"}[kind]
     first = out if kind != "q4_k_m" else Path(merged_dir) / f"{name}-bf16.gguf"
     say(f"converting to GGUF {direct} with llama.cpp's converter")
     r = runner([str(py), str(script), str(merged_dir), "--outfile", str(first),

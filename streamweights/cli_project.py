@@ -399,17 +399,24 @@ def evaluate(
     _next_hint(f"spill compare {project} --use {rec['source_run']}={rec['id']}")
 
 
-def project_export(project: Path, run: str | None, gguf: str | None, verify_rows: int):
+def project_export(project: Path, run: str | None, gguf: str | None, verify_rows: int,
+                   merge_dtype: str | None = None):
     from .project import exportrec
     typer.echo(f"spill export {project.name}: merge the run's LoRA adapter into its bf16 base"
                + (f", convert to GGUF {gguf}" if gguf else "")
                + f", then load the artifact in an independent runtime on {verify_rows} validation "
                  f"rows. Cost: $0. Record -> {project}/exports/<id>")
-    rec = exportrec.run_export(project, run, gguf, verify_rows, say=lambda s: typer.echo(f"   {s}"))
+    from .project import exportrec as _ex
+    md = merge_dtype or _ex.DEFAULT_MERGE_DTYPE
+    rec = exportrec.run_export(project, run, gguf, verify_rows, say=lambda s: typer.echo(f"   {s}"),
+                               merge_dtype=md)
     for label, v in rec["verification"]["runs"].items():
         d = v["prediction_differences"]
+        q = v["quality_delta"]
         typer.echo(f"verified {label}: {v['runtime']}; {d['count']} of {d['of']} predictions differ "
-                   f"from the training engine's; primary metric {v['primary']:.3f} on these rows")
+                   f"from the training engine's. Quality on these {q['rows']} rows ({q['metric']}): source "
+                   f"engine {q['source_engine_score']:.3f}, artifact {q['artifact_score']:.3f}, "
+                   f"change {q['delta']:+.3f}. Verified means it loaded and ran, not that quality was kept")
         dep = rec["deployment"][label]
         mem = dep["peak_memory_bytes"]
         typer.echo(f"   time to first token cold {dep['ttft_cold_s']} s, warm {dep['ttft_warm_s']} s; "

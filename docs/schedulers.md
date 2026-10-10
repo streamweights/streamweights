@@ -36,7 +36,7 @@ URI or by a path that exists there (a bucket mount, a shared filesystem, a volum
 For a build the config looks the same (`spill build /bucket/data/mine --state /bucket/state/mine
 --emit-config build.json`), and `spill build --config build.json --headless` is what the scheduler
 runs. The build's state lives under `--state`; rerunning the command, or `spill resume <folder>
---state <uri>`, continues it on any machine and engine (see [portability](portability.md)).
+--state <uri>`, continues it on any supported machine and engine (see [portability](portability.md)).
 
 ## Headless mode
 

@@ -30,6 +30,8 @@ uri = "s3://bucket/prefix"
 path = "bundle.out"
 "project dir" = "projectcopy"
 model = "qwen2.5:0.5b"
+run = "tickets"
+engine = "torch-cpu"
 
 # ---- prose references and synopses
 [[rule]]
@@ -46,7 +48,17 @@ reason = "usage synopsis with an optional argument"
 pattern = 'spill resume <uri>'
 action = "parse"
 
+[[rule]]
+pattern = 'spill evaluate <run> --engine <engine>'
+action = "parse"
+reason = "usage synopsis in docs/formats.md; the real command runs in the guide's example"
+
 # ---- installation and containers
+[[rule]]
+pattern = 'pip install "streamweights\[cloud\] @ git\+https://github.com/streamweights/streamweights"'
+action = "setup"
+reason = "scripts/fresh_wheel.py installs the built wheel with the cloud extra into a clean environment"
+
 [[rule]]
 pattern = 'pip install git\+https://github.com/streamweights/streamweights'
 action = "setup"
@@ -120,19 +132,31 @@ action = "run"
 pattern = 'spill build <project dir> --new-run'
 action = "run"
 [[rule]]
-pattern = 'spill move tickets s3://my-bucket/tickets'
-action = "tiny"
-tiny = [
-  "spill init banking77-tiny/banking77.csv --input text --output label --project stopped --seed 3",
-  {cmd = "spill build stopped --stop-after train:5", exit = [130]},
-  "spill move stopped {tmp}/moved",
-  "spill resume {tmp}/moved",
-]
-reason = "no bucket here; the same handoff and resume on a local destination (the S3 path runs against MinIO in tests/test_move.py)"
+pattern = 'spill init banking77-tiny/banking77\.csv --input text --output label --project tickets2 --seed 3'
+action = "run"
 [[rule]]
-pattern = 'spill resume s3://my-bucket/tickets'
-action = "parse"
-reason = "the tiny equivalent is the resume in the move sequence above"
+pattern = 'spill build tickets2 --stop-after train:12'
+action = "run"
+ok_exit = [130]
+reason = "the interrupted build of the continuation example; it exits 130 and keeps what was committed"
+[[rule]]
+pattern = 'spill move tickets2 s3://my-bucket/tickets2'
+action = "substitute"
+sub = {"s3://my-bucket/tickets2" = "{dest}"}
+reason = "{dest} is a bucket prefix on the MinIO the CI job starts (SPILL_DOCS_S3), else a local folder"
+[[rule]]
+pattern = 'spill resume s3://my-bucket/tickets2'
+action = "substitute"
+sub = {"s3://my-bucket/tickets2" = "{dest}"}
+[[rule]]
+pattern = 'spill evaluate tickets --engine torch-cpu'
+action = "run"
+[[rule]]
+pattern = 'python tickets/exports/\*/run_gguf\.py "Can I change my PIN at any ATM\?"'
+action = "shell"
+needs_env = "SPILL_DOCS_GGUF"
+fallback = 'python tickets/exports/*/run_safetensors.py "Can I change my PIN at any ATM?"'
+reason = "the exported artifact answering one input; the GGUF script needs the llama.cpp tools (SPILL_DOCS_GGUF=1), else the safetensors script runs"
 
 # ---- the older folder workflow, larger models replaced by explicit tiny equivalents
 [[rule]]

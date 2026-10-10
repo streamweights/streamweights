@@ -1,0 +1,297 @@
+{
+ "task": "classification",
+ "run": "run-20261009-181414-a1d6-c29d25",
+ "metric": "accuracy",
+ "metric_version": "1",
+ "verification_rows": [
+  "r-b9a43ba2141c",
+  "r-2dcafb96c914",
+  "r-7dfdc0bc3f19",
+  "r-3b5dfe2fa391",
+  "r-45262d2af7ab",
+  "r-d062a53abb60",
+  "r-6c9eebd43222",
+  "r-766ce4990b0c"
+ ],
+ "n": 8,
+ "max_tokens": 16,
+ "decoding": "greedy: Transformers do_sample=False; llama.cpp temperature 0, top_k 1, seed 0",
+ "tokenization": "prompts rendered once by the Transformers chat template and passed to every runtime as token ids",
+ "source_engine": {
+  "score": 1.0,
+  "schema_valid_rate": null,
+  "engine_conditions": {
+   "adapter_dtype": "float32",
+   "compute_dtype": "float32",
+   "decoding_applied": {
+    "greedy": true,
+    "max_tokens": 16,
+    "requested": {
+     "greedy": true,
+     "seed": 0,
+     "stop": [],
+     "temperature": 0.0,
+     "top_p": 1.0
+    },
+    "seed": 0,
+    "stop": [],
+    "temperature": 0.0,
+    "top_p": 1.0
+   },
+   "device": "cpu:Apple M4 Pro",
+   "engine": "torch-cpu",
+   "engine_impl": "torch_resident",
+   "numerics": {
+    "adapter": "float32",
+    "base": "float32",
+    "optimizer": "float32"
+   },
+   "os": "macOS arm64",
+   "versions": {
+    "mlx": "0.32.3",
+    "mlx-lm": "0.32.0",
+    "numpy": "2.5.3",
+    "peft": "0.21.2",
+    "python": "3.12.13",
+    "safetensors": "0.8.0",
+    "torch": "2.14.1",
+    "transformers": "5.19.0"
+   },
+   "weight_dtype": "float32"
+  }
+ },
+ "arms": {
+  "unmerged": {
+   "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+   "settings": {
+    "dtype": "float32 (bf16 weights upcast)",
+    "do_sample": false,
+    "chat_template": "tokenizer's own",
+    "device": "cpu"
+   },
+   "error": null,
+   "seconds": 4.8,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 988097824,
+   "peak_rss_bytes": 3406364672,
+   "score": 1.0,
+   "source_engine_score": 1.0,
+   "delta_vs_source": 0.0,
+   "text_disagreement_rate": 0.0,
+   "text_disagreements": 0,
+   "schema_valid_rate": null,
+   "parseable_rate": null,
+   "correct_rows": 8,
+   "outputs": {
+    "r-b9a43ba2141c": "change_pin",
+    "r-2dcafb96c914": "automatic_top_up",
+    "r-7dfdc0bc3f19": "change_pin",
+    "r-3b5dfe2fa391": "card_payment_wrong_exchange_rate",
+    "r-45262d2af7ab": "why_verify_identity",
+    "r-d062a53abb60": "declined_transfer",
+    "r-6c9eebd43222": "automatic_top_up",
+    "r-766ce4990b0c": "automatic_top_up"
+   }
+  },
+  "merge-f32": {
+   "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+   "settings": {
+    "dtype": "float32 (bf16 weights upcast)",
+    "do_sample": false,
+    "chat_template": "tokenizer's own",
+    "device": "cpu"
+   },
+   "error": null,
+   "seconds": 4.2,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 1976163472,
+   "peak_rss_bytes": 2473508864,
+   "score": 1.0,
+   "source_engine_score": 1.0,
+   "delta_vs_source": 0.0,
+   "text_disagreement_rate": 0.0,
+   "text_disagreements": 0,
+   "schema_valid_rate": null,
+   "parseable_rate": null,
+   "correct_rows": 8,
+   "outputs": {
+    "r-b9a43ba2141c": "change_pin",
+    "r-2dcafb96c914": "automatic_top_up",
+    "r-7dfdc0bc3f19": "change_pin",
+    "r-3b5dfe2fa391": "card_payment_wrong_exchange_rate",
+    "r-45262d2af7ab": "why_verify_identity",
+    "r-d062a53abb60": "declined_transfer",
+    "r-6c9eebd43222": "automatic_top_up",
+    "r-766ce4990b0c": "automatic_top_up"
+   }
+  },
+  "merge-bf16": {
+   "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+   "settings": {
+    "dtype": "float32 (bf16 weights upcast)",
+    "do_sample": false,
+    "chat_template": "tokenizer's own",
+    "device": "cpu"
+   },
+   "error": null,
+   "seconds": 4.2,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 988097824,
+   "peak_rss_bytes": 3411410944,
+   "score": 1.0,
+   "source_engine_score": 1.0,
+   "delta_vs_source": 0.0,
+   "text_disagreement_rate": 0.0,
+   "text_disagreements": 0,
+   "schema_valid_rate": null,
+   "parseable_rate": null,
+   "correct_rows": 8,
+   "outputs": {
+    "r-b9a43ba2141c": "change_pin",
+    "r-2dcafb96c914": "automatic_top_up",
+    "r-7dfdc0bc3f19": "change_pin",
+    "r-3b5dfe2fa391": "card_payment_wrong_exchange_rate",
+    "r-45262d2af7ab": "why_verify_identity",
+    "r-d062a53abb60": "declined_transfer",
+    "r-6c9eebd43222": "automatic_top_up",
+    "r-766ce4990b0c": "automatic_top_up"
+   }
+  },
+  "gguf-f32": {
+   "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+   "settings": {
+    "temperature": 0,
+    "top_k": 1,
+    "seed": 0,
+    "context": 4096,
+    "gpu_layers": "0",
+    "chat_template": "the GGUF's embedded template"
+   },
+   "error": null,
+   "seconds": 2.4,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 1982078880,
+   "peak_rss_bytes": 2221981696,
+   "score": 1.0,
+   "source_engine_score": 1.0,
+   "delta_vs_source": 0.0,
+   "text_disagreement_rate": 0.0,
+   "text_disagreements": 0,
+   "schema_valid_rate": null,
+   "parseable_rate": null,
+   "correct_rows": 8,
+   "outputs": {
+    "r-b9a43ba2141c": "change_pin",
+    "r-2dcafb96c914": "automatic_top_up",
+    "r-7dfdc0bc3f19": "change_pin",
+    "r-3b5dfe2fa391": "card_payment_wrong_exchange_rate",
+    "r-45262d2af7ab": "why_verify_identity",
+    "r-d062a53abb60": "declined_transfer",
+    "r-6c9eebd43222": "automatic_top_up",
+    "r-766ce4990b0c": "automatic_top_up"
+   }
+  },
+  "gguf-q8-from-f32": {
+   "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+   "settings": {
+    "temperature": 0,
+    "top_k": 1,
+    "seed": 0,
+    "context": 4096,
+    "gpu_layers": "0",
+    "chat_template": "the GGUF's embedded template"
+   },
+   "error": null,
+   "seconds": 1.2,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 531067808,
+   "peak_rss_bytes": 1271824384,
+   "score": 1.0,
+   "source_engine_score": 1.0,
+   "delta_vs_source": 0.0,
+   "text_disagreement_rate": 0.0,
+   "text_disagreements": 0,
+   "schema_valid_rate": null,
+   "parseable_rate": null,
+   "correct_rows": 8,
+   "outputs": {
+    "r-b9a43ba2141c": "change_pin",
+    "r-2dcafb96c914": "automatic_top_up",
+    "r-7dfdc0bc3f19": "change_pin",
+    "r-3b5dfe2fa391": "card_payment_wrong_exchange_rate",
+    "r-45262d2af7ab": "why_verify_identity",
+    "r-d062a53abb60": "declined_transfer",
+    "r-6c9eebd43222": "automatic_top_up",
+    "r-766ce4990b0c": "automatic_top_up"
+   }
+  },
+  "gguf-q8-from-bf16": {
+   "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+   "settings": {
+    "temperature": 0,
+    "top_k": 1,
+    "seed": 0,
+    "context": 4096,
+    "gpu_layers": "0",
+    "chat_template": "the GGUF's embedded template"
+   },
+   "error": null,
+   "seconds": 1.2,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 531067808,
+   "peak_rss_bytes": 1266237440,
+   "score": 1.0,
+   "source_engine_score": 1.0,
+   "delta_vs_source": 0.0,
+   "text_disagreement_rate": 0.0,
+   "text_disagreements": 0,
+   "schema_valid_rate": null,
+   "parseable_rate": null,
+   "correct_rows": 8,
+   "outputs": {
+    "r-b9a43ba2141c": "change_pin",
+    "r-2dcafb96c914": "automatic_top_up",
+    "r-7dfdc0bc3f19": "change_pin",
+    "r-3b5dfe2fa391": "card_payment_wrong_exchange_rate",
+    "r-45262d2af7ab": "why_verify_identity",
+    "r-d062a53abb60": "declined_transfer",
+    "r-6c9eebd43222": "automatic_top_up",
+    "r-766ce4990b0c": "automatic_top_up"
+   }
+  }
+ },
+ "runtime_comparison": {
+  "transformers_f32_vs_llamacpp_f32_text_disagreements": 0,
+  "of": 8
+ }
+}

@@ -30,6 +30,8 @@ def run(tmp_path, engine, rows, env_extra=None):
     f.write_text("".join(json.dumps(r) + "\n" for r in rows))
     out = tmp_path / "out.jsonl"
     env = {**os.environ, "SPILL_HEADLESS": "0", **(env_extra or {})}
+    if os.environ.get("SPILL_METAL_TESTS") == "1":      # the MLX case on the Metal GPU, not the CPU device
+        env.pop("SPILL_DEVICE", None)
     p = subprocess.run([sys.executable, "-m", "streamweights.cli", "run", "qwen2.5:0.5b", str(f),
                         "--out", str(out), "--engine", engine], capture_output=True, text=True, env=env,
                        cwd=tmp_path, timeout=900)

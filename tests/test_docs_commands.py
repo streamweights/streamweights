@@ -29,7 +29,7 @@ MAP = tomllib.loads((Path(__file__).parent / "docs_command_map.toml").read_text(
 PAGES = [ROOT / "README.md", *sorted((ROOT / "docs/guides").glob("*.md")),
          *[ROOT / "docs" / n for n in ("portability.md", "linux.md", "schedulers.md", "llamacpp.md",
                                        "formats.md", "models.md", "plan.md")]]
-START = re.compile(r"^(spill|pip install|uv tool|uv pip|docker|python -m|python scripts|\./)")
+START = re.compile(r"^(spill|pip install|uv tool|uv pip|docker|python |\./)")
 
 
 def inventory() -> dict[str, set[str]]:
@@ -118,7 +118,7 @@ def test_every_mapped_spill_command_parses_against_the_real_cli():
     bad = []
     for cmd in inventory():
         r = match(cmd)
-        if r["action"] in ("reference", "setup", "exclude"):
+        if r["action"] in ("reference", "setup", "exclude", "shell"):
             continue
         for part in parts(fill(cmd, r.get("fill"))):
             if not part.startswith("spill "):
@@ -196,8 +196,11 @@ def test_execute_the_small_model_commands_on_tiny_data(tmp_path):
     inv = inventory()
     ordered = []
     for r in MAP["rule"]:
-        if r["action"] in ("run", "substitute", "tiny"):
+        if r["action"] in ("run", "substitute", "tiny", "shell"):
             ordered += [(r, c) for c in sorted(inv) if match(c) is r]
+    s3 = os.environ.get("SPILL_DOCS_S3")
+    import uuid as _uuid
+    dest = f"{s3.rstrip('/')}/tickets2-{_uuid.uuid4().hex[:8]}" if s3 else str(work / "moved")
     done, failures = set(), []
     for r, cmd in ordered:
         if r.get("needs_env") and os.environ.get(r["needs_env"]) != "1":
@@ -218,8 +221,15 @@ def test_execute_the_small_model_commands_on_tiny_data(tmp_path):
                 seq.append(new)
         for item in seq:
             line, ok = item if isinstance(item, tuple) else (item, tuple(r.get("ok_exit", [0])))
-            line = line.replace("{tmp}", str(work))
+            line = line.replace("{tmp}", str(work)).replace("{dest}", dest)
             if line in done:
+                continue
+            if line.startswith("python "):
+                p = subprocess.run(["bash", "-c", line], capture_output=True, text=True, cwd=work, env=env,
+                                   timeout=1800)
+                done.add(line)
+                if p.returncode != 0 or not p.stdout.strip():
+                    failures.append(f"{line} -> exit {p.returncode}: {(p.stderr or p.stdout)[-300:]}")
                 continue
             if not line.startswith("spill "):
                 continue

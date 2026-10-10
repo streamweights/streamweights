@@ -12,7 +12,7 @@ v4 changes the front door. v3 made the loop (run, distill, tune, eval) the produ
 
 Developers cannot test against models bigger than their machine without renting GPUs, and the moment they rent, the whole dev loop changes: data leaves the building, iteration gets a meter on it, and "just run the eval again" becomes a budget conversation. Ollama answers "what fits." Ollama Cloud answers "chat with a bigger one on our servers." Neither answers:
 
-Run the unmodified full-size model against my eval set, on my machine, for free, overnight, with no data leaving the building.
+Run the unmodified full-size model against my eval set, on my machine, for free, overnight; data stays local by default, and remote storage is used when explicitly configured.
 
 That is streamweights, and it is the first verb of a loop:
 

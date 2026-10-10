@@ -173,6 +173,12 @@ jobs:
       SPILL_MIN_FREE_GB: "2"
       SPILL_DOCS_RUN: "1"
       SPILL_REQUIRE_FIXTURE_MODEL: "1"
+      MINIO_RELEASE: RELEASE.2025-10-15T17-29-55Z
+      AWS_ACCESS_KEY_ID: spilltest
+      AWS_SECRET_ACCESS_KEY: spilltest123
+      AWS_ENDPOINT_URL: http://127.0.0.1:9000
+      AWS_DEFAULT_REGION: us-east-1
+      SPILL_DOCS_S3: s3://spill-docs
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -182,13 +188,24 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,cloud]"
       - uses: actions/cache@v4
         with:
           path: models
           key: models-qwen05-minilm-v2
       - name: Download qwen2.5:0.5b
         run: python -c "from streamweights.registry import download_safetensors; download_safetensors('qwen2.5:0.5b')"
+      - name: Start the pinned MinIO (the documented move and resume run against it)
+        run: |
+          IMAGE=quay.io/minio/minio:$MINIO_RELEASE
+          if ! docker pull "$IMAGE"; then
+            docker build -f docker/minio.Dockerfile --build-arg RELEASE=$MINIO_RELEASE -t spill-minio:$MINIO_RELEASE docker
+            IMAGE=spill-minio:$MINIO_RELEASE
+          fi
+          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=spilltest -e MINIO_ROOT_PASSWORD=spilltest123 "$IMAGE" server /data
+          docker run --rm --entrypoint minio "$IMAGE" --version | head -1
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:9000/minio/health/live && break; sleep 1; done
+          python -c "import boto3; boto3.client('s3').create_bucket(Bucket='spill-docs')"
       - name: Documented commands
         run: python -m pytest tests/test_docs_commands.py tests/test_docs.py -v
 

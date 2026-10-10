@@ -78,6 +78,19 @@ def journey(task: str, engine: str, work: Path, env, gguf: bool) -> dict:
     t_rec = json.loads((newest(proj / "tests") / "record.json").read_text()) if r["exit"] == 0 else None
     out["test"] = t_rec and {"table": t_rec["table"], "rows": t_rec["rows"], "seconds": t_rec["seconds"],
                              "holdout_note": t_rec["holdout_note"]}
+    # the same run evaluated on the other engine (a separate record), and compared two ways
+    other = "torch-cpu" if engine == "mlx" else "mlx"
+    r = step(run(["evaluate", str(proj), "--engine", other], env, d))
+    if r["exit"] == 0:
+        erec = json.loads((newest(proj / "evaluations") / "record.json").read_text())
+        out["evaluate"] = {"id": erec["id"], "engine_requested": other, "table": erec["table"],
+                           "vs_original": erec["vs_original"], "rows": erec["rows"],
+                           "conditions": {k: v["conditions"] for k, v in erec["comparators"].items()},
+                           "seconds": erec["seconds"]}
+        c1 = step(run(["compare", str(proj)], env, d))
+        c2 = step(run(["compare", str(proj), "--use", f"{m['run_id']}={erec['id']}"], env, d))
+        out["compare_default"] = c1["stdout"]
+        out["compare_explicit"] = c2["stdout"]
     cmd = ["export", str(proj)] + (["--gguf", "q8_0"] if gguf else [])
     r = step(run(cmd, env, d, timeout=7200))
     out["export_exit"] = r["exit"]

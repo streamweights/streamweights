@@ -1,0 +1,2259 @@
+{
+ "imported_from": "<checkout>/streamweights/__init__.py",
+ "hardware": {
+  "host": "Amrishs-MacBook-Pro.local",
+  "system": "Darwin",
+  "os": "macOS",
+  "os_release": "24.6.0",
+  "arch": "arm64",
+  "ram_gb": 48.0,
+  "cpu": "Apple M4 Pro",
+  "python": "3.12.13"
+ },
+ "started": "2026-10-09T18:13:22-0700",
+ "journeys": [
+  {
+   "task": "classification",
+   "engine": "mlx",
+   "steps": [
+    {
+     "cmd": "spill example banking77 --tiny",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill init <scratch>/gw2/classification-mlx/banking77-tiny/banking77.csv --input text --output label --project <scratch>/gw2/classification-mlx/project",
+     "seconds": 0.2,
+     "exit": 0
+    },
+    {
+     "cmd": "spill plan <scratch>/gw2/classification-mlx/project --engine mlx",
+     "seconds": 0.7,
+     "exit": 0
+    },
+    {
+     "cmd": "spill build <scratch>/gw2/classification-mlx/project --engine mlx",
+     "seconds": 13.7,
+     "exit": 0
+    },
+    {
+     "cmd": "spill report <scratch>/gw2/classification-mlx/project",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill test <scratch>/gw2/classification-mlx/project --engine mlx",
+     "seconds": 5.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill evaluate <scratch>/gw2/classification-mlx/project --engine torch-cpu",
+     "seconds": 7.5,
+     "exit": 0
+    },
+    {
+     "cmd": "spill compare <scratch>/gw2/classification-mlx/project",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill compare <scratch>/gw2/classification-mlx/project --use run-20261009-181324-a4dd-c29d25=eval-20261009-181342-51423d",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill export <scratch>/gw2/classification-mlx/project --gguf q8_0",
+     "seconds": 19.0,
+     "exit": 0
+    }
+   ],
+   "init": [
+    "   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together",
+    "   warning: 3 of 10 training classes have no validation rows, so their accuracy is not measured",
+    "",
+    "next: spill plan <scratch>/gw2/classification-mlx/project"
+   ],
+   "build_exit": 0,
+   "run": {
+    "id": "run-20261009-181324-a4dd-c29d25",
+    "metric": "accuracy",
+    "table": [
+     {
+      "accuracy": 1.0,
+      "comparator": "baseline",
+      "inference_failures": 0,
+      "invalid_predictions": 0,
+      "macro_f1": 1.0,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 1.0,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": null,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.3333333333333333,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.2698412698412698,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.3333333333333333,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.8888888888888888,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.9047619047619048,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.8888888888888888,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     }
+    ],
+    "stages": {
+     "baseline": {
+      "seconds": 1.86,
+      "producers": [
+       {
+        "engine": "torch-cpu",
+        "hardware": "cpu",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "base": "float32"
+        },
+        "os": "macOS arm64",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "eval:trained": {
+      "seconds": 1.34,
+      "producers": [
+       {
+        "engine": "mlx",
+        "hardware": "apple-gpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "bf16"
+        },
+        "os": "macOS arm64",
+        "quanta": "18 rows",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "eval:untrained": {
+      "seconds": 1.08,
+      "producers": [
+       {
+        "engine": "mlx",
+        "hardware": "apple-gpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "bf16"
+        },
+        "os": "macOS arm64",
+        "quanta": "18 rows",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "train": {
+      "seconds": 8.12,
+      "producers": [
+       {
+        "engine": "mlx",
+        "hardware": "apple-gpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "bf16",
+         "dropout": 0.0,
+         "optimizer": "float32"
+        },
+        "os": "macOS arm64",
+        "quanta": "steps 0-42",
+        "system": "Darwin"
+       }
+      ]
+     }
+    },
+    "models": {
+     "embedding": {
+      "tag": "embedding:minilm",
+      "repo": "sentence-transformers/all-MiniLM-L6-v2",
+      "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+     },
+     "student": {
+      "tag": "qwen2.5:0.5b",
+      "repo": "Qwen/Qwen2.5-0.5B-Instruct",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775"
+     }
+    },
+    "dependencies": {
+     "boto3": "1.43.106",
+     "huggingface-hub": "1.33.0",
+     "jsonschema": "4.26.0",
+     "mlx": "0.32.3",
+     "mlx-lm": "0.32.0",
+     "numpy": "2.5.3",
+     "peft": "0.21.2",
+     "platform": "macOS-15.7.3-arm64-arm-64bit",
+     "python": "3.12.13",
+     "s3fs": "2026.9.0",
+     "safetensors": "0.8.0",
+     "streamweights": "0.1.0",
+     "tokenizers": "0.23.2",
+     "torch": "2.14.1",
+     "transformers": "5.19.0"
+    },
+    "findings": [
+     "On 18 validation rows, accuracy: embedding baseline (MiniLM + logistic regression): 1.000; student, prompted, untrained: 0.333; student, trained: 0.889.",
+     "The embedding baseline (MiniLM + logistic regression) scored 0.111 higher than the trained student (2 rows).",
+     "The trained student scored 0.556 higher than the student, prompted, untrained (10 rows)."
+    ],
+    "protocol_sha256": "e27bc6d29acf58520b805dde48344b2bddc0189c02cd23cbf518be2fe1199a26"
+   },
+   "test": {
+    "table": [
+     {
+      "accuracy": 0.9444444444444444,
+      "comparator": "baseline",
+      "inference_failures": 0,
+      "invalid_predictions": 0,
+      "macro_f1": 0.8518518518518519,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.9444444444444444,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": null,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.3333333333333333,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.22804232804232802,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.3333333333333333,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.8333333333333334,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.7037037037037037,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.8333333333333334,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     }
+    ],
+    "rows": 18,
+    "seconds": 4.6,
+    "holdout_note": "This is use 1 of this project's final test split. It was not consulted before."
+   },
+   "evaluate": {
+    "id": "eval-20261009-181342-51423d",
+    "engine_requested": "torch-cpu",
+    "table": [
+     {
+      "accuracy": 1.0,
+      "comparator": "baseline",
+      "inference_failures": 0,
+      "invalid_predictions": 0,
+      "macro_f1": 1.0,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 1.0,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": null,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.4444444444444444,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": 0,
+      "macro_f1": 0.40793650793650793,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.4444444444444444,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.8888888888888888,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.9047619047619048,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.8888888888888888,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     }
+    ],
+    "vs_original": {
+     "baseline": {
+      "difference": 0.0,
+      "new": 1.0,
+      "original": 1.0
+     },
+     "trained": {
+      "difference": 0.0,
+      "new": 0.8888888888888888,
+      "original": 0.8888888888888888
+     },
+     "untrained": {
+      "difference": 0.111111,
+      "new": 0.4444444444444444,
+      "original": 0.3333333333333333
+     }
+    },
+    "rows": 18,
+    "conditions": {
+     "baseline": {
+      "adapter_dtype": null,
+      "compute_dtype": "float32",
+      "decoding_applied": null,
+      "device": "cpu",
+      "engine": "torch-cpu",
+      "engine_impl": "embedding+logreg",
+      "numerics": {
+       "base": "float32"
+      },
+      "versions": {
+       "numpy": "2.5.3",
+       "python": "3.12.13",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "float32"
+     },
+     "trained": {
+      "adapter_dtype": "float32",
+      "compute_dtype": "float32",
+      "decoding_applied": {
+       "greedy": true,
+       "max_tokens": 16,
+       "requested": {
+        "greedy": true,
+        "seed": 0,
+        "stop": [],
+        "temperature": 0.0,
+        "top_p": 1.0
+       },
+       "seed": 0,
+       "stop": [],
+       "temperature": 0.0,
+       "top_p": 1.0
+      },
+      "device": "cpu:Apple M4 Pro",
+      "engine": "torch-cpu",
+      "engine_impl": "torch_resident",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "optimizer": "float32"
+      },
+      "os": "macOS arm64",
+      "versions": {
+       "mlx": "0.32.3",
+       "mlx-lm": "0.32.0",
+       "numpy": "2.5.3",
+       "peft": "0.21.2",
+       "python": "3.12.13",
+       "safetensors": "0.8.0",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "float32"
+     },
+     "untrained": {
+      "adapter_dtype": "float32",
+      "compute_dtype": "float32",
+      "decoding_applied": {
+       "greedy": true,
+       "max_tokens": 16,
+       "requested": {
+        "greedy": true,
+        "seed": 0,
+        "stop": [],
+        "temperature": 0.0,
+        "top_p": 1.0
+       },
+       "seed": 0,
+       "stop": [],
+       "temperature": 0.0,
+       "top_p": 1.0
+      },
+      "device": "cpu:Apple M4 Pro",
+      "engine": "torch-cpu",
+      "engine_impl": "torch_resident",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "optimizer": "float32"
+      },
+      "os": "macOS arm64",
+      "versions": {
+       "mlx": "0.32.3",
+       "mlx-lm": "0.32.0",
+       "numpy": "2.5.3",
+       "peft": "0.21.2",
+       "python": "3.12.13",
+       "safetensors": "0.8.0",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "float32"
+     }
+    },
+    "seconds": 7.0
+   },
+   "compare_default": "run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine\nrun-20261009-181324-a4dd-c29d25  run-20261009-181324-a4dd-c29d25/original  accuracy v1  0.889  1.000  0.333  18  e27bc6d29acf  mlx\nevaluation used for run-20261009-181324-a4dd-c29d25: run-20261009-181324-a4dd-c29d25/original (the run's original evaluation; no --use given; others exist: eval-20261009-181342-51423d)\n\nnext: spill export <scratch>/gw2/classification-mlx/project\n",
+   "compare_explicit": "run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine\nrun-20261009-181324-a4dd-c29d25  eval-20261009-181342-51423d  accuracy v1  0.889  1.000  0.444  18  e27bc6d29acf  torch-cpu\nevaluation used for run-20261009-181324-a4dd-c29d25: eval-20261009-181342-51423d (chosen with --use)\n\nnext: spill export <scratch>/gw2/classification-mlx/project\n",
+   "export_exit": 0,
+   "export": {
+    "id": "export-20261009-181350-ce90a0",
+    "format": [
+     "safetensors",
+     "gguf:q8_0"
+    ],
+    "status": "completed",
+    "verification": {
+     "gguf:q8_0": {
+      "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+      "diffs": 0,
+      "of": 8,
+      "primary": 0.875,
+      "load_failure": null
+     },
+     "safetensors": {
+      "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+      "diffs": 0,
+      "of": 8,
+      "primary": 0.875,
+      "load_failure": null
+     }
+    },
+    "deployment": {
+     "gguf:q8_0": {
+      "boundaries": {
+       "peak_memory": "peak resident set of the llama-server process tree sampled after each request (a lower bound)",
+       "tokens_per_s": "completion tokens / wall time of the non-streamed request",
+       "ttft": "wall time from request to the first streamed content token, cache_prompt off; cold = the first row, warm = median of the rest"
+      },
+      "hardware": {
+       "cpu": "Apple M4 Pro",
+       "cpu_cores": 12,
+       "gpu": {
+        "bf16_compute": true,
+        "model": "Apple M4 Pro",
+        "vram_bytes": 38654705664
+       },
+       "nvme_seq_read_bytes_per_sec": 5481095558,
+       "os": "Darwin 24.6.0 (15.7.3)",
+       "probed_at": "2026-09-30T20:08:10-0700",
+       "ram_total_bytes": 51539607552
+      },
+      "host": {
+       "cpus": 12,
+       "machine": "arm64",
+       "platform": "macOS-15.7.3-arm64-arm-64bit",
+       "system": "Darwin"
+      },
+      "input_tokens": [
+       43,
+       38,
+       38,
+       38,
+       40,
+       44,
+       42,
+       36
+      ],
+      "kept_separate_from": "build durations (these are inference measurements)",
+      "load_seconds": 0.443,
+      "output_tokens": [
+       6,
+       4,
+       3,
+       6,
+       4,
+       4,
+       4,
+       4
+      ],
+      "peak_memory_bytes": 731873280,
+      "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+      "tokens_per_s_warm": 121.28,
+      "ttft_cold_s": 0.0408,
+      "ttft_warm_s": 0.0204
+     },
+     "safetensors": {
+      "boundaries": {
+       "peak_memory": "ru_maxrss of this process (weights, activations, tokenizer, interpreter)",
+       "tokens_per_s": "completion tokens / wall time of the full generate() including prefill, median over rows after the first",
+       "ttft": "wall time of generate(max_new_tokens=1) including prompt prefill; cold = the first row, warm = median of the rest"
+      },
+      "hardware": {
+       "cpu": "Apple M4 Pro",
+       "cpu_cores": 12,
+       "gpu": {
+        "bf16_compute": true,
+        "model": "Apple M4 Pro",
+        "vram_bytes": 38654705664
+       },
+       "nvme_seq_read_bytes_per_sec": 5481095558,
+       "os": "Darwin 24.6.0 (15.7.3)",
+       "probed_at": "2026-09-30T20:08:10-0700",
+       "ram_total_bytes": 51539607552
+      },
+      "host": {
+       "cpus": 12,
+       "machine": "arm64",
+       "platform": "macOS-15.7.3-arm64-arm-64bit",
+       "system": "Darwin"
+      },
+      "input_tokens": [
+       43,
+       38,
+       38,
+       38,
+       40,
+       44,
+       42,
+       36
+      ],
+      "kept_separate_from": "build durations (these are inference measurements)",
+      "load_seconds": 0.333,
+      "output_tokens": [
+       6,
+       4,
+       3,
+       6,
+       4,
+       4,
+       4,
+       4
+      ],
+      "peak_memory_bytes": 3410018304,
+      "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+      "tokens_per_s_warm": 33.84,
+      "ttft_cold_s": 0.0677,
+      "ttft_warm_s": 0.0642
+     }
+    },
+    "scripts": {
+     "gguf": {
+      "error": null,
+      "exit_code": 0,
+      "input": "Can I get a new pin number at any ATM using my card?",
+      "output": "supported_cards_and_currencies",
+      "script": "run_gguf.py"
+     },
+     "safetensors": {
+      "error": null,
+      "exit_code": 0,
+      "input": "Can I get a new pin number at any ATM using my card?",
+      "output": "supported_cards_and_currencies",
+      "script": "run_safetensors.py"
+     }
+    },
+    "seconds": 18.7
+   },
+   "inference": {
+    "gguf": {
+     "input": "Can I get a new pin number at any ATM using my card?",
+     "output": "supported_cards_and_currencies",
+     "exit": 0,
+     "seconds": 0.5
+    },
+    "safetensors": {
+     "input": "Can I get a new pin number at any ATM using my card?",
+     "output": "supported_cards_and_currencies",
+     "exit": 0,
+     "seconds": 2.9
+    }
+   }
+  },
+  {
+   "task": "classification",
+   "engine": "torch-cpu",
+   "steps": [
+    {
+     "cmd": "spill example banking77 --tiny",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill init <scratch>/gw2/classification-torch-cpu/banking77-tiny/banking77.csv --input text --output label --project <scratch>/gw2/classification-torch-cpu/project",
+     "seconds": 0.2,
+     "exit": 0
+    },
+    {
+     "cmd": "spill plan <scratch>/gw2/classification-torch-cpu/project --engine torch-cpu",
+     "seconds": 0.8,
+     "exit": 0
+    },
+    {
+     "cmd": "spill build <scratch>/gw2/classification-torch-cpu/project --engine torch-cpu",
+     "seconds": 32.2,
+     "exit": 0
+    },
+    {
+     "cmd": "spill report <scratch>/gw2/classification-torch-cpu/project",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill test <scratch>/gw2/classification-torch-cpu/project --engine torch-cpu",
+     "seconds": 7.5,
+     "exit": 0
+    },
+    {
+     "cmd": "spill evaluate <scratch>/gw2/classification-torch-cpu/project --engine mlx",
+     "seconds": 4.2,
+     "exit": 0
+    },
+    {
+     "cmd": "spill compare <scratch>/gw2/classification-torch-cpu/project",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill compare <scratch>/gw2/classification-torch-cpu/project --use run-20261009-181414-a1d6-c29d25=eval-20261009-181453-4e3661",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill export <scratch>/gw2/classification-torch-cpu/project --gguf q8_0",
+     "seconds": 19.0,
+     "exit": 0
+    }
+   ],
+   "init": [
+    "   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together",
+    "   warning: 3 of 10 training classes have no validation rows, so their accuracy is not measured",
+    "",
+    "next: spill plan <scratch>/gw2/classification-torch-cpu/project"
+   ],
+   "build_exit": 0,
+   "run": {
+    "id": "run-20261009-181414-a1d6-c29d25",
+    "metric": "accuracy",
+    "table": [
+     {
+      "accuracy": 1.0,
+      "comparator": "baseline",
+      "inference_failures": 0,
+      "invalid_predictions": 0,
+      "macro_f1": 1.0,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 1.0,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": null,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.4444444444444444,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": 0,
+      "macro_f1": 0.40793650793650793,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.4444444444444444,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.9444444444444444,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.9523809523809524,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.9444444444444444,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     }
+    ],
+    "stages": {
+     "baseline": {
+      "seconds": 1.78,
+      "producers": [
+       {
+        "engine": "torch-cpu",
+        "hardware": "cpu",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "base": "float32"
+        },
+        "os": "macOS arm64",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "eval:trained": {
+      "seconds": 4.01,
+      "producers": [
+       {
+        "engine": "torch-cpu",
+        "hardware": "cpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "float32",
+         "optimizer": "float32"
+        },
+        "os": "macOS arm64",
+        "quanta": "18 rows",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "eval:untrained": {
+      "seconds": 0.02,
+      "producers": [
+       {
+        "engine": "torch-cpu",
+        "hardware": "cpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "float32",
+         "optimizer": "float32"
+        },
+        "os": "macOS arm64",
+        "quanta": "18 rows",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "train": {
+      "seconds": 25.08,
+      "producers": [
+       {
+        "engine": "torch-cpu",
+        "hardware": "cpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "float32",
+         "dropout": 0.0,
+         "optimizer": "float32"
+        },
+        "os": "macOS arm64",
+        "quanta": "steps 0-42",
+        "system": "Darwin"
+       }
+      ]
+     }
+    },
+    "models": {
+     "embedding": {
+      "tag": "embedding:minilm",
+      "repo": "sentence-transformers/all-MiniLM-L6-v2",
+      "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+     },
+     "student": {
+      "tag": "qwen2.5:0.5b",
+      "repo": "Qwen/Qwen2.5-0.5B-Instruct",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775"
+     }
+    },
+    "dependencies": {
+     "boto3": "1.43.106",
+     "huggingface-hub": "1.33.0",
+     "jsonschema": "4.26.0",
+     "mlx": "0.32.3",
+     "mlx-lm": "0.32.0",
+     "numpy": "2.5.3",
+     "peft": "0.21.2",
+     "platform": "macOS-15.7.3-arm64-arm-64bit",
+     "python": "3.12.13",
+     "s3fs": "2026.9.0",
+     "safetensors": "0.8.0",
+     "streamweights": "0.1.0",
+     "tokenizers": "0.23.2",
+     "torch": "2.14.1",
+     "transformers": "5.19.0"
+    },
+    "findings": [
+     "On 18 validation rows, accuracy: embedding baseline (MiniLM + logistic regression): 1.000; student, prompted, untrained: 0.444; student, trained: 0.944.",
+     "The embedding baseline (MiniLM + logistic regression) scored 0.056 higher than the trained student (1 row).",
+     "The trained student scored 0.500 higher than the student, prompted, untrained (9 rows)."
+    ],
+    "protocol_sha256": "e27bc6d29acf58520b805dde48344b2bddc0189c02cd23cbf518be2fe1199a26"
+   },
+   "test": {
+    "table": [
+     {
+      "accuracy": 0.9444444444444444,
+      "comparator": "baseline",
+      "inference_failures": 0,
+      "invalid_predictions": 0,
+      "macro_f1": 0.8518518518518519,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.9444444444444444,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": null,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.3333333333333333,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.24656084656084656,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.3333333333333333,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.8333333333333334,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.7037037037037037,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.8333333333333334,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     }
+    ],
+    "rows": 18,
+    "seconds": 7.0,
+    "holdout_note": "This is use 1 of this project's final test split. It was not consulted before."
+   },
+   "evaluate": {
+    "id": "eval-20261009-181453-4e3661",
+    "engine_requested": "mlx",
+    "table": [
+     {
+      "accuracy": 1.0,
+      "comparator": "baseline",
+      "inference_failures": 0,
+      "invalid_predictions": 0,
+      "macro_f1": 1.0,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 1.0,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": null,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.3333333333333333,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.2698412698412698,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.3333333333333333,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     },
+     {
+      "accuracy": 0.9444444444444444,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": 1,
+      "macro_f1": 0.9523809523809524,
+      "mean_field_accuracy": null,
+      "parseable_rate": null,
+      "primary": 0.9444444444444444,
+      "records_with_extra_fields": null,
+      "rows": 18,
+      "schema_valid_rate": null,
+      "truncated": 0,
+      "whole_record_accuracy": null
+     }
+    ],
+    "vs_original": {
+     "baseline": {
+      "difference": 0.0,
+      "new": 1.0,
+      "original": 1.0
+     },
+     "trained": {
+      "difference": 0.0,
+      "new": 0.9444444444444444,
+      "original": 0.9444444444444444
+     },
+     "untrained": {
+      "difference": -0.111111,
+      "new": 0.3333333333333333,
+      "original": 0.4444444444444444
+     }
+    },
+    "rows": 18,
+    "conditions": {
+     "baseline": {
+      "adapter_dtype": null,
+      "compute_dtype": "float32",
+      "decoding_applied": null,
+      "device": "cpu",
+      "engine": "torch-cpu",
+      "engine_impl": "embedding+logreg",
+      "numerics": {
+       "base": "float32"
+      },
+      "versions": {
+       "numpy": "2.5.3",
+       "python": "3.12.13",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "float32"
+     },
+     "trained": {
+      "adapter_dtype": "float32",
+      "compute_dtype": "bf16",
+      "decoding_applied": {
+       "greedy": true,
+       "max_tokens": 16,
+       "requested": {
+        "greedy": true,
+        "seed": 0,
+        "stop": [],
+        "temperature": 0.0,
+        "top_p": 1.0
+       },
+       "seed": 0,
+       "stop": [],
+       "temperature": 0.0,
+       "top_p": 1.0
+      },
+      "device": "apple-gpu:Apple M4 Pro",
+      "engine": "mlx",
+      "engine_impl": "mlx_resident",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16"
+      },
+      "os": "macOS arm64",
+      "versions": {
+       "mlx": "0.32.3",
+       "mlx-lm": "0.32.0",
+       "numpy": "2.5.3",
+       "peft": "0.21.2",
+       "python": "3.12.13",
+       "safetensors": "0.8.0",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "bf16"
+     },
+     "untrained": {
+      "adapter_dtype": "float32",
+      "compute_dtype": "bf16",
+      "decoding_applied": {
+       "greedy": true,
+       "max_tokens": 16,
+       "requested": {
+        "greedy": true,
+        "seed": 0,
+        "stop": [],
+        "temperature": 0.0,
+        "top_p": 1.0
+       },
+       "seed": 0,
+       "stop": [],
+       "temperature": 0.0,
+       "top_p": 1.0
+      },
+      "device": "apple-gpu:Apple M4 Pro",
+      "engine": "mlx",
+      "engine_impl": "mlx_resident",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16"
+      },
+      "os": "macOS arm64",
+      "versions": {
+       "mlx": "0.32.3",
+       "mlx-lm": "0.32.0",
+       "numpy": "2.5.3",
+       "peft": "0.21.2",
+       "python": "3.12.13",
+       "safetensors": "0.8.0",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "bf16"
+     }
+    },
+    "seconds": 3.7
+   },
+   "compare_default": "run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine\nrun-20261009-181414-a1d6-c29d25  run-20261009-181414-a1d6-c29d25/original  accuracy v1  0.944  1.000  0.444  18  e27bc6d29acf  torch-cpu\nevaluation used for run-20261009-181414-a1d6-c29d25: run-20261009-181414-a1d6-c29d25/original (the run's original evaluation; no --use given; others exist: eval-20261009-181453-4e3661)\n\nnext: spill export <scratch>/gw2/classification-torch-cpu/project\n",
+   "compare_explicit": "run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine\nrun-20261009-181414-a1d6-c29d25  eval-20261009-181453-4e3661  accuracy v1  0.944  1.000  0.333  18  e27bc6d29acf  mlx\nevaluation used for run-20261009-181414-a1d6-c29d25: eval-20261009-181453-4e3661 (chosen with --use)\n\nnext: spill export <scratch>/gw2/classification-torch-cpu/project\n",
+   "export_exit": 0,
+   "export": {
+    "id": "export-20261009-181458-c260bf",
+    "format": [
+     "safetensors",
+     "gguf:q8_0"
+    ],
+    "status": "completed",
+    "verification": {
+     "gguf:q8_0": {
+      "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+      "diffs": 0,
+      "of": 8,
+      "primary": 1.0,
+      "load_failure": null
+     },
+     "safetensors": {
+      "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+      "diffs": 0,
+      "of": 8,
+      "primary": 1.0,
+      "load_failure": null
+     }
+    },
+    "deployment": {
+     "gguf:q8_0": {
+      "boundaries": {
+       "peak_memory": "peak resident set of the llama-server process tree sampled after each request (a lower bound)",
+       "tokens_per_s": "completion tokens / wall time of the non-streamed request",
+       "ttft": "wall time from request to the first streamed content token, cache_prompt off; cold = the first row, warm = median of the rest"
+      },
+      "hardware": {
+       "cpu": "Apple M4 Pro",
+       "cpu_cores": 12,
+       "gpu": {
+        "bf16_compute": true,
+        "model": "Apple M4 Pro",
+        "vram_bytes": 38654705664
+       },
+       "nvme_seq_read_bytes_per_sec": 5481095558,
+       "os": "Darwin 24.6.0 (15.7.3)",
+       "probed_at": "2026-09-30T20:08:10-0700",
+       "ram_total_bytes": 51539607552
+      },
+      "host": {
+       "cpus": 12,
+       "machine": "arm64",
+       "platform": "macOS-15.7.3-arm64-arm-64bit",
+       "system": "Darwin"
+      },
+      "input_tokens": [
+       43,
+       38,
+       38,
+       38,
+       40,
+       44,
+       42,
+       36
+      ],
+      "kept_separate_from": "build durations (these are inference measurements)",
+      "load_seconds": 0.439,
+      "output_tokens": [
+       3,
+       4,
+       3,
+       6,
+       4,
+       4,
+       4,
+       4
+      ],
+      "peak_memory_bytes": 740720640,
+      "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+      "tokens_per_s_warm": 120.84,
+      "ttft_cold_s": 0.0372,
+      "ttft_warm_s": 0.0204
+     },
+     "safetensors": {
+      "boundaries": {
+       "peak_memory": "ru_maxrss of this process (weights, activations, tokenizer, interpreter)",
+       "tokens_per_s": "completion tokens / wall time of the full generate() including prefill, median over rows after the first",
+       "ttft": "wall time of generate(max_new_tokens=1) including prompt prefill; cold = the first row, warm = median of the rest"
+      },
+      "hardware": {
+       "cpu": "Apple M4 Pro",
+       "cpu_cores": 12,
+       "gpu": {
+        "bf16_compute": true,
+        "model": "Apple M4 Pro",
+        "vram_bytes": 38654705664
+       },
+       "nvme_seq_read_bytes_per_sec": 5481095558,
+       "os": "Darwin 24.6.0 (15.7.3)",
+       "probed_at": "2026-09-30T20:08:10-0700",
+       "ram_total_bytes": 51539607552
+      },
+      "host": {
+       "cpus": 12,
+       "machine": "arm64",
+       "platform": "macOS-15.7.3-arm64-arm-64bit",
+       "system": "Darwin"
+      },
+      "input_tokens": [
+       43,
+       38,
+       38,
+       38,
+       40,
+       44,
+       42,
+       36
+      ],
+      "kept_separate_from": "build durations (these are inference measurements)",
+      "load_seconds": 0.347,
+      "output_tokens": [
+       3,
+       4,
+       3,
+       6,
+       4,
+       4,
+       4,
+       4
+      ],
+      "peak_memory_bytes": 3410837504,
+      "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+      "tokens_per_s_warm": 32.55,
+      "ttft_cold_s": 0.0693,
+      "ttft_warm_s": 0.064
+     }
+    },
+    "scripts": {
+     "gguf": {
+      "error": null,
+      "exit_code": 0,
+      "input": "Can I get a new pin number at any ATM using my card?",
+      "output": "change_pin",
+      "script": "run_gguf.py"
+     },
+     "safetensors": {
+      "error": null,
+      "exit_code": 0,
+      "input": "Can I get a new pin number at any ATM using my card?",
+      "output": "change_pin",
+      "script": "run_safetensors.py"
+     }
+    },
+    "seconds": 18.7
+   },
+   "inference": {
+    "gguf": {
+     "input": "Can I get a new pin number at any ATM using my card?",
+     "output": "change_pin",
+     "exit": 0,
+     "seconds": 0.5
+    },
+    "safetensors": {
+     "input": "Can I get a new pin number at any ATM using my card?",
+     "output": "change_pin",
+     "exit": 0,
+     "seconds": 2.8
+    }
+   }
+  },
+  {
+   "task": "json",
+   "engine": "mlx",
+   "steps": [
+    {
+     "cmd": "spill example snips --tiny",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill init <scratch>/gw2/json-mlx/snips-tiny/snips.csv --input text --output json --schema <scratch>/gw2/json-mlx/snips-tiny/schema.json --project <scratch>/gw2/json-mlx/project",
+     "seconds": 0.2,
+     "exit": 0
+    },
+    {
+     "cmd": "spill plan <scratch>/gw2/json-mlx/project --engine mlx",
+     "seconds": 0.8,
+     "exit": 0
+    },
+    {
+     "cmd": "spill build <scratch>/gw2/json-mlx/project --engine mlx",
+     "seconds": 17.8,
+     "exit": 0
+    },
+    {
+     "cmd": "spill report <scratch>/gw2/json-mlx/project",
+     "seconds": 0.2,
+     "exit": 0
+    },
+    {
+     "cmd": "spill test <scratch>/gw2/json-mlx/project --engine mlx",
+     "seconds": 8.2,
+     "exit": 0
+    },
+    {
+     "cmd": "spill evaluate <scratch>/gw2/json-mlx/project --engine torch-cpu",
+     "seconds": 19.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill compare <scratch>/gw2/json-mlx/project",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill compare <scratch>/gw2/json-mlx/project --use run-20261009-181522-f353-ba19bd=eval-20261009-181547-0d5c09",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill export <scratch>/gw2/json-mlx/project --gguf q8_0",
+     "seconds": 22.7,
+     "exit": 0
+    }
+   ],
+   "init": [
+    "spill init snips.csv: json (all 120 outputs are JSON objects). Train 84, validation 18, final test 18 rows. Cost: $0. Project -> <scratch>/gw2/json-mlx/project",
+    "   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together",
+    "",
+    "next: spill plan <scratch>/gw2/json-mlx/project"
+   ],
+   "build_exit": 0,
+   "run": {
+    "id": "run-20261009-181522-f353-ba19bd",
+    "metric": "whole_record_accuracy",
+    "table": [
+     {
+      "accuracy": null,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.10256410256410256,
+      "parseable_rate": 1.0,
+      "primary": 0.0,
+      "records_with_extra_fields": 18,
+      "rows": 18,
+      "schema_valid_rate": 0.7222222222222222,
+      "truncated": 0,
+      "whole_record_accuracy": 0.0
+     },
+     {
+      "accuracy": null,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.9230769230769231,
+      "parseable_rate": 1.0,
+      "primary": 0.5,
+      "records_with_extra_fields": 5,
+      "rows": 18,
+      "schema_valid_rate": 1.0,
+      "truncated": 0,
+      "whole_record_accuracy": 0.5
+     }
+    ],
+    "stages": {
+     "eval:trained": {
+      "seconds": 2.01,
+      "producers": [
+       {
+        "engine": "mlx",
+        "hardware": "apple-gpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "bf16"
+        },
+        "os": "macOS arm64",
+        "quanta": "18 rows",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "eval:untrained": {
+      "seconds": 3.29,
+      "producers": [
+       {
+        "engine": "mlx",
+        "hardware": "apple-gpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "bf16"
+        },
+        "os": "macOS arm64",
+        "quanta": "18 rows",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "train": {
+      "seconds": 11.15,
+      "producers": [
+       {
+        "engine": "mlx",
+        "hardware": "apple-gpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "bf16",
+         "dropout": 0.0,
+         "optimizer": "float32"
+        },
+        "os": "macOS arm64",
+        "quanta": "steps 0-42",
+        "system": "Darwin"
+       }
+      ]
+     }
+    },
+    "models": {
+     "student": {
+      "tag": "qwen2.5:0.5b",
+      "repo": "Qwen/Qwen2.5-0.5B-Instruct",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775"
+     }
+    },
+    "dependencies": {
+     "boto3": "1.43.106",
+     "huggingface-hub": "1.33.0",
+     "jsonschema": "4.26.0",
+     "mlx": "0.32.3",
+     "mlx-lm": "0.32.0",
+     "numpy": "2.5.3",
+     "peft": "0.21.2",
+     "platform": "macOS-15.7.3-arm64-arm-64bit",
+     "python": "3.12.13",
+     "s3fs": "2026.9.0",
+     "safetensors": "0.8.0",
+     "streamweights": "0.1.0",
+     "tokenizers": "0.23.2",
+     "torch": "2.14.1",
+     "transformers": "5.19.0"
+    },
+    "findings": [
+     "On 18 validation rows, whole-record accuracy: student, schema-prompted, untrained (the baseline): 0.000; student, trained: 0.500.",
+     "The trained student scored 0.500 higher than the student, schema-prompted, untrained (the baseline) (9 rows)."
+    ],
+    "protocol_sha256": "d31102a80fef71284f74079b8c67a3a0c02e5d7479ef92898ed917cbb57df5bb"
+   },
+   "test": {
+    "table": [
+     {
+      "accuracy": null,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.12393162393162392,
+      "parseable_rate": 1.0,
+      "primary": 0.0,
+      "records_with_extra_fields": 18,
+      "rows": 18,
+      "schema_valid_rate": 0.8333333333333334,
+      "truncated": 0,
+      "whole_record_accuracy": 0.0
+     },
+     {
+      "accuracy": null,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.9102564102564104,
+      "parseable_rate": 1.0,
+      "primary": 0.3333333333333333,
+      "records_with_extra_fields": 9,
+      "rows": 18,
+      "schema_valid_rate": 1.0,
+      "truncated": 0,
+      "whole_record_accuracy": 0.3333333333333333
+     }
+    ],
+    "rows": 18,
+    "seconds": 7.7,
+    "holdout_note": "This is use 1 of this project's final test split. It was not consulted before."
+   },
+   "evaluate": {
+    "id": "eval-20261009-181547-0d5c09",
+    "engine_requested": "torch-cpu",
+    "table": [
+     {
+      "accuracy": null,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.09829059829059829,
+      "parseable_rate": 1.0,
+      "primary": 0.0,
+      "records_with_extra_fields": 18,
+      "rows": 18,
+      "schema_valid_rate": 0.6666666666666666,
+      "truncated": 0,
+      "whole_record_accuracy": 0.0
+     },
+     {
+      "accuracy": null,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.9230769230769231,
+      "parseable_rate": 1.0,
+      "primary": 0.5,
+      "records_with_extra_fields": 5,
+      "rows": 18,
+      "schema_valid_rate": 1.0,
+      "truncated": 0,
+      "whole_record_accuracy": 0.5
+     }
+    ],
+    "vs_original": {
+     "trained": {
+      "difference": 0.0,
+      "new": 0.5,
+      "original": 0.5
+     },
+     "untrained": {
+      "difference": 0.0,
+      "new": 0.0,
+      "original": 0.0
+     }
+    },
+    "rows": 18,
+    "conditions": {
+     "trained": {
+      "adapter_dtype": "float32",
+      "compute_dtype": "float32",
+      "decoding_applied": {
+       "greedy": true,
+       "max_tokens": 256,
+       "requested": {
+        "greedy": true,
+        "seed": 0,
+        "stop": [],
+        "temperature": 0.0,
+        "top_p": 1.0
+       },
+       "seed": 0,
+       "stop": [],
+       "temperature": 0.0,
+       "top_p": 1.0
+      },
+      "device": "cpu:Apple M4 Pro",
+      "engine": "torch-cpu",
+      "engine_impl": "torch_resident",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "optimizer": "float32"
+      },
+      "os": "macOS arm64",
+      "versions": {
+       "mlx": "0.32.3",
+       "mlx-lm": "0.32.0",
+       "numpy": "2.5.3",
+       "peft": "0.21.2",
+       "python": "3.12.13",
+       "safetensors": "0.8.0",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "float32"
+     },
+     "untrained": {
+      "adapter_dtype": "float32",
+      "compute_dtype": "float32",
+      "decoding_applied": {
+       "greedy": true,
+       "max_tokens": 256,
+       "requested": {
+        "greedy": true,
+        "seed": 0,
+        "stop": [],
+        "temperature": 0.0,
+        "top_p": 1.0
+       },
+       "seed": 0,
+       "stop": [],
+       "temperature": 0.0,
+       "top_p": 1.0
+      },
+      "device": "cpu:Apple M4 Pro",
+      "engine": "torch-cpu",
+      "engine_impl": "torch_resident",
+      "numerics": {
+       "adapter": "float32",
+       "base": "float32",
+       "optimizer": "float32"
+      },
+      "os": "macOS arm64",
+      "versions": {
+       "mlx": "0.32.3",
+       "mlx-lm": "0.32.0",
+       "numpy": "2.5.3",
+       "peft": "0.21.2",
+       "python": "3.12.13",
+       "safetensors": "0.8.0",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "float32"
+     }
+    },
+    "seconds": 18.6
+   },
+   "compare_default": "run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine\nrun-20261009-181522-f353-ba19bd  run-20261009-181522-f353-ba19bd/original  whole-record accuracy v2  0.500  unavailable  0.000  18  d31102a80fef  mlx\nevaluation used for run-20261009-181522-f353-ba19bd: run-20261009-181522-f353-ba19bd/original (the run's original evaluation; no --use given; others exist: eval-20261009-181547-0d5c09)\n\nnext: spill export <scratch>/gw2/json-mlx/project\n",
+   "compare_explicit": "run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine\nrun-20261009-181522-f353-ba19bd  eval-20261009-181547-0d5c09  whole-record accuracy v2  0.500  unavailable  0.000  18  d31102a80fef  torch-cpu\nevaluation used for run-20261009-181522-f353-ba19bd: eval-20261009-181547-0d5c09 (chosen with --use)\n\nnext: spill export <scratch>/gw2/json-mlx/project\n",
+   "export_exit": 0,
+   "export": {
+    "id": "export-20261009-181607-ca8e8c",
+    "format": [
+     "safetensors",
+     "gguf:q8_0"
+    ],
+    "status": "completed",
+    "verification": {
+     "gguf:q8_0": {
+      "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+      "diffs": 4,
+      "of": 8,
+      "primary": 0.25,
+      "load_failure": null
+     },
+     "safetensors": {
+      "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+      "diffs": 4,
+      "of": 8,
+      "primary": 0.25,
+      "load_failure": null
+     }
+    },
+    "deployment": {
+     "gguf:q8_0": {
+      "boundaries": {
+       "peak_memory": "peak resident set of the llama-server process tree sampled after each request (a lower bound)",
+       "tokens_per_s": "completion tokens / wall time of the non-streamed request",
+       "ttft": "wall time from request to the first streamed content token, cache_prompt off; cold = the first row, warm = median of the rest"
+      },
+      "hardware": {
+       "cpu": "Apple M4 Pro",
+       "cpu_cores": 12,
+       "gpu": {
+        "bf16_compute": true,
+        "model": "Apple M4 Pro",
+        "vram_bytes": 38654705664
+       },
+       "nvme_seq_read_bytes_per_sec": 5481095558,
+       "os": "Darwin 24.6.0 (15.7.3)",
+       "probed_at": "2026-09-30T20:08:10-0700",
+       "ram_total_bytes": 51539607552
+      },
+      "host": {
+       "cpus": 12,
+       "machine": "arm64",
+       "platform": "macOS-15.7.3-arm64-arm-64bit",
+       "system": "Darwin"
+      },
+      "input_tokens": [
+       37,
+       44,
+       38,
+       35,
+       35,
+       37,
+       41,
+       38
+      ],
+      "kept_separate_from": "build durations (these are inference measurements)",
+      "load_seconds": 0.434,
+      "output_tokens": [
+       16,
+       27,
+       27,
+       19,
+       16,
+       25,
+       23,
+       19
+      ],
+      "peak_memory_bytes": 745357312,
+      "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+      "tokens_per_s_warm": 206.15,
+      "ttft_cold_s": 0.0382,
+      "ttft_warm_s": 0.021
+     },
+     "safetensors": {
+      "boundaries": {
+       "peak_memory": "ru_maxrss of this process (weights, activations, tokenizer, interpreter)",
+       "tokens_per_s": "completion tokens / wall time of the full generate() including prefill, median over rows after the first",
+       "ttft": "wall time of generate(max_new_tokens=1) including prompt prefill; cold = the first row, warm = median of the rest"
+      },
+      "hardware": {
+       "cpu": "Apple M4 Pro",
+       "cpu_cores": 12,
+       "gpu": {
+        "bf16_compute": true,
+        "model": "Apple M4 Pro",
+        "vram_bytes": 38654705664
+       },
+       "nvme_seq_read_bytes_per_sec": 5481095558,
+       "os": "Darwin 24.6.0 (15.7.3)",
+       "probed_at": "2026-09-30T20:08:10-0700",
+       "ram_total_bytes": 51539607552
+      },
+      "host": {
+       "cpus": 12,
+       "machine": "arm64",
+       "platform": "macOS-15.7.3-arm64-arm-64bit",
+       "system": "Darwin"
+      },
+      "input_tokens": [
+       37,
+       44,
+       38,
+       35,
+       35,
+       37,
+       41,
+       38
+      ],
+      "kept_separate_from": "build durations (these are inference measurements)",
+      "load_seconds": 0.335,
+      "output_tokens": [
+       16,
+       27,
+       27,
+       19,
+       16,
+       25,
+       23,
+       19
+      ],
+      "peak_memory_bytes": 3414949888,
+      "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+      "tokens_per_s_warm": 50.92,
+      "ttft_cold_s": 0.0668,
+      "ttft_warm_s": 0.0649
+     }
+    },
+    "scripts": {
+     "gguf": {
+      "error": null,
+      "exit_code": 0,
+      "input": "Show me the picture Written in the Stars",
+      "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+      "script": "run_gguf.py"
+     },
+     "safetensors": {
+      "error": null,
+      "exit_code": 0,
+      "input": "Show me the picture Written in the Stars",
+      "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+      "script": "run_safetensors.py"
+     }
+    },
+    "seconds": 22.5
+   },
+   "inference": {
+    "gguf": {
+     "input": "Show me the picture Written in the Stars",
+     "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+     "exit": 0,
+     "seconds": 0.6
+    },
+    "safetensors": {
+     "input": "Show me the picture Written in the Stars",
+     "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+     "exit": 0,
+     "seconds": 3.0
+    }
+   }
+  },
+  {
+   "task": "json",
+   "engine": "torch-cpu",
+   "steps": [
+    {
+     "cmd": "spill example snips --tiny",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill init <scratch>/gw2/json-torch-cpu/snips-tiny/snips.csv --input text --output json --schema <scratch>/gw2/json-torch-cpu/snips-tiny/schema.json --project <scratch>/gw2/json-torch-cpu/project",
+     "seconds": 0.2,
+     "exit": 0
+    },
+    {
+     "cmd": "spill plan <scratch>/gw2/json-torch-cpu/project --engine torch-cpu",
+     "seconds": 0.8,
+     "exit": 0
+    },
+    {
+     "cmd": "spill build <scratch>/gw2/json-torch-cpu/project --engine torch-cpu",
+     "seconds": 38.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill report <scratch>/gw2/json-torch-cpu/project",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill test <scratch>/gw2/json-torch-cpu/project --engine torch-cpu",
+     "seconds": 19.2,
+     "exit": 0
+    },
+    {
+     "cmd": "spill evaluate <scratch>/gw2/json-torch-cpu/project --engine mlx",
+     "seconds": 4.4,
+     "exit": 0
+    },
+    {
+     "cmd": "spill compare <scratch>/gw2/json-torch-cpu/project",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill compare <scratch>/gw2/json-torch-cpu/project --use run-20261009-181635-8b56-ba19bd=eval-20261009-181732-e5a1ae",
+     "seconds": 0.1,
+     "exit": 0
+    },
+    {
+     "cmd": "spill export <scratch>/gw2/json-torch-cpu/project --gguf q8_0",
+     "seconds": 23.0,
+     "exit": 0
+    }
+   ],
+   "init": [
+    "spill init snips.csv: json (all 120 outputs are JSON objects). Train 84, validation 18, final test 18 rows. Cost: $0. Project -> <scratch>/gw2/json-torch-cpu/project",
+    "   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together",
+    "",
+    "next: spill plan <scratch>/gw2/json-torch-cpu/project"
+   ],
+   "build_exit": 0,
+   "run": {
+    "id": "run-20261009-181635-8b56-ba19bd",
+    "metric": "whole_record_accuracy",
+    "table": [
+     {
+      "accuracy": null,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.09829059829059829,
+      "parseable_rate": 1.0,
+      "primary": 0.0,
+      "records_with_extra_fields": 18,
+      "rows": 18,
+      "schema_valid_rate": 0.6666666666666666,
+      "truncated": 0,
+      "whole_record_accuracy": 0.0
+     },
+     {
+      "accuracy": null,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.9316239316239316,
+      "parseable_rate": 1.0,
+      "primary": 0.4444444444444444,
+      "records_with_extra_fields": 7,
+      "rows": 18,
+      "schema_valid_rate": 1.0,
+      "truncated": 0,
+      "whole_record_accuracy": 0.4444444444444444
+     }
+    ],
+    "stages": {
+     "eval:trained": {
+      "seconds": 5.78,
+      "producers": [
+       {
+        "engine": "torch-cpu",
+        "hardware": "cpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "float32",
+         "optimizer": "float32"
+        },
+        "os": "macOS arm64",
+        "quanta": "18 rows",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "eval:untrained": {
+      "seconds": 0.1,
+      "producers": [
+       {
+        "engine": "torch-cpu",
+        "hardware": "cpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "float32",
+         "optimizer": "float32"
+        },
+        "os": "macOS arm64",
+        "quanta": "18 rows",
+        "system": "Darwin"
+       }
+      ]
+     },
+     "train": {
+      "seconds": 30.83,
+      "producers": [
+       {
+        "engine": "torch-cpu",
+        "hardware": "cpu:Apple M4 Pro",
+        "host": "Amrishs-MacBook-Pro.local",
+        "numerics": {
+         "adapter": "float32",
+         "base": "float32",
+         "dropout": 0.0,
+         "optimizer": "float32"
+        },
+        "os": "macOS arm64",
+        "quanta": "steps 0-42",
+        "system": "Darwin"
+       }
+      ]
+     }
+    },
+    "models": {
+     "student": {
+      "tag": "qwen2.5:0.5b",
+      "repo": "Qwen/Qwen2.5-0.5B-Instruct",
+      "revision": "7ae557604adf67be50417f59c2c2f167def9a775"
+     }
+    },
+    "dependencies": {
+     "boto3": "1.43.106",
+     "huggingface-hub": "1.33.0",
+     "jsonschema": "4.26.0",
+     "mlx": "0.32.3",
+     "mlx-lm": "0.32.0",
+     "numpy": "2.5.3",
+     "peft": "0.21.2",
+     "platform": "macOS-15.7.3-arm64-arm-64bit",
+     "python": "3.12.13",
+     "s3fs": "2026.9.0",
+     "safetensors": "0.8.0",
+     "streamweights": "0.1.0",
+     "tokenizers": "0.23.2",
+     "torch": "2.14.1",
+     "transformers": "5.19.0"
+    },
+    "findings": [
+     "On 18 validation rows, whole-record accuracy: student, schema-prompted, untrained (the baseline): 0.000; student, trained: 0.444.",
+     "The trained student scored 0.444 higher than the student, schema-prompted, untrained (the baseline) (8 rows)."
+    ],
+    "protocol_sha256": "d31102a80fef71284f74079b8c67a3a0c02e5d7479ef92898ed917cbb57df5bb"
+   },
+   "test": {
+    "table": [
+     {
+      "accuracy": null,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.14529914529914528,
+      "parseable_rate": 1.0,
+      "primary": 0.0,
+      "records_with_extra_fields": 18,
+      "rows": 18,
+      "schema_valid_rate": 0.8888888888888888,
+      "truncated": 0,
+      "whole_record_accuracy": 0.0
+     },
+     {
+      "accuracy": null,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.9358974358974359,
+      "parseable_rate": 1.0,
+      "primary": 0.5555555555555556,
+      "records_with_extra_fields": 8,
+      "rows": 18,
+      "schema_valid_rate": 1.0,
+      "truncated": 0,
+      "whole_record_accuracy": 0.5555555555555556
+     }
+    ],
+    "rows": 18,
+    "seconds": 18.8,
+    "holdout_note": "This is use 1 of this project's final test split. It was not consulted before."
+   },
+   "evaluate": {
+    "id": "eval-20261009-181732-e5a1ae",
+    "engine_requested": "mlx",
+    "table": [
+     {
+      "accuracy": null,
+      "comparator": "untrained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.10256410256410256,
+      "parseable_rate": 1.0,
+      "primary": 0.0,
+      "records_with_extra_fields": 18,
+      "rows": 18,
+      "schema_valid_rate": 0.7222222222222222,
+      "truncated": 0,
+      "whole_record_accuracy": 0.0
+     },
+     {
+      "accuracy": null,
+      "comparator": "trained",
+      "inference_failures": 0,
+      "invalid_predictions": null,
+      "macro_f1": null,
+      "mean_field_accuracy": 0.9316239316239316,
+      "parseable_rate": 1.0,
+      "primary": 0.4444444444444444,
+      "records_with_extra_fields": 7,
+      "rows": 18,
+      "schema_valid_rate": 1.0,
+      "truncated": 0,
+      "whole_record_accuracy": 0.4444444444444444
+     }
+    ],
+    "vs_original": {
+     "trained": {
+      "difference": 0.0,
+      "new": 0.4444444444444444,
+      "original": 0.4444444444444444
+     },
+     "untrained": {
+      "difference": 0.0,
+      "new": 0.0,
+      "original": 0.0
+     }
+    },
+    "rows": 18,
+    "conditions": {
+     "trained": {
+      "adapter_dtype": "float32",
+      "compute_dtype": "bf16",
+      "decoding_applied": {
+       "greedy": true,
+       "max_tokens": 256,
+       "requested": {
+        "greedy": true,
+        "seed": 0,
+        "stop": [],
+        "temperature": 0.0,
+        "top_p": 1.0
+       },
+       "seed": 0,
+       "stop": [],
+       "temperature": 0.0,
+       "top_p": 1.0
+      },
+      "device": "apple-gpu:Apple M4 Pro",
+      "engine": "mlx",
+      "engine_impl": "mlx_resident",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16"
+      },
+      "os": "macOS arm64",
+      "versions": {
+       "mlx": "0.32.3",
+       "mlx-lm": "0.32.0",
+       "numpy": "2.5.3",
+       "peft": "0.21.2",
+       "python": "3.12.13",
+       "safetensors": "0.8.0",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "bf16"
+     },
+     "untrained": {
+      "adapter_dtype": "float32",
+      "compute_dtype": "bf16",
+      "decoding_applied": {
+       "greedy": true,
+       "max_tokens": 256,
+       "requested": {
+        "greedy": true,
+        "seed": 0,
+        "stop": [],
+        "temperature": 0.0,
+        "top_p": 1.0
+       },
+       "seed": 0,
+       "stop": [],
+       "temperature": 0.0,
+       "top_p": 1.0
+      },
+      "device": "apple-gpu:Apple M4 Pro",
+      "engine": "mlx",
+      "engine_impl": "mlx_resident",
+      "numerics": {
+       "adapter": "float32",
+       "base": "bf16"
+      },
+      "os": "macOS arm64",
+      "versions": {
+       "mlx": "0.32.3",
+       "mlx-lm": "0.32.0",
+       "numpy": "2.5.3",
+       "peft": "0.21.2",
+       "python": "3.12.13",
+       "safetensors": "0.8.0",
+       "torch": "2.14.1",
+       "transformers": "5.19.0"
+      },
+      "weight_dtype": "bf16"
+     }
+    },
+    "seconds": 4.0
+   },
+   "compare_default": "run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine\nrun-20261009-181635-8b56-ba19bd  run-20261009-181635-8b56-ba19bd/original  whole-record accuracy v2  0.444  unavailable  0.000  18  d31102a80fef  torch-cpu\nevaluation used for run-20261009-181635-8b56-ba19bd: run-20261009-181635-8b56-ba19bd/original (the run's original evaluation; no --use given; others exist: eval-20261009-181732-e5a1ae)\n\nnext: spill export <scratch>/gw2/json-torch-cpu/project\n",
+   "compare_explicit": "run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine\nrun-20261009-181635-8b56-ba19bd  eval-20261009-181732-e5a1ae  whole-record accuracy v2  0.444  unavailable  0.000  18  d31102a80fef  mlx\nevaluation used for run-20261009-181635-8b56-ba19bd: eval-20261009-181732-e5a1ae (chosen with --use)\n\nnext: spill export <scratch>/gw2/json-torch-cpu/project\n",
+   "export_exit": 0,
+   "export": {
+    "id": "export-20261009-181736-5172d6",
+    "format": [
+     "safetensors",
+     "gguf:q8_0"
+    ],
+    "status": "completed",
+    "verification": {
+     "gguf:q8_0": {
+      "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+      "diffs": 2,
+      "of": 8,
+      "primary": 0.625,
+      "load_failure": null
+     },
+     "safetensors": {
+      "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+      "diffs": 3,
+      "of": 8,
+      "primary": 0.375,
+      "load_failure": null
+     }
+    },
+    "deployment": {
+     "gguf:q8_0": {
+      "boundaries": {
+       "peak_memory": "peak resident set of the llama-server process tree sampled after each request (a lower bound)",
+       "tokens_per_s": "completion tokens / wall time of the non-streamed request",
+       "ttft": "wall time from request to the first streamed content token, cache_prompt off; cold = the first row, warm = median of the rest"
+      },
+      "hardware": {
+       "cpu": "Apple M4 Pro",
+       "cpu_cores": 12,
+       "gpu": {
+        "bf16_compute": true,
+        "model": "Apple M4 Pro",
+        "vram_bytes": 38654705664
+       },
+       "nvme_seq_read_bytes_per_sec": 5481095558,
+       "os": "Darwin 24.6.0 (15.7.3)",
+       "probed_at": "2026-09-30T20:08:10-0700",
+       "ram_total_bytes": 51539607552
+      },
+      "host": {
+       "cpus": 12,
+       "machine": "arm64",
+       "platform": "macOS-15.7.3-arm64-arm-64bit",
+       "system": "Darwin"
+      },
+      "input_tokens": [
+       37,
+       44,
+       38,
+       35,
+       35,
+       37,
+       41,
+       38
+      ],
+      "kept_separate_from": "build durations (these are inference measurements)",
+      "load_seconds": 0.444,
+      "output_tokens": [
+       21,
+       27,
+       32,
+       19,
+       22,
+       25,
+       23,
+       19
+      ],
+      "peak_memory_bytes": 750518272,
+      "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+      "tokens_per_s_warm": 207.46,
+      "ttft_cold_s": 0.0401,
+      "ttft_warm_s": 0.0208
+     },
+     "safetensors": {
+      "boundaries": {
+       "peak_memory": "ru_maxrss of this process (weights, activations, tokenizer, interpreter)",
+       "tokens_per_s": "completion tokens / wall time of the full generate() including prefill, median over rows after the first",
+       "ttft": "wall time of generate(max_new_tokens=1) including prompt prefill; cold = the first row, warm = median of the rest"
+      },
+      "hardware": {
+       "cpu": "Apple M4 Pro",
+       "cpu_cores": 12,
+       "gpu": {
+        "bf16_compute": true,
+        "model": "Apple M4 Pro",
+        "vram_bytes": 38654705664
+       },
+       "nvme_seq_read_bytes_per_sec": 5481095558,
+       "os": "Darwin 24.6.0 (15.7.3)",
+       "probed_at": "2026-09-30T20:08:10-0700",
+       "ram_total_bytes": 51539607552
+      },
+      "host": {
+       "cpus": 12,
+       "machine": "arm64",
+       "platform": "macOS-15.7.3-arm64-arm-64bit",
+       "system": "Darwin"
+      },
+      "input_tokens": [
+       37,
+       44,
+       38,
+       35,
+       35,
+       37,
+       41,
+       38
+      ],
+      "kept_separate_from": "build durations (these are inference measurements)",
+      "load_seconds": 0.336,
+      "output_tokens": [
+       21,
+       27,
+       32,
+       15,
+       16,
+       25,
+       23,
+       19
+      ],
+      "peak_memory_bytes": 3414884352,
+      "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+      "tokens_per_s_warm": 51.39,
+      "ttft_cold_s": 0.0665,
+      "ttft_warm_s": 0.0639
+     }
+    },
+    "scripts": {
+     "gguf": {
+      "error": null,
+      "exit_code": 0,
+      "input": "Show me the picture Written in the Stars",
+      "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\",\"object_type\":\"picture\"}",
+      "script": "run_gguf.py"
+     },
+     "safetensors": {
+      "error": null,
+      "exit_code": 0,
+      "input": "Show me the picture Written in the Stars",
+      "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\",\"object_type\":\"picture\"}",
+      "script": "run_safetensors.py"
+     }
+    },
+    "seconds": 22.7
+   },
+   "inference": {
+    "gguf": {
+     "input": "Show me the picture Written in the Stars",
+     "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\",\"object_type\":\"picture\"}",
+     "exit": 0,
+     "seconds": 0.6
+    },
+    "safetensors": {
+     "input": "Show me the picture Written in the Stars",
+     "output": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\",\"object_type\":\"picture\"}",
+     "exit": 0,
+     "seconds": 3.1
+    }
+   }
+  }
+ ],
+ "finished": "2026-10-09T18:18:03-0700"
+}

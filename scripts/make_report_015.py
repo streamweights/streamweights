@@ -79,12 +79,14 @@ for j in d["journeys"]:
                    f"{v['tokens_per_s_warm']} tokens/s | {'unavailable' if mem == 'unavailable' else f'{mem / 1e9:.2f} GB'} |")
 out.append("")
 ex = d["journeys"][0]["export"]["deployment"]
-b = next(iter(ex.values()))["boundaries"]
-out += ["Boundaries, Transformers: time to first token is " + b["ttft"] + "; tokens per second is "
-            + b["tokens_per_s"] + "; peak memory is " + b["peak_memory"] + ". For llama.cpp: "
-            + ex["gguf:q8_0"]["boundaries"]["ttft"] + "; peak memory is "
-            + ex["gguf:q8_0"]["boundaries"]["peak_memory"] + ". Hardware: the machine above; llama.cpp "
-            "runs with all layers on the Metal GPU, Transformers on the CPU.", ""]
+tf, gg = ex["safetensors"]["boundaries"], ex["gguf:q8_0"]["boundaries"]
+out += ["Measurement descriptions, each runtime's own. Transformers (safetensors, float32 on the CPU): time to first "
+        "token is " + tf["ttft"] + "; tokens per second is " + tf["tokens_per_s"] + "; peak memory is "
+        + tf["peak_memory"] + ", a process peak of resident memory and not a GPU-memory figure. llama.cpp (GGUF "
+        "q8_0, all layers on the Metal GPU): time to first token is " + gg["ttft"] + "; tokens per second is "
+        + gg["tokens_per_s"] + "; the sampled process resident set is a lower bound, not a total of GPU memory. "
+        "Cold first-token timing excludes model loading (load time is recorded apart). The Metal q8_0 and CPU "
+        "float32 numbers are not a format-only performance comparison: runtime, device and precision all differ.", ""]
 out += ["## Inference through the exported artifact", ""]
 for j in d["journeys"]:
     for fmt, v in j["inference"].items():

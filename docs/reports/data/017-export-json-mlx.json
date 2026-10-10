@@ -1,0 +1,296 @@
+{
+ "task": "json",
+ "run": "run-20261009-181522-f353-ba19bd",
+ "metric": "whole-record accuracy",
+ "metric_version": "2",
+ "verification_rows": [
+  "r-8e3af801180e",
+  "r-10360fcef242",
+  "r-755cf91924b9",
+  "r-3d6fa2994a5c",
+  "r-44c98cb280f0",
+  "r-24757b44a931",
+  "r-b3d75bb55fa5",
+  "r-c8e7090b6072"
+ ],
+ "n": 8,
+ "max_tokens": 256,
+ "decoding": "greedy: Transformers do_sample=False; llama.cpp temperature 0, top_k 1, seed 0",
+ "tokenization": "prompts rendered once by the Transformers chat template and passed to every runtime as token ids",
+ "source_engine": {
+  "score": 0.5,
+  "schema_valid_rate": 1.0,
+  "engine_conditions": {
+   "adapter_dtype": "float32",
+   "compute_dtype": "bf16",
+   "decoding_applied": {
+    "greedy": true,
+    "max_tokens": 256,
+    "requested": {
+     "greedy": true,
+     "seed": 0,
+     "stop": [],
+     "temperature": 0.0,
+     "top_p": 1.0
+    },
+    "seed": 0,
+    "stop": [],
+    "temperature": 0.0,
+    "top_p": 1.0
+   },
+   "device": "apple-gpu:Apple M4 Pro",
+   "engine": "mlx",
+   "engine_impl": "mlx_resident",
+   "numerics": {
+    "adapter": "float32",
+    "base": "bf16"
+   },
+   "os": "macOS arm64",
+   "versions": {
+    "mlx": "0.32.3",
+    "mlx-lm": "0.32.0",
+    "numpy": "2.5.3",
+    "peft": "0.21.2",
+    "python": "3.12.13",
+    "safetensors": "0.8.0",
+    "torch": "2.14.1",
+    "transformers": "5.19.0"
+   },
+   "weight_dtype": "bf16"
+  }
+ },
+ "arms": {
+  "unmerged": {
+   "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+   "settings": {
+    "dtype": "float32 (bf16 weights upcast)",
+    "do_sample": false,
+    "chat_template": "tokenizer's own",
+    "device": "cpu"
+   },
+   "error": null,
+   "seconds": 7.8,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 988097824,
+   "peak_rss_bytes": 3410706432,
+   "score": 0.25,
+   "source_engine_score": 0.5,
+   "delta_vs_source": -0.25,
+   "text_disagreement_rate": 0.5,
+   "text_disagreements": 4,
+   "schema_valid_rate": 1.0,
+   "parseable_rate": 1.0,
+   "correct_rows": 2,
+   "outputs": {
+    "r-8e3af801180e": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+    "r-10360fcef242": "{\"artist\":\"damon johnson\",\"intent\":\"AddToPlaylist\",\"playlist\":\"frescura indie\",\"playlist_owner\":\"my\"}",
+    "r-755cf91924b9": "{\"intent\":\"RateBook\",\"object_select\":\"this\",\"object_type\":\"book\",\"rating_unit\":\"points\",\"rating_value\":\"6\"}",
+    "r-3d6fa2994a5c": "{\"artist\":\"ana carolina\",\"intent\":\"AddToPlaylist\",\"playlist\":\"chill\"}",
+    "r-44c98cb280f0": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"The Family Jams\"}",
+    "r-24757b44a931": "{\"intent\":\"RateBook\",\"object_name\":\"The Logic of Sense\",\"rating_unit\":\"zero\",\"rating_value\":\"zero\"}",
+    "r-b3d75bb55fa5": "{\"entity_name\":\"Sonntagskind\",\"intent\":\"AddToPlaylist\",\"playlist\":\"soulful disco\"}",
+    "r-c8e7090b6072": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Most Necessary\",\"playlist\":\"Most Necessary\"}"
+   }
+  },
+  "merge-f32": {
+   "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+   "settings": {
+    "dtype": "float32 (bf16 weights upcast)",
+    "do_sample": false,
+    "chat_template": "tokenizer's own",
+    "device": "cpu"
+   },
+   "error": null,
+   "seconds": 6.5,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 1976163472,
+   "peak_rss_bytes": 2479964160,
+   "score": 0.25,
+   "source_engine_score": 0.5,
+   "delta_vs_source": -0.25,
+   "text_disagreement_rate": 0.5,
+   "text_disagreements": 4,
+   "schema_valid_rate": 1.0,
+   "parseable_rate": 1.0,
+   "correct_rows": 2,
+   "outputs": {
+    "r-8e3af801180e": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+    "r-10360fcef242": "{\"artist\":\"damon johnson\",\"intent\":\"AddToPlaylist\",\"playlist\":\"frescura indie\",\"playlist_owner\":\"my\"}",
+    "r-755cf91924b9": "{\"intent\":\"RateBook\",\"object_select\":\"this\",\"object_type\":\"book\",\"rating_unit\":\"points\",\"rating_value\":\"6\"}",
+    "r-3d6fa2994a5c": "{\"artist\":\"ana carolina\",\"intent\":\"AddToPlaylist\",\"playlist\":\"chill\"}",
+    "r-44c98cb280f0": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"The Family Jams\"}",
+    "r-24757b44a931": "{\"intent\":\"RateBook\",\"object_name\":\"The Logic of Sense\",\"rating_unit\":\"zero\",\"rating_value\":\"zero\"}",
+    "r-b3d75bb55fa5": "{\"entity_name\":\"Sonntagskind\",\"intent\":\"AddToPlaylist\",\"playlist\":\"soulful disco\"}",
+    "r-c8e7090b6072": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Most Necessary\",\"playlist\":\"Most Necessary\"}"
+   }
+  },
+  "merge-bf16": {
+   "runtime": "transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores)",
+   "settings": {
+    "dtype": "float32 (bf16 weights upcast)",
+    "do_sample": false,
+    "chat_template": "tokenizer's own",
+    "device": "cpu"
+   },
+   "error": null,
+   "seconds": 6.8,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 988097824,
+   "peak_rss_bytes": 3415687168,
+   "score": 0.25,
+   "source_engine_score": 0.5,
+   "delta_vs_source": -0.25,
+   "text_disagreement_rate": 0.5,
+   "text_disagreements": 4,
+   "schema_valid_rate": 1.0,
+   "parseable_rate": 1.0,
+   "correct_rows": 2,
+   "outputs": {
+    "r-8e3af801180e": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+    "r-10360fcef242": "{\"artist\":\"damon johnson\",\"intent\":\"AddToPlaylist\",\"playlist\":\"frescura indie\",\"playlist_owner\":\"my\"}",
+    "r-755cf91924b9": "{\"intent\":\"RateBook\",\"object_select\":\"this\",\"object_type\":\"book\",\"rating_unit\":\"points\",\"rating_value\":\"6\"}",
+    "r-3d6fa2994a5c": "{\"artist\":\"ana carolina\",\"intent\":\"AddToPlaylist\",\"playlist\":\"chill\"}",
+    "r-44c98cb280f0": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"The Family Jams\"}",
+    "r-24757b44a931": "{\"intent\":\"RateBook\",\"object_name\":\"The Logic of Sense\",\"rating_unit\":\"zero\",\"rating_value\":\"zero\"}",
+    "r-b3d75bb55fa5": "{\"entity_name\":\"Sonntagskind\",\"intent\":\"AddToPlaylist\",\"playlist\":\"soulful disco\"}",
+    "r-c8e7090b6072": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Most Necessary\",\"playlist\":\"Most Necessary\"}"
+   }
+  },
+  "gguf-f32": {
+   "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+   "settings": {
+    "temperature": 0,
+    "top_k": 1,
+    "seed": 0,
+    "context": 4096,
+    "gpu_layers": "0",
+    "chat_template": "the GGUF's embedded template"
+   },
+   "error": null,
+   "seconds": 3.4,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 1982078880,
+   "peak_rss_bytes": 2231123968,
+   "score": 0.25,
+   "source_engine_score": 0.5,
+   "delta_vs_source": -0.25,
+   "text_disagreement_rate": 0.5,
+   "text_disagreements": 4,
+   "schema_valid_rate": 1.0,
+   "parseable_rate": 1.0,
+   "correct_rows": 2,
+   "outputs": {
+    "r-8e3af801180e": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+    "r-10360fcef242": "{\"artist\":\"damon johnson\",\"intent\":\"AddToPlaylist\",\"playlist\":\"frescura indie\",\"playlist_owner\":\"my\"}",
+    "r-755cf91924b9": "{\"intent\":\"RateBook\",\"object_select\":\"this\",\"object_type\":\"book\",\"rating_unit\":\"points\",\"rating_value\":\"6\"}",
+    "r-3d6fa2994a5c": "{\"artist\":\"ana carolina\",\"intent\":\"AddToPlaylist\",\"playlist\":\"chill\"}",
+    "r-44c98cb280f0": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"The Family Jams\"}",
+    "r-24757b44a931": "{\"intent\":\"RateBook\",\"object_name\":\"The Logic of Sense\",\"rating_unit\":\"zero\",\"rating_value\":\"zero\"}",
+    "r-b3d75bb55fa5": "{\"entity_name\":\"Sonntagskind\",\"intent\":\"AddToPlaylist\",\"playlist\":\"soulful disco\"}",
+    "r-c8e7090b6072": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Most Necessary\",\"playlist\":\"Most Necessary\"}"
+   }
+  },
+  "gguf-q8-from-f32": {
+   "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+   "settings": {
+    "temperature": 0,
+    "top_k": 1,
+    "seed": 0,
+    "context": 4096,
+    "gpu_layers": "0",
+    "chat_template": "the GGUF's embedded template"
+   },
+   "error": null,
+   "seconds": 1.7,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 531067808,
+   "peak_rss_bytes": 1262845952,
+   "score": 0.375,
+   "source_engine_score": 0.5,
+   "delta_vs_source": -0.125,
+   "text_disagreement_rate": 0.625,
+   "text_disagreements": 5,
+   "schema_valid_rate": 1.0,
+   "parseable_rate": 1.0,
+   "correct_rows": 3,
+   "outputs": {
+    "r-8e3af801180e": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+    "r-10360fcef242": "{\"artist\":\"damon johnson\",\"intent\":\"AddToPlaylist\",\"playlist\":\"frescura indie\",\"playlist_owner\":\"my\"}",
+    "r-755cf91924b9": "{\"best_rating\":\"6\",\"intent\":\"RateBook\",\"object_select\":\"this\",\"object_type\":\"book\",\"rating_unit\":\"points\",\"rating_value\":\"2\"}",
+    "r-3d6fa2994a5c": "{\"artist\":\"ana carolina\",\"intent\":\"AddToPlaylist\",\"playlist\":\"chill\"}",
+    "r-44c98cb280f0": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"The Family Jams\"}",
+    "r-24757b44a931": "{\"intent\":\"RateBook\",\"object_name\":\"The Logic of Sense\",\"rating_unit\":\"zero\",\"rating_value\":\"zero\"}",
+    "r-b3d75bb55fa5": "{\"entity_name\":\"Sonntagskind\",\"intent\":\"AddToPlaylist\",\"playlist\":\"soulful disco\"}",
+    "r-c8e7090b6072": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Most Necessary\",\"playlist\":\"Most Necessary\"}"
+   }
+  },
+  "gguf-q8-from-bf16": {
+   "runtime": "llama.cpp version: 0.5.0-dev (build 11311, commit f7b384c1e)",
+   "settings": {
+    "temperature": 0,
+    "top_k": 1,
+    "seed": 0,
+    "context": 4096,
+    "gpu_layers": "0",
+    "chat_template": "the GGUF's embedded template"
+   },
+   "error": null,
+   "seconds": 1.6,
+   "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "platform": "macOS-15.7.3-arm64-arm-64bit",
+    "cpus": 12
+   },
+   "size_bytes": 531067808,
+   "peak_rss_bytes": 1271808000,
+   "score": 0.375,
+   "source_engine_score": 0.5,
+   "delta_vs_source": -0.125,
+   "text_disagreement_rate": 0.625,
+   "text_disagreements": 5,
+   "schema_valid_rate": 1.0,
+   "parseable_rate": 1.0,
+   "correct_rows": 3,
+   "outputs": {
+    "r-8e3af801180e": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Written in the Stars\"}",
+    "r-10360fcef242": "{\"artist\":\"damon johnson\",\"intent\":\"AddToPlaylist\",\"playlist\":\"frescura indie\",\"playlist_owner\":\"my\"}",
+    "r-755cf91924b9": "{\"best_rating\":\"6\",\"intent\":\"RateBook\",\"object_select\":\"this\",\"object_type\":\"book\",\"rating_unit\":\"points\",\"rating_value\":\"2\"}",
+    "r-3d6fa2994a5c": "{\"artist\":\"ana carolina\",\"intent\":\"AddToPlaylist\",\"playlist\":\"chill\"}",
+    "r-44c98cb280f0": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"The Family Jams\"}",
+    "r-24757b44a931": "{\"intent\":\"RateBook\",\"object_name\":\"The Logic of Sense\",\"rating_unit\":\"zero\",\"rating_value\":\"zero\"}",
+    "r-b3d75bb55fa5": "{\"entity_name\":\"Sonntagskind\",\"intent\":\"AddToPlaylist\",\"playlist\":\"soulful disco\"}",
+    "r-c8e7090b6072": "{\"intent\":\"SearchCreativeWork\",\"object_name\":\"Most Necessary\",\"playlist\":\"Most Necessary\"}"
+   }
+  }
+ },
+ "runtime_comparison": {
+  "transformers_f32_vs_llamacpp_f32_text_disagreements": 0,
+  "of": 8
+ }
+}
