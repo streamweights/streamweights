@@ -449,9 +449,10 @@ def _dur(s: float) -> str:
 def _score_note(plan, st, out) -> str:
     task = plan.cfg["task"]["type"]
     m = out.metrics
-    v = m.get("accuracy") if task == "classification" else m.get("whole_record_accuracy")
+    metric = R.metric_key(plan.cfg)
+    v = m.get(metric)
     if st.kind in ("eval", "baseline") and v is not None:
-        return f"; {R.primary_name(task)} {v:.3f} on {m.get('rows')} rows"
+        return f"; {R.primary_name(metric)} {v:.3f} on {m.get('rows')} rows"
     if st.kind == "train":
         return f"; {m.get('steps')} steps, final loss {m.get('final_loss')}"
     return ""

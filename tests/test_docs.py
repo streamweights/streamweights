@@ -173,7 +173,7 @@ def test_help_lists_commands_in_loop_order_one_line_each():
     out = _cli("--help")
     cmds = re.findall(r"^  (\w+)\s{2,}(.+)$", out, re.M)
     assert [c for c, _ in cmds] == ["init", "plan", "build", "report", "compare", "example", "run",
-                                    "distill", "tune", "eval", "export", "test", "bundle", "move",
+                                    "distill", "tune", "eval", "evaluate", "export", "test", "bundle", "move",
                                     "models", "adapters", "runs", "status", "tail", "resume",
                                     "doctor", "check"]
     assert all(len(d) < 62 for _, d in cmds)
@@ -181,7 +181,7 @@ def test_help_lists_commands_in_loop_order_one_line_each():
 
 def test_every_command_help_ends_with_one_example():
     for c in ("init", "plan", "build", "report", "compare", "example", "run", "distill", "tune",
-              "eval", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
+              "eval", "evaluate", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
               "tail", "resume", "doctor", "check"):
         lines = [l for l in _cli(c, "--help").rstrip().splitlines()]
         assert lines[-1].lstrip().startswith("Example: spill ") or \

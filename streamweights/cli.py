@@ -31,7 +31,7 @@ if sys.version_info < (3, 10):  # pragma: no cover
     raise SystemExit(1)
 
 COMMAND_ORDER = ["init", "plan", "build", "report", "compare", "example", "run", "distill", "tune",
-                 "eval", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
+                 "eval", "evaluate", "export", "test", "bundle", "move", "models", "adapters", "runs", "status",
                  "tail", "resume", "doctor", "check"]
 
 

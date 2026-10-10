@@ -26,8 +26,31 @@ CONFIG_NAME = "streamweights.toml"
 LEGACY_FILES = ("evals.jsonl", "train.jsonl", "prompts.jsonl")
 TASKS = ("classification", "json")
 
-METRIC_VERSION = "1"
-PROTOCOL_VERSION = "1"
+METRIC_VERSIONS = {"classification": "1", "json": "2"}   # json 2: invalid outputs get no credit
+METRIC_VERSION = "1"                                      # kept for callers that mean classification
+PROTOCOL_VERSION = "2"                                    # 2: decoding includes stop and greedy
+SUPPORTED_METRICS = {
+    "classification": ("accuracy", "macro_f1"),
+    "json": ("whole_record_accuracy", "mean_field_accuracy", "schema_valid_rate", "parseable_rate"),
+}
+METRIC_LABELS = {"accuracy": "accuracy", "macro_f1": "macro-F1",
+                 "whole_record_accuracy": "whole-record accuracy",
+                 "mean_field_accuracy": "mean field accuracy",
+                 "schema_valid_rate": "schema-valid rate", "parseable_rate": "parseable rate"}
+DEFAULT_DECODING = {"temperature": 0.0, "top_p": 1.0, "stop": [], "greedy": True, "seed": 0}
+
+
+def metric_version(cfg: dict) -> str:
+    """The version of the scorer in this code, whatever an older config file says."""
+    return METRIC_VERSIONS[cfg["task"]["type"]]
+
+
+def check_metric(task: str, metric: str) -> str:
+    ok = SUPPORTED_METRICS.get(task)
+    if ok is None or metric not in ok:
+        raise SpillError(f"metric {metric!r} is not supported for the {task} task (choose from "
+                         f"{', '.join(ok or ())})", f"set evaluation.metric in {CONFIG_NAME}")
+    return metric
 DUP_NORMALIZATION = ("Unicode NFKC, casefold, whitespace runs collapsed to one space, ends "
                      "stripped; applied to inputs for duplicate detection and to group values")
 LABEL_NORMALIZATION = ("Unicode NFKC, casefold, whitespace runs collapsed to one space, ends "
@@ -72,9 +95,9 @@ def default_config(name: str, task: str, mapping: dict, system: str | None) -> d
         "model": {"student": "qwen2.5:0.5b", "teacher": "", "engine": "auto"},
         "training": dict(DEFAULT_TRAINING),
         "evaluation": {
-            "protocol_version": PROTOCOL_VERSION, "metric_version": METRIC_VERSION,
+            "protocol_version": PROTOCOL_VERSION, "metric_version": METRIC_VERSIONS[task],
             "metric": "accuracy" if task == "classification" else "whole_record_accuracy",
-            "decoding": {"temperature": 0.0, "top_p": 1.0, "seed": 0},
+            "decoding": dict(DEFAULT_DECODING),
             "max_tokens": 16 if task == "classification" else 256,
             "precision": "bf16 base weights, float32 adapter",
             "postprocessing": "none beyond the contract rules",
@@ -165,7 +188,9 @@ def identity_fields(cfg: dict, split_sha: dict, model_ident: dict) -> dict:
     return {
         "task": cfg["task"], "contract": cfg["contract"],
         "split": {"fingerprints": split_sha, "seed": cfg["split"]["seed"]},
-        "training": cfg["training"], "evaluation": cfg["evaluation"],
+        "training": cfg["training"],
+        "evaluation": {**cfg["evaluation"], "metric_version": metric_version(cfg),
+                       "protocol_version": PROTOCOL_VERSION},
         "baseline": cfg.get("baseline", {}),
         "model": {"student": model_ident.get("student"), "teacher": model_ident.get("teacher"),
                   "embedding": model_ident.get("embedding")},

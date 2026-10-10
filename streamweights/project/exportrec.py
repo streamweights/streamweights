@@ -225,7 +225,7 @@ def run_export(project: Path, run_id: str | None = None, gguf: str | None = None
                 metrics = (K.agg_class(items, golds, cfg["contract"]["labels"]) if task == "classification"
                            else K.agg_json(items, schema, golds))
                 entry.update(prediction_differences={"count": len(diffs), "of": len(val), "rows": diffs},
-                             metrics=metrics, primary=R.primary(task, metrics))
+                             metrics=metrics, primary=R.primary(R.metric_key(cfg), metrics))
                 rec.setdefault("deployment", {})[label] = {
                     "hardware": hw, "host": res["host"], "runtime": res["runtime"],
                     "input_tokens": [p["prompt_tokens"] for p in res["predictions"]],

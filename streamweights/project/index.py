@@ -36,6 +36,11 @@ def test_uses(project: Path) -> dict:
     return n
 
 
+def _label(m: dict) -> str:
+    from . import report as R
+    return R.primary_name(R.key_of(m.get("metric_key") or m["metric"]))
+
+
 def render(project: Path) -> str:
     project = Path(project)
     runs = records(project, "runs")
@@ -56,12 +61,20 @@ def render(project: Path) -> str:
             base = "baseline" if "baseline" in tbl else "untrained"
             engines = sorted({p.get("engine") for s in m["stages"].values()
                               for p in s.get("producers", []) if p.get("engine")})
-            lines.append(f"| {m['run_id']} | {m['metric']} | {v('trained')} | {base} {v(base)} | "
+            lines.append(f"| {m['run_id']} | {_label(m)} | {v('trained')} | {base} {v(base)} | "
                          f"{', '.join(engines) or '-'} | {uses.get(m['run_id'], 0)} |")
+    par = [(m["run_id"], m["parent"]) for m in runs if m.get("parent")]
+    if par:
+        lines += [""] + [f"- Run {r} has parent {p}: experiment lineage only; {r} trained from the base "
+                         f"model, not from {p}'s weights." for r, p in par]
     ex = records(project, "exports")
     lines += ["", "## Exports", ""]
     lines += ([f"- {e['id']}: {e['format']} from {e['source_run']}, {e['status']}" for e in ex]
               or ["None yet. `spill export <project>` makes one."])
+    evs = records(project, "evaluations")
+    if evs:
+        lines += ["", "## Evaluations", ""]
+        lines += [f"- {e['id']}: run {e['source_run']}, {e['status']}" for e in evs]
     ts = records(project, "tests")
     lines += ["", "## Final test", ""]
     if ts:

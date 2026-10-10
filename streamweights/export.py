@@ -54,9 +54,16 @@ def _adapter_f32(x):
     return np.asarray(x, dtype=np.float32)
 
 
-def merge_adapter(model_dir: Path, adapter, out_dir: Path, say=lambda s: None) -> dict:
-    """Write the merged model to out_dir (numpy, so it runs without MLX). Returns
-    {"modules": n, "shards": n, "dtype": str}."""
+def merge_adapter(model_dir: Path, adapter, out_dir: Path, say=lambda s: None,
+                  merge_dtype: str = "bf16") -> dict:
+    """Write the merged model to out_dir (numpy, so it runs without MLX). The merge is computed in
+    float32; `merge_dtype` is what it is written as: "bf16" (the base's dtype, which rounds the
+    adapter's delta into bf16 weights) or "float32" (every tensor written as float32, nothing
+    rounded). Returns {"modules": n, "shards": n, "dtype": str}."""
+    if merge_dtype not in ("bf16", "float32"):
+        raise SpillError(f"--merge-dtype must be float32 or bf16, not {merge_dtype}",
+                         "spill export <project> --merge-dtype float32")
+    to32 = merge_dtype == "float32"
     model_dir, out_dir = Path(model_dir), Path(out_dir)
     cfg = json.loads((model_dir / "config.json").read_text())
     if cfg.get("quantization"):
@@ -78,10 +85,11 @@ def merge_adapter(model_dir: Path, adapter, out_dir: Path, say=lambda s: None) -
                 m = _WEIGHT.match(name)
                 ab = adapter.layers.get(int(m.group(1)), {}).get(m.group(2)) if m else None
                 if ab is None:
-                    return raw
+                    return snp.to_f32(raw, dt) if to32 else raw
                 a, b, scale = ab
                 delta = (_adapter_f32(a) @ _adapter_f32(b)) * np.float32(scale)   # [in, out]
-                return snp.from_f32(snp.to_f32(raw, dt) + delta.T, dt)
+                merged = snp.to_f32(raw, dt) + delta.T
+                return merged if to32 else snp.from_f32(merged, dt)
             m = _WEIGHT.match(name)
             ab = adapter.layers.get(int(m.group(1)), {}).get(m.group(2)) if m else None
             if ab is not None:
@@ -92,9 +100,9 @@ def merge_adapter(model_dir: Path, adapter, out_dir: Path, say=lambda s: None) -
                         f"adapter {adapter.id} layer {m.group(1)} {m.group(2)} makes a "
                         f"{upd[::-1]} update for a {tuple(shape)} weight; it was trained on a "
                         f"different base")
-                dtype = dt
+                dtype = "F32" if to32 else dt
                 merged += 1
-            entries.append((name, dt, shape, make))
+            entries.append((name, "F32" if to32 else dt, shape, make))
         snp.write(out_dir / shard.name, entries, metadata={"format": "pt"})
         say(f"merged shard {i + 1}/{len(shards)}: {shard.name}")
     if merged != expected:
@@ -104,9 +112,17 @@ def merge_adapter(model_dir: Path, adapter, out_dir: Path, say=lambda s: None) -
     for f in model_dir.iterdir():
         if f.is_file() and f.suffix in COPY_SUFFIXES and f.name != "adapter_config.json":
             shutil.copyfile(f, out_dir / f.name)
+    if to32:                                   # the config must say what the weights are
+        cfgp = out_dir / "config.json"
+        c = json.loads(cfgp.read_text())
+        for k in ("torch_dtype", "dtype"):
+            if k in c:
+                c[k] = "float32"
+        cfgp.write_text(json.dumps(c, indent=2))
     (out_dir / "merge.json").write_text(json.dumps({
         "adapter": adapter.id, "adapter_hash": adapter.hash, "rank": adapter.rank,
-        "modules": merged, "base_dir": str(model_dir), "dtype": dtype}, indent=2))
+        "modules": merged, "base_dir": str(model_dir), "dtype": dtype,
+        "merge_dtype": merge_dtype}, indent=2))
     return {"modules": merged, "shards": len(shards), "dtype": dtype}
 
 

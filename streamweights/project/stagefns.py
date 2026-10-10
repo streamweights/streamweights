@@ -14,6 +14,7 @@ from pathlib import Path
 
 from ..errors import SpillError
 from . import baseline as B
+from . import config as C
 from . import contract as K
 from . import modelid, training
 from .common import read_json, read_jsonl, sha_file, write_json, write_jsonl
@@ -141,8 +142,16 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
                 [{**p, "comparator": "baseline"} for p in res["predictions"]])
     metrics = {**res["metrics"], "settings": res["settings"], "training": manifest}
     write_json(ctx.out_dir / "metrics.json", metrics)
+    from . import modelid
+    v = modelid.dependency_versions()
     return StageOutcome("done", metrics, [{"engine": "torch-cpu", "hardware": "cpu",
-                                            "numerics": {"base": "float32"}}])
+                                            "numerics": {"base": "float32"}}],
+                        notes={"conditions": {"engine": "torch-cpu", "engine_impl": "embedding+logreg",
+                                              "device": "cpu", "numerics": {"base": "float32"},
+                                              "weight_dtype": "float32", "adapter_dtype": None,
+                                              "compute_dtype": "float32",
+                                              "versions": {k: v[k] for k in ("python", "torch", "transformers", "numpy") if k in v},
+                                              "decoding_applied": None}})
 
 
 def _teacher_answers(desc: StageDesc, ctx: StageContext) -> dict | None:
@@ -159,13 +168,33 @@ def _backend():
 
 
 def _prompt_rows(cfg: dict, schema, rows: list[dict], view: str, max_tokens: int) -> list[dict]:
+    """Batch-shaped requests. Every recorded decoding setting is in each request body."""
+    from .. import decoding
+    dec = {**C.DEFAULT_DECODING, **cfg["evaluation"].get("decoding", {})}
     out = []
     for r in rows:
         msgs = (K.messages_untrained(cfg, schema, r["input"]) if view == "untrained"
                 else K.messages_student(cfg, r["input"]))
-        out.append({"custom_id": r["id"], "messages": msgs, "max_tokens": max_tokens,
+        out.append({"custom_id": r["id"], "method": "POST", "url": "/v1/chat/completions",
+                    "body": {"messages": msgs, **decoding.request_fields(dec, max_tokens)},
                     "expected": K.target_text(cfg, r["output"])})
     return out
+
+
+def executed_conditions(result_rows: list[dict], engine: str) -> dict:
+    """What an evaluation actually ran under, read off its result rows (not off the config):
+    engine, device, numerics, runtime and library versions, and the decoding as applied. Kept
+    apart from the requested precision policy in the protocol."""
+    from . import modelid
+    sw = (result_rows[0].get("streamweights") if result_rows else None) or {}
+    num = sw.get("numerics") or {}
+    vers = modelid.dependency_versions()
+    keep = {k: vers[k] for k in ("python", "torch", "transformers", "peft", "mlx", "mlx-lm",
+                                 "safetensors", "numpy") if k in vers}
+    return {"engine": engine, "engine_impl": sw.get("engine"), "device": sw.get("hardware"),
+            "numerics": num, "weight_dtype": num.get("base"), "adapter_dtype": num.get("adapter"),
+            "compute_dtype": num.get("compute", num.get("base")),
+            "os": sw.get("os"), "versions": keep, "decoding_applied": sw.get("decoding")}
 
 
 def _distill(desc: StageDesc, ctx: StageContext) -> StageOutcome:
@@ -227,6 +256,10 @@ def _eval(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     val = read_jsonl(ctx.inputs_dir / "val.jsonl")
     ev = cfg["evaluation"]
     mt = ev["max_tokens"]
+    from .. import decoding as dec_mod
+    from ..engine_select import choose_engine
+    dec_mod.check_decoding(choose_engine(runtime.ENV.engine).name,
+                           {**C.DEFAULT_DECODING, **ev.get("decoding", {})})
     comparator = desc.params["comparator"]            # untrained | trained | teacher
     view = "student" if comparator == "trained" else "untrained"
     model = desc.params["model"]
@@ -277,6 +310,8 @@ def _eval(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     write_jsonl(ctx.out_dir / "predictions.jsonl", preds)
     write_json(ctx.out_dir / "metrics.json", metrics)
     from ..cli_build import _row_producers
+    rr = list(results.values())
     return StageOutcome("done", metrics, _row_producers(res["results_path"]),
                         notes={"engine_run_id": res.get("run_id"), "model": model,
-                               "reused": bool(res.get("cached"))})
+                               "reused": bool(res.get("cached")),
+                               "conditions": executed_conditions(rr, choose_engine(runtime.ENV.engine).name)})
