@@ -29,6 +29,7 @@ MAP = tomllib.loads((Path(__file__).parent / "docs_command_map.toml").read_text(
 PAGES = [ROOT / "README.md", *sorted((ROOT / "docs/guides").glob("*.md")),
          *[ROOT / "docs" / n for n in ("portability.md", "linux.md", "schedulers.md", "llamacpp.md",
                                        "formats.md", "models.md", "plan.md")]]
+OUTPUT_LINE = re.compile(r"^spill \w+ \S+: ")        # a pre-run or result line the CLI prints, not a command
 START = re.compile(r"^(spill|pip install|uv tool|uv pip|docker|python |\./)")
 
 
@@ -42,7 +43,7 @@ def inventory() -> dict[str, set[str]]:
             while i < len(lines):
                 s = lines[i].strip()
                 s = s[2:] if s.startswith("$ ") else s
-                if START.match(s):
+                if START.match(s) and not OUTPUT_LINE.match(s):
                     while s.endswith("\\") and i + 1 < len(lines):
                         i += 1
                         s = s[:-1].rstrip() + " " + lines[i].strip()
@@ -193,6 +194,8 @@ def test_execute_the_small_model_commands_on_tiny_data(tmp_path):
     (work / "prompts.jsonl").write_text("".join(
         json.dumps({"prompt": json.loads(l)["prompt"]}) + "\n"
         for l in (tiny / "train.jsonl").read_text().splitlines()))
+    for name in ("my-tickets.csv", "orders.csv", "schema.json"):          # the README's own-data files
+        shutil.copyfile(ROOT / "tests/fixtures/own-data" / name, work / name)
     inv = inventory()
     ordered = []
     for r in MAP["rule"]:
@@ -230,6 +233,12 @@ def test_execute_the_small_model_commands_on_tiny_data(tmp_path):
                 done.add(line)
                 if p.returncode != 0 or not p.stdout.strip():
                     failures.append(f"{line} -> exit {p.returncode}: {(p.stderr or p.stdout)[-300:]}")
+                elif r.get("expect") == "json":
+                    answer = json.loads(p.stdout.strip().splitlines()[-1])
+                    schema = json.loads((work / "schema.json").read_text())
+                    if not set(schema["required"]) <= set(answer) or answer["action"] not in \
+                            schema["properties"]["action"]["enum"]:
+                        failures.append(f"{line} -> answer does not satisfy schema.json: {answer}")
                 continue
             if not line.startswith("spill "):
                 continue

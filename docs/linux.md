@@ -62,6 +62,22 @@ Precision: adapters and optimizer state are float32. Base weights are bf16 on CU
 4. **Two cloud CPU types**, a modern server CPU with AMX and an ordinary AVX2 instance, with measured times.
 5. **`io_uring`** for the ring, if it leaves the disk idle on a fast NVMe.
 
+## Evidence by platform
+
+Moved here from the README's platform table.
+
+| platform | status |
+|---|---|
+| Apple silicon, MLX on the GPU | tested: M4 Pro, 48 GB. A tiny build killed while publishing a checkpoint was finished on the other engine, MLX to torch-cpu to MLX and the reverse, and moved to a local folder and to a local MinIO in both directions, on the Metal GPU ([report 016](reports/016-close-gaps.md)); the pytest version of the continuation test runs MLX on the CPU device |
+| macOS and Linux CPU, PyTorch | tested: this Mac's CPU, and GitHub Linux and macOS runners on every push |
+| offline use | a bundle was installed, inferred from, forked and trained with the network blocked: in a Linux container started with `--network none` (CI) and, on this Mac, under a `sandbox-exec` profile that denies network access ([report 016](reports/016-close-gaps.md)); the tiny 120-row classification project and qwen2.5:0.5b only |
+| S3 | tested against a MinIO server (built from its release tag in Linux CI; a Homebrew build of the same release locally); real AWS S3 is untested |
+| NVIDIA CUDA | built, untested ([docs/linux.md](linux.md), [issue #1](https://github.com/streamweights/streamweights/issues/1)) |
+| network filesystems, Windows | untested; a network filesystem is refused for a live run |
+| power loss | untested; the tests terminate the process |
+
+Python 3.10 or newer; models are fetched at pinned revisions, and downloads never leave less than 20 GB free. `spill doctor` checks the machine.
+
 ## Not in scope here
 
 Windows installs and the torch-cpu engine should work; running on it is untested. Quantized torch inference (`--quant 8bit`) is MLX only.

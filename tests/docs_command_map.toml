@@ -111,6 +111,13 @@ action = "run"
 pattern = 'spill compare tickets'
 action = "run"
 [[rule]]
+pattern = 'spill export tickets'
+action = "run"
+[[rule]]
+pattern = 'python tickets/exports/\*/run_safetensors\.py "Can I change my PIN at any ATM\?"'
+action = "shell"
+reason = "the README's inference command: the exported model answers one input"
+[[rule]]
 pattern = 'spill export tickets --gguf q8_0'
 action = "run"
 needs_env = "SPILL_DOCS_GGUF"
@@ -157,6 +164,35 @@ action = "shell"
 needs_env = "SPILL_DOCS_GGUF"
 fallback = 'python tickets/exports/*/run_safetensors.py "Can I change my PIN at any ATM?"'
 reason = "the exported artifact answering one input; the GGUF script needs the llama.cpp tools (SPILL_DOCS_GGUF=1), else the safetensors script runs"
+
+# ---- the README's "Use your own data" workflows, on the 120-row fixtures in tests/fixtures/own-data
+# (my-tickets.csv, orders.csv and schema.json are copied into the scratch directory by the harness)
+[[rule]]
+pattern = 'spill init my-tickets\.csv --input text --output label --project my-tickets'
+action = "run"
+[[rule]]
+pattern = 'spill build my-tickets'
+action = "run"
+[[rule]]
+pattern = 'spill export my-tickets'
+action = "run"
+[[rule]]
+pattern = 'python my-tickets/exports/\*/run_safetensors\.py "Can I get a new PIN at a cash machine\?"'
+action = "shell"
+[[rule]]
+pattern = 'spill init orders\.csv --input text --output json --schema schema\.json --project orders'
+action = "run"
+[[rule]]
+pattern = 'spill build orders'
+action = "run"
+[[rule]]
+pattern = 'spill export orders'
+action = "run"
+[[rule]]
+pattern = 'python orders/exports/\*/run_safetensors\.py "Order B-2201: cancel the glass vase"'
+action = "shell"
+expect = "json"
+reason = "the JSON answer must parse and carry the schema's required keys"
 
 # ---- the older folder workflow, larger models replaced by explicit tiny equivalents
 [[rule]]

@@ -1,4 +1,4 @@
-"""Writes tests/fixtures/orders.csv: 120 invented support messages with their JSON fields, in the
+"""Writes orders.csv next to this file (schema.json is hand-written and shown in the README): 120 invented support messages with their JSON fields, in the
 README's own-data format (columns text,json; the json cell uses doubled quotes). Seeded, so the
 file is reproducible. Not real data."""
 
@@ -28,9 +28,4 @@ with open(out, "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["text", "json"])
     w.writerows(rows)
-Path(__file__).with_name("orders-schema.json").write_text(json.dumps({
-    "type": "object",
-    "properties": {"order_id": {"type": "string"}, "action": {"type": "string", "enum": ["refund", "replace", "cancel"]},
-                   "product": {"type": "string"}},
-    "required": ["order_id", "action"], "additionalProperties": False}, indent=2) + "\n")
 print(out)
