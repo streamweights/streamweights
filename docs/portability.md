@@ -279,6 +279,24 @@ collection of orphaned payloads, a remote scheduler, transparent multi-writer sy
 resume inside a stopped eval or distill stage (a stage is accepted whole; a training stage resumes
 from its last checkpoint).
 
+## Continuing on another machine, step by step
+
+Moved here from the README. A run that was interrupted can be moved and resumed; a completed run cannot resume training. The S3 commands need the cloud extra:
+
+```
+pip install "streamweights[cloud] @ git+https://github.com/streamweights/streamweights"
+spill init banking77-tiny/banking77.csv --input text --output label --project tickets2 --seed 3
+spill build tickets2 --stop-after train:12
+spill move tickets2 s3://my-bucket/tickets2
+spill resume s3://my-bucket/tickets2
+```
+
+`--stop-after train:12` interrupts the build after step 12 (Ctrl-C at a checkpoint does the same). A live run has one authoritative control object (a file under `.spill/` or an S3 object written with conditional writes); `move` quiesces the writer, copies a verified snapshot, fences the source and only then activates the destination, and can be re-run after any interruption. `resume` acquires ownership first, then continues from the committed checkpoint on any supported engine: MLX and torch-cpu runs were killed mid-training and finished on the other engine in both directions, with the transition recorded, and moved through a local folder and MinIO ([portability](portability.md), [report 016](reports/016-close-gaps.md)). A run that continues a parent records experiment lineage only: it trained from the base model, not from the parent's weights. `spill bundle` packs a project and its pinned models for use with the network blocked. A build started on Linux and finished on macOS, and the reverse, runs on every push: [relay workflow](https://github.com/streamweights/streamweights/actions/workflows/relay.yml).
+
+[![Relay workflow status: a build started on one OS and finished on the other, every push](https://github.com/streamweights/streamweights/actions/workflows/relay.yml/badge.svg)](https://github.com/streamweights/streamweights/actions/workflows/relay.yml)
+
+The cloud extra is needed for S3 commands. The tested paths are local folders and a MinIO server; real AWS S3 is untested. For the evidence by platform see [Linux and other platforms](linux.md#evidence-by-platform).
+
 ## Addendum: what 016 added
 
 The offline bundle was installed, inferred from, forked and trained with the network blocked (a Linux container started with `--network none`, and a macOS `sandbox-exec` profile), and a build killed while publishing a checkpoint was finished on the other engine in both directions on the MLX Metal GPU, including through local and MinIO moves: see [report 016](reports/016-close-gaps.md). The limits above still stand: real AWS S3, CUDA, network filesystems, Windows and power loss are untested.

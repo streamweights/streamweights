@@ -54,12 +54,15 @@ nav:
       - Closing the 015 gaps: reports/016-close-gaps.md
       - Scorer and protocol: reports/017-scorer-and-protocol.md
       - Export diagnosis: reports/017-export-diagnosis.md
+      - README pass: reports/018-readme-pass.md
   - Reference:
       - Commands: cli.md
       - Formats: formats.md
       - Models: models.md
       - Linux and other platforms: linux.md
       - Portability: portability.md
+      - Architecture: architecture.md
+      - Prior art: prior-art.md
       - Schedulers: schedulers.md
       - llama.cpp: llamacpp.md
       - Plan: plan.md

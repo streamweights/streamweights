@@ -73,6 +73,37 @@ Give `spill init` a CSV or JSONL with an input column and an answer column; `spi
 
 For text to JSON, `spill example snips --tiny` and `spill init snips-tiny/snips.csv --input text --output json --schema snips-tiny/schema.json`; the report then gives parseable rate, schema-valid rate, per-field accuracy and whole-record accuracy.
 
+## What each command does
+
+Or install it as a tool: `uv tool install git+https://github.com/streamweights/streamweights`. `init` validates every row (file, row, problem, fix), suggests the task (`classification` or `json`, never guessed from free text), freezes the label vocabulary or JSON schema from the training rows, and splits train, validation and final test by seed without separating duplicate inputs or shared `--group` values. `plan` states models, engine, downloads, disk and a time per stage, each labeled a measurement, an assumption or unknown, and loads nothing. `build` trains a small student (`qwen2.5:0.5b`, bf16) with LoRA; a teacher runs only if you ask. `export` merges the adapter, writes safetensors and GGUF, and loads each artifact in an independent runtime on validation rows before it records the export.
+
+## Your own data in detail
+
+The README shows the shape of the two CSV formats. The details:
+
+- **Classification** needs an input column and a label column (`text,label`): `spill init my-tickets.csv --input text --output label --project my-tickets`. The label vocabulary is frozen from the training rows unless you pass `--labels`.
+- **JSON extraction** needs an input column and a column holding one JSON object per row (`text,json`), and optionally a JSON Schema file: `spill init orders.csv --input text --output json --schema schema.json --project orders`. Without `--schema` one is derived from the training rows. A comma or a double quote inside a cell needs the cell in double quotes with each inner quote doubled, as in `"{""order_id"": ""A-1655""}"`.
+- **The schema used in the README** is `tests/fixtures/own-data/schema.json` in the repository; the docs harness runs both workflows against `my-tickets.csv` and `orders.csv` from that folder, 120 rows each, with exactly these commands.
+- A JSONL file with the same keys works instead of a CSV. Row problems are reported as file, row, problem and fix. Your own `--val` and `--test` files are kept as given and rejected if they overlap the training rows.
+
+## Sample projects
+
+| example | task | data | license |
+|---|---|---|---|
+| `spill example banking77` (`--quick`, `--tiny`) | classification, 77 intents | BANKING77, PolyAI (Casanueva et al., 2020) | CC BY 4.0, attribution in its README |
+| `spill example snips` (`--quick`, `--tiny`) | text to JSON: intent and slots, 3 intents | Snips NLU benchmark, 2017-06 custom intent engines, commit `b86ac7f` | CC0 1.0, citation kept in its README |
+
+## When a teacher is useful
+
+`spill build tickets --teacher <model>` has the teacher answer the training prompts and trains the student on those answers next to yours (your labels count twice, the teacher's once): sequence-level distillation from teacher answers, not logit or KL distillation. Teachers see training rows only. Use one when you have prompts without labels or want to see whether a larger model's answers help; its score is shown next to the others. A folder with only `prompts.jsonl` still builds, and its report says quality evaluation is unavailable: the teacher's agreement is not task accuracy. The older folder workflow (`evals.jsonl`, `train.jsonl`, `prompts.jsonl`, `spill build <folder>`) keeps working.
+
+### Large teachers, streamed from disk
+
+This is the capability the project started with and it is optional. A teacher bigger than RAM is read from disk in layer order, one forward pass reading every weight once whatever the batch size: [Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB MacBook Pro.](../reports/002-phase1.md) mmap reached only 11 to 13% of the disk rate on a model 1.5x RAM, the streaming runner 79.2%. A teacher this size is a 70B-class run on large hardware and many hours; the guided examples here use none.
+
+The four-row results table and the evaluation protocol are in [report 017](../reports/017-scorer-and-protocol.md); the guided examples here use no large teacher.
+
+
 ## Try it
 
 ```

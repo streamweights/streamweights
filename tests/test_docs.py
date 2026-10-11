@@ -1,5 +1,5 @@
 """The docs ship finished: no placeholders, no em-dashes, no number that no report measured,
-a README under 170 lines in the promised order, every link resolves, and cli.md and
+a README in the promised six sections, its output taken from a real MLX run, every link resolves, and cli.md and
 models.md match the code."""
 
 import re
@@ -29,32 +29,125 @@ def test_no_placeholders_or_em_dashes():
         assert "—" not in text, f"em-dash in {p}"
 
 
+HEADLINE = "**Build a small model for your task, on hardware you control.**"
+SUPPORT = ("Bring labeled examples. Fine-tune locally, compare against simple baselines, and "
+           "export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux.")
+SECTIONS = ["What it does", "Try it", "Use your own data", "Understand the result", "Go further",
+            "Support and limitations"]
+
+
+def _section(title: str) -> str:
+    m = re.search(rf"^## {re.escape(title)}\n(.*?)(?=^## |\Z)", README, re.M | re.S)
+    assert m, title
+    return m.group(1)
+
+
 def test_readme_shape():
     lines = README.splitlines()
-    assert len(lines) < 170
-    assert lines[2] == "**Build a small model for your task, on hardware you control.**"
-    assert lines[4] == ("Bring labeled examples. Fine-tune locally, compare against simple baselines, and "
-                        "export to GGUF or safetensors. Pause and resume supported training runs across "
-                        "Mac and Linux.")
-    assert "[Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB MacBook Pro.](docs/reports/" in README
-    assert README.index("## Quickstart") < README.index("Measured: Llama 3.3 70B")
-    heads = re.findall(r"^## (.+)$", README, re.M)
-    assert heads == ["Quickstart: your examples to a model that answers", "Understanding results",
-                     "Continuing on another machine", "Sample projects", "When a teacher is useful",
-                     "Platforms and explicitly untested paths", "Under the hood", "Prior art",
-                     "Status"]
+    assert lines[2] == HEADLINE and lines[4] == SUPPORT
+    assert re.findall(r"^## (.+)$", README, re.M) == SECTIONS
     assert "shields.io" not in README
     badges = re.findall(r"!\[[^\]]*\]\(([^)]*badge[^)]*)\)", README)       # one badge, for the relay workflow only
     assert badges == ["https://github.com/streamweights/streamweights/actions/workflows/relay.yml/badge.svg"]
-    assert "pip install git+https://github.com/streamweights/streamweights" in README
-    assert "uv tool install git+https://github.com/streamweights/streamweights" in README
-    assert "docs/linux.md" in README and "issues/1" in README
-    assert "arrives with the full proof run" in README
-    first = README.split("\n## ")[0].lower()
-    for word in ("fine-tune", "mac", "linux", "lora", "local", "gguf", "safetensors", "baseline"):
-        assert word in first, word
     for img in re.findall(r"!\[([^\]]*)\]", README):
         assert len(img) > 20, "image alt text must be descriptive"
+    from scripts.readme_counts import count
+    before = __import__("json").loads((ROOT / "docs/reports/data/018-readme-counts-before.json").read_text())
+    assert count(README)["prose_words"] <= before["prose_words"] / 2 + 10, "the README grew back"
+
+
+def test_what_it_does_names_both_jobs_without_implementation_terms():
+    s = _section("What it does").lower()
+    assert "text classification" in s and "json extraction" in s
+    for term in ("lora", "mlx", "pytorch", "embedding", "bf16", "adapter", "fenc", "lineage", "distill"):
+        assert term not in s, term
+
+
+def test_try_it_has_prerequisites_then_commands_then_the_models_answer():
+    s = _section("Try it")
+    before_commands = s.split("```", 1)[0]
+    for need in ("Python 3.10", "0.93 GB", "92 MB", "Apple silicon", "not training time"):
+        assert need in before_commands, need
+    assert "# setup" in s and "# training" in s and "# export, then inference" in s
+    blocks = re.findall(r"```\n(.*?)```", s, re.S)
+    assert blocks[0].startswith("# setup")
+    answer = next(b for b in blocks if "change_pin" in b and "verified safetensors" in b)
+    assert answer.rstrip().endswith("change_pin"), "Try it ends the commands on the model's answer"
+    assert s.index("spill plan tickets") > s.index("change_pin")
+    assert "spill report tickets" in s
+
+
+def test_own_data_section_shows_formats_schema_and_the_same_commands():
+    s = _section("Use your own data")
+    assert "The example is over" in s
+    assert "text,label" in s and "text,json" in s
+    assert "shape only" in s, "the snippets are labeled as format examples, not datasets"
+    assert '""order_id"": ""A-1655""' in s, "JSON cells use doubled quotes"
+    assert "spill init my-tickets.csv --input text --output label --project my-tickets" in s
+    assert "spill init orders.csv --input text --output json --schema schema.json --project orders" in s
+    for cmd in ("spill build my-tickets", "spill export my-tickets", "spill build orders",
+                "spill export orders"):
+        assert cmd in s, cmd
+    shown = re.search(r"`schema.json` says.*?```\n(.*?)```", s, re.S).group(1)
+    fixture = ROOT / "tests/fixtures/own-data/schema.json"
+    import json
+    assert json.loads(shown) == json.loads(fixture.read_text())
+    assert shown.strip() == fixture.read_text().strip(), "the README shows the fixture verbatim"
+
+
+def test_understand_the_result_shows_the_baseline_win_and_links_the_export_check():
+    s = _section("Understand the result")
+    assert "scored 0.111 higher than the trained student" in s
+    assert "whether fine-tuning beats a simpler approach" in s
+    assert "export-diagnosis" in s
+    assert "four-row" not in s
+
+
+def test_go_further_and_support_sections():
+    s = _section("Go further")
+    for need in ("Continue an interrupted run", "JSON extraction", "Offline bundles", "Large teachers",
+                 "spill resume s3://my-bucket/tickets2", "[Measured: Llama 3.3 70B"):
+        assert need in s, need
+    assert s.index("Continue an interrupted run") < s.index("JSON extraction")
+    t = _section("Support and limitations")
+    assert "| platform | status |" in t and "issues/1" in t
+    for need in ("small models", "CUDA is untested", "differ in quality"):
+        assert need in t, need
+    for link in ("docs/prior-art.md", "docs/architecture.md", "docs/plan.md", "/discussions"):
+        assert link in t, link
+
+
+def test_moved_pages_are_in_the_nav_and_one_click_from_the_readme():
+    nav = (ROOT / "mkdocs.yml").read_text()
+    for page in ("prior-art.md", "architecture.md", "portability.md", "plan.md", "reports/018-readme-pass.md",
+                 "guides/turn-a-csv-of-examples-into-an-evaluated-model.md"):
+        assert page in nav, page
+        assert page.split("/")[-1] in README or page in README or page == "reports/018-readme-pass.md", page
+    for anchor in ("your-own-data-in-detail", "sample-projects", "when-a-teacher-is-useful"):
+        assert f"#{anchor}" in README
+
+
+def test_readme_concept_names_are_only_linked_names():
+    prose = re.sub(r"```.*?```", "", README, flags=re.S)
+    for term in ("lora", "ownership fenc", "lineage", "distillation", "split rule", "evaluation protocol"):
+        assert term not in prose.lower(), term
+
+
+def test_every_output_line_in_the_readme_is_from_the_real_mlx_capture():
+    import json
+    cap = json.loads((ROOT / "docs/reports/data/018-readme-capture.json").read_text())
+    assert cap["ok"] and cap["device"].startswith("Device(gpu"), "the capture is a real Metal run"
+    captured = "\n".join(s["stdout"] for s in cap["steps"])
+    commands = {s["command"] for s in cap["steps"]} | {"pip install git+https://github.com/streamweights/streamweights"}
+    shown = 0
+    for title in ("Try it", "Understand the result"):
+        for block in re.findall(r"```\n(.*?)```", _section(title), re.S):
+            for line in block.splitlines():
+                if not line.strip() or line.startswith("#") or line.strip() in commands or line.strip() == "...":
+                    continue
+                assert line.strip() in captured, f"README shows output that was not captured: {line!r}"
+                shown += 1
+    assert shown >= 15
 
 
 def _slug(heading: str) -> str:

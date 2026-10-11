@@ -24,3 +24,4 @@ Every number in the README and the guides comes from one of these reports, measu
 | [016 Closing the 015 gaps](016-close-gaps.md) | the offline bundle gate with the network blocked, MLX-on-Metal continuation in both directions, merge hygiene |
 | [017 Scorer and protocol](017-scorer-and-protocol.md) | JSON scorer version 2, historical JSON accounting, decoding settings applied, evaluation records, compare outcomes, replication |
 | [017 Export diagnosis](017-export-diagnosis.md) | controlled merge, runtime and quantization comparison for JSON and classification exports; the merge-dtype default |
+| [018 README pass](018-readme-pass.md) | README counts before and after, the real MLX capture, and where each moved block lives |
