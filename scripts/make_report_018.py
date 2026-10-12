@@ -17,8 +17,9 @@ DATA = ROOT / "docs/reports/data"
 
 def main() -> None:
     before = json.loads((DATA / "018-readme-counts-before.json").read_text())
+    mid = json.loads((DATA / "018-readme-counts-after.json").read_text())      # the 018 merge, kept as recorded
     after = count((ROOT / "README.md").read_text())
-    (DATA / "018-readme-counts-after.json").write_text(json.dumps(after, indent=1) + "\n")
+    (DATA / "019-readme-counts-after.json").write_text(json.dumps(after, indent=1) + "\n")
     cap = json.loads((DATA / "018-readme-capture.json").read_text())
     rows = "\n".join(f"| `{s['command']}` | {s['exit']} | {s['seconds']} s |" for s in cap["steps"])
     cut = round(100 * (1 - after["prose_words"] / before["prose_words"]))
@@ -33,9 +34,10 @@ Measured with `scripts/readme_counts.py`, the same script on both versions. Pros
 | | lines | words | prose words |
 |---|---|---|---|
 | before (directive 017) | {before['lines']} | {before['words']} | {before['prose_words']} |
-| after | {after['lines']} | {after['words']} | {after['prose_words']} |
+| after directive 018 | {mid['lines']} | {mid['words']} | {mid['prose_words']} |
+| after the finishing pass (directive 019) | {after['lines']} | {after['words']} | {after['prose_words']} |
 
-Prose words fell by {cut} percent. The lines went up because commands and their real output now sit in code blocks, which the prose count excludes.
+Prose words fell by {cut} percent against the 017 README. The lines went up because commands and their real output now sit in code blocks, which the prose count excludes.
 
 ## The real MLX capture
 
@@ -46,6 +48,14 @@ The output in the README's Try it section was captured by `scripts/capture_readm
 {rows}
 
 The build took 15 s after the models were on disk. The first-time download of the two models is not included and depends on the connection.
+
+## Capture conditions
+
+The capture script ran with `SPILL_MIN_FREE_GB=2`, not the default. The default free-space reserve enforced during downloads is 20 GB (`MIN_FREE_AFTER_DOWNLOAD` in `streamweights/registry.py`, read from `SPILL_MIN_FREE_GB`); this machine could not keep 20 GB free after the downloads, so the reserve was lowered. The models were already on disk when the capture ran, so no download was timed. Nothing else differed from a default run, and the README says the excerpts come from a run with the lowered reserve.
+
+## Finishing pass (directive 019)
+
+The Try it and Understand the result outputs were cut to short verbatim excerpts (each omission is one `...` line), the score comparison is a Markdown table checked cell by cell against the capture, and the S3 continuation walkthrough left the README for [portability](../portability.md#continuing-on-another-machine-step-by-step). The harness still discovers and covers those commands there: `docs/portability.md` is one of the pages `tests/test_docs_commands.py` reads, its `spill build tickets2 --stop-after train:12`, `spill move` and `spill resume` lines map to rules in `tests/docs_command_map.toml`, and the mapping test fails if a rule goes unused.
 
 ## Where the cut content went
 

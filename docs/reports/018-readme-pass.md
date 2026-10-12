@@ -9,9 +9,10 @@ Measured with `scripts/readme_counts.py`, the same script on both versions. Pros
 | | lines | words | prose words |
 |---|---|---|---|
 | before (directive 017) | 113 | 1837 | 1342 |
-| after | 162 | 1177 | 651 |
+| after directive 018 | 162 | 1177 | 651 |
+| after the finishing pass (directive 019) | 153 | 1003 | 661 |
 
-Prose words fell by 51 percent. The lines went up because commands and their real output now sit in code blocks, which the prose count excludes.
+Prose words fell by 51 percent against the 017 README. The lines went up because commands and their real output now sit in code blocks, which the prose count excludes.
 
 ## The real MLX capture
 
@@ -28,6 +29,14 @@ The output in the README's Try it section was captured by `scripts/capture_readm
 | `python tickets/exports/*/run_safetensors.py "Can I change my PIN at any ATM?"` | 0 | 2.7 s |
 
 The build took 15 s after the models were on disk. The first-time download of the two models is not included and depends on the connection.
+
+## Capture conditions
+
+The capture script ran with `SPILL_MIN_FREE_GB=2`, not the default. The default free-space reserve enforced during downloads is 20 GB (`MIN_FREE_AFTER_DOWNLOAD` in `streamweights/registry.py`, read from `SPILL_MIN_FREE_GB`); this machine could not keep 20 GB free after the downloads, so the reserve was lowered. The models were already on disk when the capture ran, so no download was timed. Nothing else differed from a default run, and the README says the excerpts come from a run with the lowered reserve.
+
+## Finishing pass (directive 019)
+
+The Try it and Understand the result outputs were cut to short verbatim excerpts (each omission is one `...` line), the score comparison is a Markdown table checked cell by cell against the capture, and the S3 continuation walkthrough left the README for [portability](../portability.md#continuing-on-another-machine-step-by-step). The harness still discovers and covers those commands there: `docs/portability.md` is one of the pages `tests/test_docs_commands.py` reads, its `spill build tickets2 --stop-after train:12`, `spill move` and `spill resume` lines map to rules in `tests/docs_command_map.toml`, and the mapping test fails if a rule goes unused.
 
 ## Where the cut content went
 

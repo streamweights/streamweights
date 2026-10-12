@@ -15,7 +15,11 @@ It also scores your model against simpler approaches on examples it never saw, s
 
 ## Try it
 
-**Before you start.** An Apple silicon Mac, or a Mac or Linux machine with a CPU ([platforms](#support-and-limitations)); Python 3.10 or newer. The first build downloads two models, 0.93 GB and 92 MB, and a run plus an export write about 1.6 GB more; `spill plan` prints the exact figures before anything runs. Installing and downloading depend on your connection and are not training time: on an M4 Pro with the models already on disk, the build below took 15 s.
+**Before you start.** An Apple silicon Mac, or a Mac or Linux machine with a CPU ([platforms](#support-and-limitations)); Python 3.10 or newer.
+
+**Disk.** Models are 0.93 GB and 92 MB; a run and an export write about 1.6 GB. Downloads also keep a 20 GB free-space reserve (`SPILL_MIN_FREE_GB`), so the example needs about 23 GB free. Lower the reserve with `SPILL_MIN_FREE_GB=2`; the risk is a nearly full disk. `spill plan` prints exact figures first.
+
+**Time.** Installing and downloading depend on your connection and are not training time. With the models on disk, the build below took 15 s on an M4 Pro.
 
 ```
 # setup
@@ -24,22 +28,14 @@ spill example banking77 --tiny
 spill init banking77-tiny/banking77.csv --input text --output label --project tickets
 ```
 ```
-spill init banking77.csv: classification (10 distinct short labels over 120 rows, 100% of rows share their label with another row). Train 84, validation 18, final test 18 rows. Cost: $0. Project -> tickets
-```
-```
 # training, and a comparison on rows the model never saw
 spill build tickets
 ```
 ```
-stage 1 done in 3 s; accuracy 1.000 on 18 rows
-stage 2 done in 9 s; 42 steps, final loss 0.001835554838180542
-stage 3 done in 1 s; accuracy 0.333 on 18 rows
-stage 4 done in 1 s; accuracy 0.889 on 18 rows
-
-embedding baseline (MiniLM + logistic regression)  accuracy 1.000  (18 rows)
-student, prompted, untrained                       accuracy 0.333  (18 rows)
-student, trained                                   accuracy 0.889  (18 rows)
-run run-20261011-145259-149d-c29d25: tickets/runs/run-20261011-145259-149d-c29d25
+stage 1/4: embedding + logistic regression baseline
+...
+stage 2/4: tune qwen2.5:0.5b on 84 training rows; estimate 13 s (measurement)
+...
 ```
 ```
 # export, then inference
@@ -47,13 +43,14 @@ spill export tickets
 python tickets/exports/*/run_safetensors.py "Can I change my PIN at any ATM?"
 ```
 ```
-verified safetensors: transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores); 0 of 8 predictions differ from the training engine's. Quality on these 8 rows (accuracy): source engine 0.875, artifact 0.875, change +0.000. Verified means it loaded and ran, not that quality was kept
+   merged shard 1/1: model.safetensors
+...
 change_pin
 ```
 
-That output was captured from a real run on the Apple GPU ([capture](docs/reports/data/018-readme-capture.json)); the tiny example is a workflow check on 18 validation rows, not a benchmark.
+Excerpts are verbatim from a real Apple GPU run with `SPILL_MIN_FREE_GB=2`, not the default ([full capture](docs/reports/data/018-readme-capture.json)). Scores are below.
 
-**Inspect before and after.** `spill plan tickets` states the models, downloads, disk and an estimated time per stage, and loads nothing:
+**Inspect.** `spill plan tickets` states models, downloads, disk and time per stage, loading nothing:
 
 ```
    qwen2.5:0.5b: 0.93 GB already on disk
@@ -118,14 +115,16 @@ python orders/exports/*/run_safetensors.py "Order B-2201: cancel the glass vase"
 
 ## Understand the result
 
-The report from the run above, abridged (18 validation rows; [full report](docs/reports/017-scorer-and-protocol.md)):
+The report from the run above, abridged (18 validation rows each; [full report](docs/reports/018-readme-pass.md)):
+
+| comparator | accuracy | validation rows |
+|---|---|---|
+| embedding baseline (MiniLM + logistic regression) | 1.000 | 18 |
+| student, prompted, untrained | 0.333 | 18 |
+| student, trained | 0.889 | 18 |
 
 ```
-| comparator | accuracy | macro-F1 | rows | invalid predictions | failures | truncated |
-|---|---|---|---|---|---|---|
-| embedding baseline (MiniLM + logistic regression) | 1.000 | 1.000 | 18 | 0 | 0 | n/a |
-| student, prompted, untrained | 0.333 | 0.270 | 18 | 1 | 0 | 0 |
-| student, trained | 0.889 | 0.905 | 18 | 1 | 0 | 0 |
+...
 The embedding baseline (MiniLM + logistic regression) scored 0.111 higher than the trained student (2 rows).
 ```
 
@@ -133,15 +132,7 @@ The simple baseline won here, which is the point: the tool helps you discover wh
 
 ## Go further
 
-- **Continue an interrupted run on another machine.** Stop a build, move it, and finish it on another Mac or Linux machine, on either engine ([portability](docs/portability.md)); a build started on one OS and finished on the other is checked on every push:
-
-  ```
-  pip install "streamweights[cloud] @ git+https://github.com/streamweights/streamweights"
-  spill init banking77-tiny/banking77.csv --input text --output label --project tickets2 --seed 3
-  spill build tickets2 --stop-after train:12
-  spill move tickets2 s3://my-bucket/tickets2
-  spill resume s3://my-bucket/tickets2
-  ```
+- **Continue an interrupted training run on another supported machine.** Stop a build on one Mac or Linux machine and finish it on another, on either engine: [step-by-step walkthrough](docs/portability.md#continuing-on-another-machine-step-by-step). A build started on one OS and finished on the other is checked on every push.
 
   [![Relay workflow status: a build started on one OS and finished on the other, every push](https://github.com/streamweights/streamweights/actions/workflows/relay.yml/badge.svg)](https://github.com/streamweights/streamweights/actions/workflows/relay.yml)
 - **JSON extraction.** `spill example snips --tiny` is a runnable text-to-JSON project ([guide](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#sample-projects)).
