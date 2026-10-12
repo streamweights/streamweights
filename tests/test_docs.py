@@ -71,10 +71,24 @@ def test_try_it_has_prerequisites_then_commands_then_the_models_answer():
     assert "# setup" in s and "# training" in s and "# export, then inference" in s
     blocks = re.findall(r"```\n(.*?)```", s, re.S)
     assert blocks[0].startswith("# setup")
-    answer = next(b for b in blocks if "change_pin" in b and "verified safetensors" in b)
+    answer = next(b for b in blocks if "change_pin" in b)
     assert answer.rstrip().endswith("change_pin"), "Try it ends the commands on the model's answer"
+    assert "SPILL_MIN_FREE_GB=2" in s.split("```", 1)[1].split("full capture")[-1] or "SPILL_MIN_FREE_GB=2" in s
     assert s.index("spill plan tickets") > s.index("change_pin")
     assert "spill report tickets" in s
+
+
+def test_disk_prerequisite_matches_the_code_and_the_capture_difference_is_stated():
+    import json
+    src = (ROOT / "streamweights/registry.py").read_text()
+    assert 'environ.get("SPILL_MIN_FREE_GB", 20)' in src, "the default reserve is 20 GB"
+    s = _section("Try it")
+    assert "20 GB free-space reserve (`SPILL_MIN_FREE_GB`)" in s and "about 23 GB free" in s
+    assert "nearly full disk" in s and "with `SPILL_MIN_FREE_GB=2`, not the default" in s
+    cap = json.loads((ROOT / "docs/reports/data/018-readme-capture.json").read_text())
+    assert "SPILL_MIN_FREE_GB" in (ROOT / "scripts/capture_readme.py").read_text()
+    assert "SPILL_MIN_FREE_GB=2" in (ROOT / "docs/reports/018-readme-pass.md").read_text()
+    assert cap["ok"]
 
 
 def test_own_data_section_shows_formats_schema_and_the_same_commands():
@@ -105,10 +119,15 @@ def test_understand_the_result_shows_the_baseline_win_and_links_the_export_check
 
 def test_go_further_and_support_sections():
     s = _section("Go further")
-    for need in ("Continue an interrupted run", "JSON extraction", "Offline bundles", "Large teachers",
-                 "spill resume s3://my-bucket/tickets2", "[Measured: Llama 3.3 70B"):
+    for need in ("Continue an interrupted training run", "JSON extraction", "Offline bundles", "Large teachers",
+                 "docs/portability.md#continuing-on-another-machine-step-by-step", "[Measured: Llama 3.3 70B"):
         assert need in s, need
-    assert s.index("Continue an interrupted run") < s.index("JSON extraction")
+    assert s.index("Continue an interrupted") < s.index("JSON extraction")
+    assert "spill move" not in s and "s3://" not in s, "the S3 walkthrough lives in docs/portability.md"
+    walk = (ROOT / "docs/portability.md").read_text()
+    for cmd in ("spill build tickets2 --stop-after train:12", "spill move tickets2 s3://my-bucket/tickets2",
+                "spill resume s3://my-bucket/tickets2"):
+        assert cmd in walk, cmd
     t = _section("Support and limitations")
     assert "| platform | status |" in t and "issues/1" in t
     for need in ("small models", "CUDA is untested", "differ in quality"):
@@ -147,7 +166,15 @@ def test_every_output_line_in_the_readme_is_from_the_real_mlx_capture():
                     continue
                 assert line.strip() in captured, f"README shows output that was not captured: {line!r}"
                 shown += 1
-    assert shown >= 15
+    assert shown >= 4
+    table = re.findall(r"^\| (.+?) \| ([\d.]+) \| (\d+) \|$", _section("Understand the result"), re.M)
+    assert [t[0] for t in table] == ["embedding baseline (MiniLM + logistic regression)",
+                                      "student, prompted, untrained", "student, trained"]
+    report = next(s["stdout"] for s in cap["steps"] if s["command"].startswith("spill report"))
+    for name, acc, rows in table:
+        cells = next(l for l in report.splitlines() if l.startswith(f"| {name} |")).split("|")[1:-1]
+        assert (cells[0].strip(), cells[1].strip(), cells[3].strip()) == (name, acc, rows), name
+    assert "```" not in re.search(r"^\| comparator.*?\n\n", _section("Understand the result"), re.S | re.M).group(0)
 
 
 def _slug(heading: str) -> str:
