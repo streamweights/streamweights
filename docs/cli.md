@@ -233,6 +233,12 @@ Options:
                         (automatic when stdout is not a terminal)
   --config <path>       run the invocation stored in this job.json
   --emit-config <path>  write this invocation to job.json and exit
+  --distill-loss <str>  kl | ce | mix: how to learn from a teacher's log-probs
+                        (default: mix when the file has them and the
+                        tokenizers match, otherwise ce)
+  --kd-temp <float>     temperature of the kl loss  [default: 1.0]
+  --kd-alpha <float>    mix: weight of the kl term (the rest is cross-entropy)
+                        [default: 0.5]
   --help                Show this message and exit.
 
   Example: spill tune qwen2.5:0.5b banking77-quick/train.jsonl --name banking

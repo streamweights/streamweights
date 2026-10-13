@@ -25,6 +25,7 @@ import numpy as np
 from ..engines.torch_common import (Core, ResidentProvider, RingProvider, _Slot, attention_mask,
                                     make_lora_aware, set_slot, torch)
 from ..ring import SafetensorsIndex
+from . import kd as KD
 from . import lora_core as lo
 from .budget import head_chunk_positions
 
@@ -100,9 +101,11 @@ def to_params(np_params: dict, device=None) -> dict:
 
 class StreamedTrainer:
     def __init__(self, model_dir: Path, cfg: lo.LoraConfig, params: dict | None, *, dtype,
-                 device, shapes: dict, resident_weights: bool = False, note=None):
+                 device, shapes: dict, resident_weights: bool = False, note=None,
+                 kd: KD.KDConfig = KD.KDConfig()):
         self.note = note or (lambda s: None)
         self.cfg = cfg
+        self.kdc = kd
         self.index = SafetensorsIndex(model_dir)
         self.core = Core(self.index, dtype, device)
         self.L = self.index.n_layers
@@ -155,9 +158,10 @@ class StreamedTrainer:
             masks[w] = attention_mask(pos, pos, valid, h.dtype, w)
         return pos, cs, masks
 
-    def micro_batch(self, inputs, targets, mask, micro: int):
+    def micro_batch(self, inputs, targets, mask, micro: int, kd=None):
         """Forward + backward for one micro-batch. Returns (loss, grads, ntoks); grads are
-        float32 {portable name: tensor} of the token-mean loss."""
+        float32 {portable name: tensor} of the token-mean loss. `kd` is the batch's teacher
+        top-k (ids, log-probs, has-teacher), used when the distillation loss asks for it."""
         t_micro = time.monotonic()
         core, dev = self.core, self.device
         ids = torch.as_tensor(inputs, dtype=torch.long, device=dev)
@@ -165,6 +169,12 @@ class StreamedTrainer:
         tgt = torch.as_tensor(targets, dtype=torch.long, device=dev).reshape(-1)
         msk = torch.as_tensor(mask, dtype=torch.float32, device=dev).reshape(-1)
         ntoks = msk.sum()
+        kdt = None
+        if kd is not None and self.kdc.uses_kl:
+            K = kd[0].shape[-1]
+            kdt = (torch.as_tensor(kd[0], dtype=torch.long, device=dev).reshape(-1, K),
+                   torch.as_tensor(kd[1], dtype=torch.float32, device=dev).reshape(-1, K),
+                   torch.as_tensor(kd[2], dtype=torch.bool, device=dev).reshape(-1))
         with torch.no_grad():
             h = core.embed(ids)
         pos, cs, masks = self._rope_mask(B, T, h)
@@ -184,7 +194,11 @@ class StreamedTrainer:
             sl = slice(c0, c0 + self.chunk)
             hc = hf[sl].detach().requires_grad_(True)
             with torch.enable_grad():
-                ce = F.cross_entropy(core.logits(hc).float(), tgt[sl], reduction="none")
+                if kdt is None:
+                    ce = F.cross_entropy(core.logits(hc).float(), tgt[sl], reduction="none")
+                else:
+                    ce = KD.torch_losses(core.logits(hc).float(), tgt[sl], kdt[0][sl], kdt[1][sl],
+                                         kdt[2][sl], self.kdc)
                 lc = (ce * msk[sl]).sum() / ntoks
                 (gc,) = torch.autograd.grad(lc, hc)
             total += float(lc.detach())
@@ -224,11 +238,12 @@ class PeftTrainer:
     """The model fully in memory, LoRA through PEFT, ordinary autograd."""
 
     def __init__(self, model_dir: Path, cfg: lo.LoraConfig, params: dict | None, *, dtype,
-                 device, shapes: dict, note=None):
+                 device, shapes: dict, note=None, kd: KD.KDConfig = KD.KDConfig()):
         from peft import LoraConfig as PeftLoraConfig
         from peft import get_peft_model
         from transformers import AutoModelForCausalLM
         self.cfg, self.device = cfg, device
+        self.kdc = kd
         self.index = SafetensorsIndex(model_dir)
         self.L = self.index.n_layers
         self.paths = list(shapes)
@@ -266,7 +281,7 @@ class PeftTrainer:
                 mod.lora_A["default"].weight.copy_(a.T)
                 mod.lora_B["default"].weight.copy_(b.T)
 
-    def micro_batch(self, inputs, targets, mask, micro: int):
+    def micro_batch(self, inputs, targets, mask, micro: int, kd=None):
         t0 = time.monotonic()
         self._load()
         for q in self.model.parameters():
@@ -276,7 +291,19 @@ class PeftTrainer:
         msk = torch.as_tensor(mask, dtype=torch.float32, device=self.device)
         with torch.enable_grad():
             logits = self.model(input_ids=ids).logits
-            loss, ntoks = masked_ce(logits, tgt, msk)
+            if kd is not None and self.kdc.uses_kl:
+                B, T, V = logits.shape
+                K = kd[0].shape[-1]
+                dev = self.device
+                pos = KD.torch_losses(
+                    logits.reshape(B * T, V), tgt.reshape(-1),
+                    torch.as_tensor(kd[0], dtype=torch.long, device=dev).reshape(-1, K),
+                    torch.as_tensor(kd[1], dtype=torch.float32, device=dev).reshape(-1, K),
+                    torch.as_tensor(kd[2], dtype=torch.bool, device=dev).reshape(-1), self.kdc)
+                ntoks = msk.sum()
+                loss = (pos * msk.reshape(-1)).sum() / ntoks
+            else:
+                loss, ntoks = masked_ce(logits, tgt, msk)
             loss.backward()
         grads = {}
         for (k, p), mod in self.mods.items():

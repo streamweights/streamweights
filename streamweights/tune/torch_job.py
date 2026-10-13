@@ -160,10 +160,10 @@ def run_tune(prep: Prepared, job: Job, *, stop=None, progress_cb=None, resume: b
     if streamed:
         tr = StreamedTrainer(model_dir, cfg, init.params if init else None, dtype=dtype,
                              device=dev, shapes=shapes, resident_weights=spec.resident_weights,
-                             note=note)
+                             note=note, kd=spec.kd())
     else:
         tr = PeftTrainer(model_dir, cfg, init.params if init else None, dtype=dtype, device=dev,
-                         shapes=shapes, note=note)
+                         shapes=shapes, note=note, kd=spec.kd())
     opt = AdamW(tr.params, cfg.lr, spec.steps, cfg.schedule, cfg.weight_decay)
     if init:
         opt.load(init.opt)
@@ -181,7 +181,7 @@ def run_tune(prep: Prepared, job: Job, *, stop=None, progress_cb=None, resume: b
                 for a in range(spec.grad_accum):
                     m = step * spec.grad_accum + a
                     b = prep.plan.batch(m)
-                    loss, grads, _ = tr.micro_batch(b.inputs, b.targets, b.mask, m)
+                    loss, grads, _ = tr.micro_batch(b.inputs, b.targets, b.mask, m, b.kd)
                     losses.append(loss)
                     toks += b.n_tokens
                     acc = grads if acc is None else {k: acc[k] + grads[k] for k in acc}

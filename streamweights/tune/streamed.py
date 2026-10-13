@@ -34,6 +34,7 @@ from ..adapters import _resolve, _Slot
 from ..engines.mlx_stream import (MB, ResidentProvider, RingReader, SafetensorsIndex,
                                   _bind, _load_resident, _load_resident_maybe_quantized,
                                   _model_modules, calibrate, load_calibration)
+from . import kd as KD
 from . import lora as lo
 from .budget import head_chunk_positions
 
@@ -53,9 +54,10 @@ def masked_ce(logits, targets, mask):
 
 class StreamedTrainer:
     def __init__(self, model_dir: Path, cfg: lo.LoraConfig, params: dict | None = None,
-                 resident_weights: bool = False, note=None):
+                 resident_weights: bool = False, note=None, kd: KD.KDConfig = KD.KDConfig()):
         self.note = note or (lambda s: None)
         self.cfg = cfg
+        self.kdc = kd
         self.index = SafetensorsIndex(model_dir)
         self.config = self.index.config
         self.block, self.args, self.fam = _model_modules(self.config)
@@ -166,9 +168,10 @@ class StreamedTrainer:
 
     # ---- one micro-batch
 
-    def micro_batch(self, inputs, targets, mask, micro: int):
+    def micro_batch(self, inputs, targets, mask, micro: int, kd=None):
         """Forward + backward for one micro-batch. Returns (loss, grads, ntoks) where
-        grads is {param name: float32 array} of the token-mean loss."""
+        grads is {param name: float32 array} of the token-mean loss. `kd` is the batch's teacher
+        top-k (ids, log-probs, has-teacher), used when the distillation loss asks for it."""
         if self.ring is not None and not self._ring_started:
             self._start_ring()
         t_micro = time.monotonic()
@@ -177,6 +180,11 @@ class StreamedTrainer:
         tgt = mx.array(targets).reshape(-1)
         msk = mx.array(mask).reshape(-1)
         ntoks = msk.sum()
+        kdt = None
+        if kd is not None and self.kdc.uses_kl:
+            K = kd[0].shape[-1]
+            kdt = (mx.array(kd[0]).reshape(-1, K), mx.array(kd[1]).reshape(-1, K),
+                   mx.array(kd[2]).reshape(-1))
 
         h = self._embed(ids)
         mx.eval(h)
@@ -194,14 +202,18 @@ class StreamedTrainer:
         total = mx.array(0.0)
         dh_chunks = []
 
-        def head_loss(hc, tc, mc):
-            ce = nn.losses.cross_entropy(self._logits(hc), tc) * mc
+        def head_loss(hc, tc, mc, *kdc):
+            if kdc:
+                ce = KD.mlx_losses(self._logits(hc), tc, kdc[0], kdc[1], kdc[2], self.kdc) * mc
+            else:
+                ce = nn.losses.cross_entropy(self._logits(hc), tc) * mc
             return ce.astype(mx.float32).sum() / ntoks
 
         vg = mx.value_and_grad(head_loss)
         for c0 in range(0, B * T, self.chunk):
             sl = slice(c0, c0 + self.chunk)
-            lc, gc = vg(hf[sl], tgt[sl], msk[sl])
+            extra = (kdt[0][sl], kdt[1][sl], kdt[2][sl]) if kdt is not None else ()
+            lc, gc = vg(hf[sl], tgt[sl], msk[sl], *extra)
             mx.eval(lc, gc)
             total = total + lc
             dh_chunks.append(gc)

@@ -37,10 +37,17 @@ class TuneSpec:
     engine: str = "mlx"                 # mlx | torch-cpu | torch-cuda
     state: str | None = None            # portable state URI (a path, s3://, gs://, az://)
     stop_after: int | None = None       # stop cleanly after this many steps (tests, demos)
+    distill_loss: str = "ce"            # ce | kl | mix, used where the data carries teacher log-probs
+    kd_temp: float = 1.0
+    kd_alpha: float = 0.5
 
     def lora(self) -> lo.LoraConfig:
         return lo.LoraConfig(self.rank, self.alpha, self.dropout, self.targets, self.lr,
                              self.weight_decay, self.schedule, self.seed)
+
+    def kd(self):
+        from .kd import KDConfig
+        return KDConfig(self.distill_loss, self.kd_temp, self.kd_alpha).validate()
 
     def to_dict(self) -> dict:
         return asdict(self)
