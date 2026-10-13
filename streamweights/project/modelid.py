@@ -104,7 +104,8 @@ def student_identity(model: str, fetch: bool = True) -> dict:
     d = download_hf(res) if fetch else res.local_dir
     return {"tag": model, "repo": res.name, "revision": res.revision or "unpinned",
             "format": "safetensors", "files": hash_dir(d) if Path(d).exists() else {},
-            "present": Path(d).exists(), "dir": str(d)}
+            "present": Path(d).exists(), "dir": str(d), "size_bytes": res.st_bytes,
+            "family": res.family.label if res.family else None}
 
 
 def embedding_dir() -> Path:

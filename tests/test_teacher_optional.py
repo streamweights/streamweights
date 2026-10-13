@@ -39,7 +39,7 @@ def test_labels_alone_build_without_a_teacher_or_any_extra_download(tmp_path):
     assert [d["model"] for d in plan.downloads] == ["qwen2.5:0.5b", "embedding:minilm"]
     assert plan.models["teacher"] is None and plan.kd["mode"] == "ce" and plan.kd["logprobs"] is None
     text = "\n".join(P.render(plan))
-    assert "teacher   none" in text and "judge" not in text.replace("judged", "")
+    assert "teacher   none" in text and "   judge     " not in text
     train = [s for s in plan.stages if s.id == "train"][0]
     assert train.params["teacher"] is False and train.depends == []
 

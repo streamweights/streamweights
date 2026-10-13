@@ -130,7 +130,8 @@ def engine_pick(override: str | None):
 
 def _tag_params(tag: str, ident: dict) -> None:
     if tag not in est.PARAMS_B:
-        size = sum(f["bytes"] for n, f in ident["files"].items() if n.endswith(".safetensors"))
+        size = sum(f["bytes"] for n, f in ident["files"].items() if n.endswith(".safetensors")) \
+            or ident.get("size_bytes") or 0
         if size:
             est.register_model(tag, size)
 
@@ -269,12 +270,12 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
         hw = probe_mod.load(probe_if_missing=False)
     except (FileNotFoundError, OSError):
         hw = None
-    estimates = _estimates(cfg, stages, train, val, schema, eng, cal, hw)
+    estimates = _estimates(cfg, stages, train, val, schema, eng, cal, hw, len(unlabeled))
     downloads = [d for d in (
         _dl("student", student_tag, sid), _dl("teacher", teacher_tag, tid) if tid else None,
         _dl("judge", judge_tag, jid) if jid and jid is not sid and jid is not tid else None,
         _dl("embedding", modelid.EMBEDDING_TAG, eid) if eid else None) if d]
-    disk = _disk(cfg, sid, train, t, eng)
+    disk = _disk(cfg, sid, train, t, eng, len(unlabeled))
     plan = BuildPlan(project, cfg, eng, why, stages, estimates,
                      {"student": sid, "teacher": tid, "judge": jid, "embedding": eid}, downloads, disk,
                      ident_sha, fields, shas)
@@ -317,17 +318,17 @@ def _kd_plan(cfg: dict, sid: dict, tid: dict | None) -> dict:
 
 
 def _dl(role: str, tag: str, ident: dict) -> dict | None:
-    size = sum(f["bytes"] for f in ident["files"].values())
+    size = sum(f["bytes"] for f in ident["files"].values()) or ident.get("size_bytes") or 0
     return {"role": role, "model": tag, "repo": ident.get("repo"), "revision": ident.get("revision"),
             "bytes": size, "present": ident.get("present", False)}
 
 
-def _disk(cfg, sid, train, t, engine) -> dict:
+def _disk(cfg, sid, train, t, engine, n_unl: int = 0) -> dict:
     mdir = Path(sid["dir"]) if sid.get("dir") else None
     lp = _lora_params(mdir, t["rank"]) if mdir and mdir.exists() else None
     base = sum(f["bytes"] for n, f in sid["files"].items() if n.endswith(".safetensors"))
     steps = None
-    n = len(train) * (1 if not cfg["model"].get("teacher") else 3)
+    n = len(train) * (1 if not cfg["model"].get("teacher") else 3) + (n_unl if cfg["model"].get("teacher") else 0)
     mb = t["micro_batch"] * t["grad_accum"]
     steps = max(1, math.ceil(n * t["epochs"] / mb))
     n_ck = max(1, math.ceil(steps / t["ckpt_every"]))
@@ -371,7 +372,7 @@ def _judge_recommendation(cfg, student_tag, val, eng, cal, hw, fetch, n_judged, 
             "requests": n_req}
 
 
-def _estimates(cfg, stages, train, val, schema, eng, cal, hw) -> dict:
+def _estimates(cfg, stages, train, val, schema, eng, cal, hw, n_unl: int = 0) -> dict:
     out = {}
     student = cfg["model"]["student"]
     t = cfg["training"]
@@ -411,7 +412,7 @@ def _estimates(cfg, stages, train, val, schema, eng, cal, hw) -> dict:
         model = s.params.get("model") or s.params.get("teacher") or student
         if s.kind == "train":
             toks = sum(_tok(len(r["input"]) + len(K.target_text(cfg, r["output"]))) + 24 for r in train)
-            reps = 1 if not cfg["model"].get("teacher") else 3
+            reps = 1 if not cfg["model"].get("teacher") else 3 + n_unl / max(1, len(train))
             m = timings.lookup(eng, model, "train")
             units = toks * reps * t["epochs"]
             if m:
@@ -472,25 +473,36 @@ def pre_run_line(p: BuildPlan, verb: str = "build") -> str:
             f"Run -> {p.project / 'runs'}/<run id>")
 
 
+def _role_line(role: str, ident: dict, why: str) -> str:
+    size = sum(f["bytes"] for n, f in ident["files"].items() if n.endswith(".safetensors")) \
+        or ident.get("size_bytes") or 0
+    state = ("on disk" if ident.get("present") else
+             f"{_gb(size)} to download, {_gb(size)} of disk needed")
+    return (f"   {role:<9} {ident['tag']}  {ident.get('repo') or 'local'}@{(ident.get('revision') or '')[:12]}  "
+            f"{ident.get('format', '')}  {_gb(size)}, {state}  ({why})")
+
+
 def render(p: BuildPlan) -> list[str]:
     lines = [pre_run_line(p, "plan")]
-    lines.append(f"models:")
-    s = p.models["student"]
-    lines.append(f"   student   {s['tag']}  {s['repo'] or 'local'}@{(s['revision'] or '')[:12]}  "
-                 f"{s['format']}  (chosen by {'streamweights.toml'}; default for the guided path)")
+    lines.append("models (each is a choice: edit streamweights.toml, or pass --student, --teacher, --judge):")
+    m = p.cfg["model"]
+    lines.append(_role_line("student", p.models["student"], m.get("student_why") or
+                            "set in streamweights.toml"))
     if p.models.get("teacher"):
-        t = p.models["teacher"]
-        lines.append(f"   teacher   {t['tag']}  {t['repo']}@{(t['revision'] or '')[:12]}  (asked for "
-                     f"in streamweights.toml; used only for training-partition answers)")
+        lines.append(_role_line("teacher", p.models["teacher"], "named by you; answers the training "
+                                "prompts only, never a validation or test row"))
     else:
-        lines.append("   teacher   none (a teacher runs only when you ask: spill build --teacher <model>)")
+        lines.append("   teacher   none (a teacher runs only when you name one: spill build "
+                     "--teacher <model>)")
     if p.cfg["model"].get("teacher"):
         lines.append(f"   training  the teacher's answers train the student with {p.kd['mode']} "
                      f"({p.kd['why']}); your labels are repeated x{round(training.DEFAULT_WEIGHT_OWN)}")
     if p.models.get("judge"):
         j = p.models["judge"]
-        lines.append(f"   judge     {j['tag']}  {j['repo'] or 'local'}@{(j['revision'] or '')[:12]}  (named in "
-                     f"streamweights.toml; its scores are one model's assessment, not accuracy)")
+        why = ("the teacher, because a named teacher judges unless you name a judge"
+               if J.same_model(m["judge"], m.get("teacher") or "") and p.models.get("teacher") else
+               "named by you")
+        lines.append(_role_line("judge", j, f"{why}; its scores are one model's assessment, not accuracy"))
     elif p.judge_rec:
         r = p.judge_rec
         lines.append("   judge     " + J.recommendation_line(r, r["bytes"], r["present"], r["seconds"],

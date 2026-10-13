@@ -71,6 +71,21 @@ def _scoring_arg(score: str | None, task: str | None) -> tuple[str | None, Path 
     return None, None
 
 
+def _student_why() -> str:
+    """Why the default student is the default, from the probed machine (nothing is probed here
+    if the machine has not been probed yet)."""
+    from .. import build_defaults, engine_select
+    from .. import probe as probe_mod
+    try:
+        eng = engine_select.choose_engine(None).name
+        hw = probe_mod.load(probe_if_missing=False)
+        ws = build_defaults.machine_inputs(eng, hw, {})[0]
+        return build_defaults.guided_student(eng, ws)[1]
+    except Exception:
+        return (f"{build_defaults.SMALL}: the smallest curated model, so a first result takes minutes "
+                f"on any machine")
+
+
 def _read_unlabeled(path: Path, mapping: dict, splits) -> tuple[list[dict], list[str]]:
     """Unlabeled prompts: inputs only, for a teacher to answer. Leakage rule: a prompt that
     matches any training, validation or test input (after the duplicate normalization) is
@@ -173,6 +188,7 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     for role, tag in (("student", student), ("teacher", teacher), ("judge", judge)):
         if tag:
             cfg["model"][role] = tag
+    cfg["model"]["student_why"] = ("chosen with --student" if student else _student_why())
     cfg["split"].update({"seed": seed, "val_fraction": val_fraction,
                          "test_fraction": test_fraction, "mode": splits.mode})
     warnings: list[str] = []
