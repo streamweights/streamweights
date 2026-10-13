@@ -89,7 +89,8 @@ JSON_RULES = {
 
 DEFAULT_TRAINING = {"epochs": 2.0, "lr": 1e-4, "rank": 16, "alpha": 32.0, "dropout": 0.0,
                     "weight_decay": 0.01, "schedule": "cosine", "seed": 0, "max_seq": 2048,
-                    "micro_batch": 4, "grad_accum": 1, "ckpt_every": 10}
+                    "micro_batch": 4, "grad_accum": 1, "ckpt_every": 10,
+                    "distill_loss": "auto", "kd_temp": 1.0, "kd_alpha": 0.5, "kd_topk": 20}
 DEFAULT_SPLIT = {"seed": 0, "val_fraction": 0.15, "test_fraction": 0.15}
 DEFAULT_EMBEDDING = {"repo": "sentence-transformers/all-MiniLM-L6-v2", "pooling": "mean",
                      "normalize": True, "max_length": 256}

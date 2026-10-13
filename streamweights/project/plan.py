@@ -51,6 +51,7 @@ class BuildPlan:
     split_sha: dict
     notes: list = field(default_factory=list)
     judge_rec: dict | None = None
+    kd: dict = field(default_factory=dict)
 
     @property
     def total_s(self) -> float | None:
@@ -65,9 +66,12 @@ def load_project(project: Path, frozen: Path | None = None) -> tuple[dict, dict]
     if frozen is not None:
         cfg = C.parse((Path(frozen) / "streamweights.toml").read_bytes(), "the run's frozen config")
         ident = json.loads((Path(frozen) / "identity.json").read_text())
-        return cfg, {"train": sha_file(Path(frozen) / "train.jsonl"),
-                     "val": sha_file(Path(frozen) / "val.jsonl"),
-                     "test": ident["split_sha256"]["test"]}
+        shas = {"train": sha_file(Path(frozen) / "train.jsonl"),
+                "val": sha_file(Path(frozen) / "val.jsonl"),
+                "test": ident["split_sha256"]["test"]}
+        if (Path(frozen) / "unlabeled.jsonl").exists():
+            shas["unlabeled"] = sha_file(Path(frozen) / "unlabeled.jsonl")
+        return cfg, shas
     cfg = C.load(project)
     shas = {}
     for name in ("train", "val", "test"):
@@ -76,6 +80,12 @@ def load_project(project: Path, frozen: Path | None = None) -> tuple[dict, dict]
             raise SpillError(f"{project.name}/data/{name}.jsonl is missing",
                              "spill init <data> --input <col> --output <col>")
         shas[name] = sha_file(p)
+    if (cfg["data"] or {}).get("unlabeled"):
+        p = Path(project) / "data" / "unlabeled.jsonl"
+        if not p.exists():
+            raise SpillError(f"{project.name}/data/unlabeled.jsonl is missing",
+                             "spill init <data> --input <col> --output <col> --unlabeled <file> --force")
+        shas["unlabeled"] = sha_file(p)
     return cfg, shas
 
 
@@ -193,18 +203,28 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
 
     train = read_jsonl(path_of("train"))
     val = read_jsonl(path_of("val"))
+    unlabeled = read_jsonl(path_of("unlabeled")) if "unlabeled" in shas else []
+    if unlabeled and not teacher_tag:
+        raise SpillError(f"the project has {len(unlabeled)} unlabeled prompts and no teacher to "
+                         f"answer them", f"spill build {project} --teacher <model>")
+    kdp = _kd_plan(cfg, sid, tid)
     schema = None
     if task == "json":
         schema = json.loads(((Path(frozen) if frozen is not None else project) /
                              contract["schema_file"]).read_text())
     inputs = [{"name": "train.jsonl", "sha256": shas["train"]},
               {"name": "val.jsonl", "sha256": shas["val"]}]
+    if unlabeled:
+        inputs.append({"name": "unlabeled.jsonl", "sha256": shas["unlabeled"]})
 
     stages: list[StageDesc] = []
     if teacher_tag:
         stages.append(StageDesc("distill", "distill", f"teacher {teacher_tag} answers the "
-                                f"{len(train)} training prompts", {"teacher": teacher_tag},
-                                inputs[:1], ["teacher.jsonl"]))
+                                f"{len(train)} training prompts"
+                                + (f" and {len(unlabeled)} unlabeled prompts" if unlabeled else "")
+                                + (f", keeping its top-{kdp['logprobs']} log-probs" if kdp["logprobs"] else ""),
+                                {"teacher": teacher_tag, "logprobs": kdp["logprobs"]},
+                                [inputs[0]] + inputs[2:], ["teacher.jsonl"]))
     weight_own = training.DEFAULT_WEIGHT_OWN
     if task in ("classification", "open"):
         stages.append(StageDesc("baseline", "baseline", ("embedding + logistic regression baseline" if task == "classification"
@@ -213,9 +233,15 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
                                 ["predictions.jsonl", "metrics.json"],
                                 ["distill"] if teacher_tag else []))
     name = f"{cfg['project']['name']}-{ident_sha[:8]}"
-    stages.append(StageDesc("train", "train", f"tune {student_tag} on {len(train)} training rows",
+    n_tr = len(train) * (round(weight_own) if teacher_tag else 1) + (len(train) + len(unlabeled) if teacher_tag else 0)
+    stages.append(StageDesc("train", "train", f"tune {student_tag} on {n_tr} training rows "
+                            f"({len(train)} yours"
+                            + (f" x{round(weight_own)} plus {len(train) + len(unlabeled)} from the teacher, "
+                               f"loss {kdp['mode']}" if teacher_tag else "") + ")",
                             {"model": student_tag, "adapter_name": name,
-                             "teacher": bool(teacher_tag), "weight_own": weight_own},
+                             "teacher": bool(teacher_tag), "weight_own": weight_own,
+                             "distill_loss": kdp["mode"], "kd_temp": t.get("kd_temp", 1.0),
+                             "kd_alpha": t.get("kd_alpha", 0.5)},
                             inputs[:1], ["adapter", "training.manifest.json", "training.rows.jsonl"],
                             ["distill"] if teacher_tag else []))
     ev = lambda cmp, model, label, dep=(): StageDesc(
@@ -262,9 +288,32 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
     if use_judge:
         for c, why in jp["excluded"].items():
             plan.notes.append(why)
+    plan.kd = kdp
     if hw is None:
         plan.notes.append("no hardware probe yet; estimates use assumptions (spill doctor probes)")
     return plan
+
+
+def _kd_plan(cfg: dict, sid: dict, tid: dict | None) -> dict:
+    """How the teacher's answers train the student: the loss, whether the teacher keeps its top-k
+    log-probs, and why. `auto` is mix when the two models share a tokenizer (the same
+    tokenizer.json), otherwise ce on the teacher's text. An explicit kl or mix needs the shared
+    tokenizer."""
+    t = cfg["training"]
+    want = t.get("distill_loss", "auto")
+    if tid is None:
+        return {"mode": "ce", "logprobs": None, "why": "no teacher: trained on your labels alone"}
+    tok = lambda i: (i["files"].get("tokenizer.json") or {}).get("sha256") if i else None
+    match = tok(sid) is not None and tok(sid) == tok(tid)
+    if want in ("kl", "mix") and not match:
+        raise SpillError(f"--distill-loss {want} needs the teacher and the student to share a tokenizer; "
+                         f"{cfg['model']['teacher']} and {cfg['model']['student']} do not",
+                         "spill build <project> --distill-loss ce")
+    mode = ("mix" if match else "ce") if want == "auto" else want
+    k = int(t.get("kd_topk", 20)) if mode in ("kl", "mix") else None
+    why = ("log-probs kept: same tokenizer" if k else
+           "the teacher's tokens as text" + ("" if want != "auto" or match else "; tokenizers differ"))
+    return {"mode": mode, "logprobs": k, "why": why}
 
 
 def _dl(role: str, tag: str, ident: dict) -> dict | None:
@@ -435,6 +484,9 @@ def render(p: BuildPlan) -> list[str]:
                      f"in streamweights.toml; used only for training-partition answers)")
     else:
         lines.append("   teacher   none (a teacher runs only when you ask: spill build --teacher <model>)")
+    if p.cfg["model"].get("teacher"):
+        lines.append(f"   training  the teacher's answers train the student with {p.kd['mode']} "
+                     f"({p.kd['why']}); your labels are repeated x{round(training.DEFAULT_WEIGHT_OWN)}")
     if p.models.get("judge"):
         j = p.models["judge"]
         lines.append(f"   judge     {j['tag']}  {j['repo'] or 'local'}@{(j['revision'] or '')[:12]}  (named in "

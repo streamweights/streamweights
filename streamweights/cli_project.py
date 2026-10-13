@@ -57,6 +57,9 @@ def init(
     judge: str = typer.Option(None, "--judge", help="a model that scores open-ended output "
                                                     "against a rubric, or `recommended` "
                                                     "(optional)"),
+    unlabeled: Path = typer.Option(None, "--unlabeled", help="a CSV or JSONL of prompts with no "
+                                                             "answers (same input column, or "
+                                                             "`prompt`); a teacher answers them"),
     project: Path = typer.Option(None, "--project", help="the project folder (default: the "
                                                          "data file's name)"),
     labels: str = typer.Option(None, "--labels", help="the class vocabulary: a,b,c or a file of "
@@ -85,7 +88,7 @@ def init(
         res = create_project(data, folder, mapping, task, system, labels, schema, val, test, seed,
                              val_fraction, test_fraction, force, say=typer.echo, score=score,
                              student=student, teacher=teacher,
-                             judge=_init_judge(judge, student))
+                             judge=_init_judge(judge, student), unlabeled=unlabeled)
     except D.DataErrors as e:
         for line in e.lines():
             typer.echo(f"spill: {line}", err=True)
@@ -136,7 +139,7 @@ def plan(
 
 
 def project_build(folder, student, teacher, epochs, engine, headless, executor, new_run,
-                  stop_after, notify, judge=None):
+                  stop_after, notify, judge=None, kd=None):
     """`spill build <project>`: plan, run, report. Flags that change the build are written
     into streamweights.toml first (one line each), so the project stays the record."""
     from . import runtime
@@ -156,8 +159,16 @@ def project_build(folder, student, teacher, epochs, engine, headless, executor, 
                              f"{SC.scoring_of(cfg)}", f"spill build {folder}")
         judge = P.recommended_judge(student or cfg["model"]["student"])
         typer.echo(f"accepting the recommended judge: {judge}")
+    kd = kd or {}
+    if kd.get("distill_loss") not in (None, "auto", "kl", "ce", "mix"):
+        raise SpillError(f"--distill-loss must be kl, ce or mix, not {kd['distill_loss']!r}",
+                         f"spill build {folder} --distill-loss mix")
     for key, val, path in (("student", student, "model"), ("teacher", teacher, "model"),
-                           ("judge", judge, "model"), ("epochs", epochs, "training")):
+                           ("judge", judge, "model"), ("epochs", epochs, "training"),
+                           ("distill_loss", kd.get("distill_loss"), "training"),
+                           ("kd_temp", kd.get("kd_temp"), "training"),
+                           ("kd_alpha", kd.get("kd_alpha"), "training"),
+                           ("kd_topk", kd.get("kd_topk"), "training")):
         if val is not None and cfg[path].get(key) != val:
             changed.append(f"{path}.{key} = {val!r} (was {cfg[path].get(key)!r})")
             cfg[path][key] = val

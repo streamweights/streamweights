@@ -71,6 +71,45 @@ def _scoring_arg(score: str | None, task: str | None) -> tuple[str | None, Path 
     return None, None
 
 
+def _read_unlabeled(path: Path, mapping: dict, splits) -> tuple[list[dict], list[str]]:
+    """Unlabeled prompts: inputs only, for a teacher to answer. Leakage rule: a prompt that
+    matches any training, validation or test input (after the duplicate normalization) is
+    removed, so no evaluation input can reach the teacher's training answers."""
+    cols, recs, issues = D.read_table(path)
+    if issues:
+        raise D.DataErrors(issues)
+    col = mapping["input"] if mapping["input"] in cols else "prompt" if "prompt" in cols else None
+    if col is None:
+        raise SpillError(f"{path.name} has no column {mapping['input']!r} or 'prompt' for the unlabeled "
+                         f"prompts", f"name the input column {mapping['input']!r} in {path.name}")
+    known = {norm_dup(r.input) for r in splits.train + splits.val + splits.test}
+    rows, seen, leaked, dup, empty = [], set(), 0, 0, 0
+    for r in recs:
+        text = D._cell_text(r.values.get(col)).strip()
+        if not text:
+            empty += 1
+            continue
+        key = norm_dup(text)
+        if key in known:
+            leaked += 1
+        elif key in seen:
+            dup += 1
+        else:
+            seen.add(key)
+            rows.append({"id": "u-" + sha_bytes(text.encode())[:12], "input": text,
+                         "source": {"file": r.file, "row": r.row}})
+    notes = []
+    if leaked:
+        notes.append(f"{leaked} unlabeled prompt(s) matched a training, validation or test input and "
+                     f"were removed (an evaluation input must never reach the teacher)")
+    if dup or empty:
+        notes.append(f"{dup} duplicate and {empty} empty unlabeled prompt(s) were removed")
+    if not rows:
+        raise SpillError(f"{path.name} leaves no unlabeled prompts after the leakage check",
+                         "give prompts that are not in your examples")
+    return rows, notes
+
+
 def create_project(data: Path, folder: Path, mapping: dict, task: str | None = None,
                    system_file: Path | None = None, labels: str | None = None,
                    schema_file: Path | None = None, val: Path | None = None,
@@ -78,7 +117,7 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
                    test_fraction: float = 0.15, force: bool = False,
                    say=lambda s: None, score: str | None = None,
                    student: str | None = None, teacher: str | None = None,
-                   judge: str | None = None) -> InitResult:
+                   judge: str | None = None, unlabeled: Path | None = None) -> InitResult:
     folder = Path(folder)
     if C.exists(folder) and not force:
         raise SpillError(f"{folder} already has a {C.CONFIG_NAME}", f"spill plan {folder}   "
@@ -220,6 +259,11 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     for why in D.check_usable(splits, task):
         warnings.append(f"{why}; a build will be refused until this is fixed")
 
+    unl_rows = []
+    if unlabeled is not None:
+        unl_rows, unl_notes = _read_unlabeled(Path(unlabeled), mapping, splits)
+        warnings += unl_notes
+
     # ---- write the project
     folder.mkdir(parents=True, exist_ok=True)
     srcs = []
@@ -239,6 +283,13 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     cfg["split"]["fingerprints"] = fps
     cfg["split"]["sizes"] = sizes
     cfg["data"]["canonical"] = {n: f"data/{n}.jsonl" for n in ("train", "val", "test")}
+    if unl_rows:
+        write_jsonl(folder / "data" / "unlabeled.jsonl", unl_rows)
+        cfg["data"]["unlabeled"] = {"file": "data/unlabeled.jsonl", "rows": len(unl_rows),
+                                    "sha256": sha_file(folder / "data" / "unlabeled.jsonl"),
+                                    "use": "inputs only; a teacher answers them, they are never "
+                                           "evaluation rows"}
+        sizes["unlabeled"] = len(unl_rows)
     if script:
         shutil.copyfile(script_path, folder / script["file"])
     if system:

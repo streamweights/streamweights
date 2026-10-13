@@ -136,9 +136,9 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
         rows = read_jsonl(Path(desc.params["training_rows"]))
         manifest = read_json(Path(desc.params["training_rows"]).with_name("training.manifest.json"))
     else:
-        answers = _teacher_answers(desc, ctx)
+        answers, fields = _teacher_answers(desc, ctx)
         rows, manifest = training.build_training(cfg, train, answers, desc.params.get(
-            "weight_own", training.DEFAULT_WEIGHT_OWN))
+            "weight_own", training.DEFAULT_WEIGHT_OWN), fields, _unlabeled(ctx))
     if cfg["task"]["type"] == "open":
         res = B.run_baseline_open(cfg, rows, val)
     else:
@@ -161,12 +161,25 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
                                               "decoding_applied": None}})
 
 
-def _teacher_answers(desc: StageDesc, ctx: StageContext) -> dict | None:
+def _teacher_answers(desc: StageDesc, ctx: StageContext) -> tuple[dict | None, dict | None]:
+    """({row id: the teacher's completion}, {row id: its tokens and top-k log-probs}) from the
+    distill stage, or (None, None) without a teacher."""
     if not desc.params.get("teacher"):
-        return None
+        return None, None
+    from ..tune.data import teacher_record
     d = ctx.dep_dir("distill")
     recs = read_jsonl(d / "teacher.jsonl")
-    return {r["custom_id"]: r["completion"] for r in recs}
+    fields = {}
+    for r in recs:
+        t = teacher_record(r, (r.get("teacher") or {}).get("tokenizer_sha256"))
+        if t is not None:
+            fields[r["custom_id"]] = t
+    return {r["custom_id"]: r["completion"] for r in recs}, fields or None
+
+
+def _unlabeled(ctx: StageContext) -> list[dict] | None:
+    f = ctx.inputs_dir / "unlabeled.jsonl"
+    return read_jsonl(f) if f.exists() else None
 
 
 def _backend():
@@ -209,14 +222,17 @@ def _distill(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     training partition's inputs go in: no validation or test row reaches the teacher."""
     cfg = _config(ctx)
     train = read_jsonl(ctx.inputs_dir / "train.jsonl")
+    unl = _unlabeled(ctx) or []
     schema = _schema(ctx, cfg)
     mt = cfg["evaluation"]["max_tokens"]
     f = ctx.stage_dir / "prompts.jsonl"
-    write_jsonl(f, [{**p} for p in _prompt_rows(cfg, schema, train, "untrained", mt)])
+    asked = train + [{**u, "output": ""} for u in unl]
+    write_jsonl(f, [{**p} for p in _prompt_rows(cfg, schema, asked, "untrained", mt)])
     from .. import runtime
     runtime.ENV.state = str(ctx.stage_dir / "state")
     runtime.ENV.in_build = True
-    res = _backend().distill(desc.params["teacher"], f, ctx.out_dir / "teacher.jsonl", mt, None)
+    res = _backend().distill(desc.params["teacher"], f, ctx.out_dir / "teacher.jsonl", mt, None,
+                             desc.params.get("logprobs"))
     if res.get("interrupted"):
         return StageOutcome("interrupted", {"rows": res.get("rows")}, res.get("producers", []))
     return StageOutcome("done", {"rows": res.get("rows")}, res.get("producers", []))
@@ -228,9 +244,13 @@ def _train(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     cfg = _config(ctx)
     t = cfg["training"]
     train = read_jsonl(ctx.inputs_dir / "train.jsonl")
-    answers = _teacher_answers(desc, ctx)
+    answers, fields = _teacher_answers(desc, ctx)
     rows, manifest = training.build_training(cfg, train, answers,
-                                             desc.params.get("weight_own", training.DEFAULT_WEIGHT_OWN))
+                                             desc.params.get("weight_own", training.DEFAULT_WEIGHT_OWN),
+                                             fields, _unlabeled(ctx))
+    loss = desc.params.get("distill_loss", "ce") if manifest["teacher_rows_with_logprobs"] else "ce"
+    manifest.update(distill_loss=loss, kd_temp=desc.params.get("kd_temp", 1.0),
+                    kd_alpha=desc.params.get("kd_alpha", 0.5))
     write_jsonl(ctx.out_dir / "training.rows.jsonl", rows)
     write_json(ctx.out_dir / "training.manifest.json", manifest)
     chat = ctx.stage_dir / "train.chat.jsonl"
@@ -244,7 +264,8 @@ def _train(desc: StageDesc, ctx: StageContext) -> StageOutcome:
         job, res = cli._tune_impl(
             desc.params["model"], chat, name, t["rank"], t["alpha"], t["dropout"], None, t["lr"],
             t["schedule"], t["weight_decay"], None, t["epochs"], t["micro_batch"],
-            t["grad_accum"], t["max_seq"], t["seed"], "auto", t["ckpt_every"], True, True)
+            t["grad_accum"], t["max_seq"], t["seed"], "auto", t["ckpt_every"], True, True,
+            distill_loss=loss, kd_temp=manifest["kd_temp"], kd_alpha=manifest["kd_alpha"])
     from ..cli_build import _tune_producers
     producers = _tune_producers(runtime.state_uri())
     if res["interrupted"]:
