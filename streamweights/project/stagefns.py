@@ -17,6 +17,7 @@ from . import baseline as B
 from . import config as C
 from . import contract as K
 from . import modelid, training
+from . import judge as J
 from . import scoring as SC
 from .common import read_json, read_jsonl, sha_file, write_json, write_jsonl
 
@@ -119,7 +120,8 @@ def _normalize_producers(items: list[dict]) -> list[dict]:
 def run_stage(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     ctx.out_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.monotonic()
-    fn = {"baseline": _baseline, "distill": _distill, "train": _train, "eval": _eval}[desc.kind]
+    fn = {"baseline": _baseline, "distill": _distill, "train": _train, "eval": _eval,
+          "judge": _judge}[desc.kind]
     out = fn(desc, ctx)
     out.seconds = round(time.monotonic() - t0, 2)
     out.producers = _normalize_producers(out.producers)
@@ -312,3 +314,102 @@ def _eval(desc: StageDesc, ctx: StageContext) -> StageOutcome:
                         notes={"engine_run_id": res.get("run_id"), "model": model,
                                "reused": bool(res.get("cached")),
                                "conditions": executed_conditions(rr, choose_engine(runtime.ENV.engine).name)})
+
+
+def _judge(desc: StageDesc, ctx: StageContext) -> StageOutcome:
+    """The judge model assesses the comparators' outputs on the validation rows: pointwise for
+    each judged comparator, pairwise (both orders) for each pair. One batch job, one model load.
+    A comparator whose model is the judge is not judged (see judge.plan_judging)."""
+    from .. import decoding as dec_mod
+    from .. import runtime
+    cfg = _config(ctx)
+    val = read_jsonl(ctx.inputs_dir / "val.jsonl")
+    rubric, source = J.rubric_for(ctx.inputs_dir)
+    judged, pairs = desc.params["judged"], desc.params["pairs"]
+    excluded = desc.params.get("excluded", {})
+    files = desc.params.get("pred_files") or {}
+    preds = {}
+    for c in judged:
+        f = Path(files[c]) if c in files else ctx.dep_dir("baseline" if c == "baseline"
+                                                           else f"eval:{c}") / "predictions.jsonl"
+        preds[c] = {p["id"]: p for p in read_jsonl(f)}
+    body = dec_mod.request_fields({**J.DECODING}, J.MAX_TOKENS)
+    reqs = []
+
+    def add(cid, msgs):
+        reqs.append({"custom_id": cid, "method": "POST", "url": "/v1/chat/completions",
+                     "body": {"messages": msgs, **body}, "expected": "judged"})
+    text_of = lambda c, r: preds[c].get(r["id"], {}).get("text")
+    for c in judged:
+        for r in val:
+            add(f"pt:{c}:{r['id']}", J.pointwise_messages(rubric, r["input"], text_of(c, r),
+                                                          _ref(cfg, r)))
+    for x, y in pairs:
+        for r in val:
+            add(f"pw:{x}:{y}:xa:{r['id']}", J.pairwise_messages(rubric, r["input"], text_of(x, r),
+                                                                 text_of(y, r), _ref(cfg, r)))
+            add(f"pw:{x}:{y}:ya:{r['id']}", J.pairwise_messages(rubric, r["input"], text_of(y, r),
+                                                                 text_of(x, r), _ref(cfg, r)))
+    f = ctx.stage_dir / "judge.jsonl"
+    write_jsonl(f, reqs)
+    runtime.ENV.state = str(ctx.stage_dir / "state")
+    runtime.ENV.in_build = True
+    res = _backend().eval(desc.params["judge"], f)
+    if res.get("interrupted"):
+        return StageOutcome("interrupted", {}, res.get("producers", []))
+    results = {r["custom_id"]: r for r in read_jsonl(res["results_path"])}
+
+    def reply(cid):
+        row = results.get(cid)
+        if row and not row.get("error") and row.get("response"):
+            return row["response"]["body"]["choices"][0]["message"]["content"]
+        return None
+    records, point_metrics, cal_items = [], {}, []
+    for c in judged:
+        scores = []
+        for r in val:
+            raw = reply(f"pt:{c}:{r['id']}")
+            sc, why = J.parse_pointwise(raw)
+            scores.append(sc)
+            records.append({"kind": "pointwise", "comparator": c, "id": r["id"], "score": sc,
+                            "rationale": why, "judge_reply": raw, "output": text_of(c, r),
+                            "reference": _ref(cfg, r)})
+            cal_items.append({"reference": _ref(cfg, r), "output": text_of(c, r), "score": sc})
+        point_metrics[c] = J.pointwise_summary(scores)
+    pair_metrics = []
+    for x, y in pairs:
+        rows = []
+        for r in val:
+            ra, rb = reply(f"pw:{x}:{y}:xa:{r['id']}"), reply(f"pw:{x}:{y}:ya:{r['id']}")
+            (v1, w1), (v2, w2) = J.parse_pairwise(ra), J.parse_pairwise(rb)
+            m1 = J.to_models(v1, "x", "y")             # x was shown as A
+            m2 = J.to_models(v2, "y", "x")             # y was shown as A
+            verdict, dis = J.combine_orders(m1, m2)
+            rows.append({"verdict": verdict, "disagreed": dis, "picks": [v1, v2]})
+            records.append({"kind": "pairwise", "pair": [x, y], "id": r["id"], "verdict": verdict,
+                            "disagreed": dis,
+                            "orders": [{"a": x, "b": y, "picked": v1, "rationale": w1, "judge_reply": ra},
+                                       {"a": y, "b": x, "picked": v2, "rationale": w2, "judge_reply": rb}]})
+        pair_metrics.append({"pair": [x, y], **J.pairwise_summary(rows)})
+    metrics = {"judge": desc.params["judge"], "label": "one model's assessment, not accuracy",
+               "rows": len(val), "pointwise": point_metrics, "pairwise": pair_metrics,
+               "excluded": excluded, "calibration": J.calibration(cal_items),
+               "prompt_cached_run": bool(res.get("cached"))}
+    write_jsonl(ctx.out_dir / "judgments.jsonl", records)
+    write_json(ctx.out_dir / "metrics.json", metrics)
+    from ..cli_build import _row_producers
+    return StageOutcome("done", metrics, _row_producers(res["results_path"]),
+                        notes={"engine_run_id": res.get("run_id"), "model": desc.params["judge"],
+                               "reused": bool(res.get("cached")),
+                               "conditions": executed_conditions(list(results.values()),
+                                                                 choose_engine_name())})
+
+
+def choose_engine_name() -> str:
+    from .. import runtime
+    from ..engine_select import choose_engine
+    return choose_engine(runtime.ENV.engine).name
+
+
+def _ref(cfg: dict, row: dict) -> str:
+    return K.target_text(cfg, row["output"])

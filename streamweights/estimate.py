@@ -27,11 +27,11 @@ RESIDENT_BYTES_PER_S = 120e9
 STREAM_PASS_S_FALLBACK = 34.0
 
 # parameters in billions (all registry tags); HF repos fall back to bytes / 2
-PARAMS_B = {"qwen2.5:0.5b": 0.494, "qwen2.5:7b": 7.62, "qwen2.5:32b": 32.8,
+PARAMS_B = {"qwen2.5:0.5b": 0.494, "qwen2.5:1.5b": 1.5437, "qwen2.5:7b": 7.62, "qwen2.5:32b": 32.8,
             "llama3.3:70b": 70.55}
-ARCH = {"qwen2.5:0.5b": (24, 2, 64), "qwen2.5:7b": (28, 4, 128),
+ARCH = {"qwen2.5:0.5b": (24, 2, 64), "qwen2.5:1.5b": (28, 2, 128), "qwen2.5:7b": (28, 4, 128),
         "qwen2.5:32b": (64, 8, 128), "llama3.3:70b": (80, 8, 128)}
-BF16_BYTES = {"qwen2.5:0.5b": 0.99e9, "qwen2.5:7b": 15.23e9, "qwen2.5:32b": 65.5e9,
+BF16_BYTES = {"qwen2.5:0.5b": 0.99e9, "qwen2.5:1.5b": 3.0875e9, "qwen2.5:7b": 15.23e9, "qwen2.5:32b": 65.5e9,
               "llama3.3:70b": 141.1e9}
 
 

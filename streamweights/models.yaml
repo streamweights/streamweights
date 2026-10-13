@@ -23,6 +23,22 @@ models:
         files: [qwen2.5-0.5b-instruct-q4_k_m.gguf]
         bytes: 491000000
 
+  qwen2.5:1.5b:
+    arch: {n_layers: 28, n_kv_heads: 2, head_dim: 128}
+    quants:
+      bf16:
+        convert_from: Qwen/Qwen2.5-1.5B-Instruct   # no public bf16 GGUF exists
+        files: []
+        bytes: 3087467144
+      Q8_0:
+        repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF
+        files: [qwen2.5-1.5b-instruct-q8_0.gguf]
+        bytes: 1894532128
+      Q4_K_M:
+        repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF
+        files: [qwen2.5-1.5b-instruct-q4_k_m.gguf]
+        bytes: 1117320736
+
   qwen2.5:7b:
     arch: {n_layers: 28, n_kv_heads: 4, head_dim: 128}
     quants:
@@ -86,12 +102,14 @@ models:
 # exist on 2026-10-01 (HTTP 200): 8bit and 4bit for each model.
 safetensors:
   qwen2.5:0.5b:  {repo: Qwen/Qwen2.5-0.5B-Instruct,       bytes: 988000000,    dir: bf16-st}
+  qwen2.5:1.5b:  {repo: Qwen/Qwen2.5-1.5B-Instruct,       bytes: 3087467144,   dir: bf16-st}
   qwen2.5:7b:    {repo: Qwen/Qwen2.5-7B-Instruct,         bytes: 15231271888,  dir: bf16-st}
   qwen2.5:32b:   {repo: Qwen/Qwen2.5-32B-Instruct,        bytes: 65500000000,  dir: bf16-st}
   llama3.3:70b:  {repo: unsloth/Llama-3.3-70B-Instruct,   bytes: 141100000000, dir: bf16-st}
 
 mlx_quants:
   qwen2.5:0.5b:  {8bit: mlx-community/Qwen2.5-0.5B-Instruct-8bit, 4bit: mlx-community/Qwen2.5-0.5B-Instruct-4bit}
+  qwen2.5:1.5b:  {8bit: mlx-community/Qwen2.5-1.5B-Instruct-8bit, 4bit: mlx-community/Qwen2.5-1.5B-Instruct-4bit}
   qwen2.5:7b:    {8bit: mlx-community/Qwen2.5-7B-Instruct-8bit,  4bit: mlx-community/Qwen2.5-7B-Instruct-4bit}
   qwen2.5:32b:   {8bit: mlx-community/Qwen2.5-32B-Instruct-8bit,  4bit: mlx-community/Qwen2.5-32B-Instruct-4bit}
   llama3.3:70b:  {8bit: mlx-community/Llama-3.3-70B-Instruct-8bit, 4bit: mlx-community/Llama-3.3-70B-Instruct-4bit}
@@ -110,6 +128,19 @@ pins:
       config.json: {sha256: 18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45, bytes: 659}
       generation_config.json: {sha256: e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6, bytes: 242}
       model.safetensors: {sha256: fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe, bytes: 988097824}
+      tokenizer.json: {sha256: c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539, bytes: 7031645}
+      tokenizer_config.json: {sha256: 5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583, bytes: 7305}
+      vocab.json: {sha256: ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910, bytes: 2776833}
+  qwen2.5:1.5b:
+    repo: Qwen/Qwen2.5-1.5B-Instruct
+    revision: 989aa7980e4cf806f80c7fef2b1adb7bc71aa306
+    role: student, teacher and judge; trainable bf16 safetensors
+    format: safetensors bf16
+    license: apache-2.0
+    files:
+      config.json: {sha256: 98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670, bytes: 660}
+      generation_config.json: {sha256: e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6, bytes: 242}
+      model.safetensors: {sha256: dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee, bytes: 3087467144}
       tokenizer.json: {sha256: c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539, bytes: 7031645}
       tokenizer_config.json: {sha256: 5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583, bytes: 7305}
       vocab.json: {sha256: ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910, bytes: 2776833}

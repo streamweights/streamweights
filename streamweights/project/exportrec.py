@@ -231,6 +231,8 @@ def run_export(project: Path, run_id: str | None = None, gguf: str | None = None
                              for r in val]
                 src_metrics = SC.aggregate(cfg, src_items, golds, schema)
                 mk = R.metric_key(cfg)
+                if mk == "judge_mean":            # the export check uses no judge: overlap with the reference
+                    mk = "token_f1"
                 src_p, art_p = R.primary(mk, src_metrics), R.primary(mk, metrics)
                 entry.update(prediction_differences={"count": len(diffs), "of": len(val), "rows": diffs},
                              metrics=metrics, primary=art_p,

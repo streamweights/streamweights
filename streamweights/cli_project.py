@@ -26,6 +26,15 @@ def _guided(folder, command: str) -> dict:
     return cfg
 
 
+def _init_judge(judge: str | None, student: str | None) -> str | None:
+    if judge != "recommended":
+        return judge
+    from .project import plan as P
+    tag = P.recommended_judge(student or "qwen2.5:0.5b")
+    typer.echo(f"accepting the recommended judge: {tag}")
+    return tag
+
+
 @app.command(short_help="Start a project from a CSV or JSONL of examples",
              epilog="Example: spill init tickets.csv --input text --output label")
 def init(
@@ -76,7 +85,7 @@ def init(
         res = create_project(data, folder, mapping, task, system, labels, schema, val, test, seed,
                              val_fraction, test_fraction, force, say=typer.echo, score=score,
                              student=student, teacher=teacher,
-                             judge=None if judge == "recommended" else judge)
+                             judge=_init_judge(judge, student))
     except D.DataErrors as e:
         for line in e.lines():
             typer.echo(f"spill: {line}", err=True)
@@ -127,7 +136,7 @@ def plan(
 
 
 def project_build(folder, student, teacher, epochs, engine, headless, executor, new_run,
-                  stop_after, notify):
+                  stop_after, notify, judge=None):
     """`spill build <project>`: plan, run, report. Flags that change the build are written
     into streamweights.toml first (one line each), so the project stays the record."""
     from . import runtime
@@ -136,15 +145,29 @@ def project_build(folder, student, teacher, epochs, engine, headless, executor, 
     from .project import data as D
     from .project import plan as P
     from .project import report as R
+    from .project import scoring as SC
     from .project.common import read_jsonl
     folder = Path(folder)
     cfg = C.load(folder)
     changed = []
+    if judge == "recommended":
+        if cfg["task"]["type"] != "open":
+            raise SpillError(f"judged scoring is for open-ended output; this project scores by "
+                             f"{SC.scoring_of(cfg)}", f"spill build {folder}")
+        judge = P.recommended_judge(student or cfg["model"]["student"])
+        typer.echo(f"accepting the recommended judge: {judge}")
     for key, val, path in (("student", student, "model"), ("teacher", teacher, "model"),
-                           ("epochs", epochs, "training")):
+                           ("judge", judge, "model"), ("epochs", epochs, "training")):
         if val is not None and cfg[path].get(key) != val:
             changed.append(f"{path}.{key} = {val!r} (was {cfg[path].get(key)!r})")
             cfg[path][key] = val
+    resolved = P.resolve_roles(cfg)
+    for path, key in (("model", "judge"), ("evaluation", "metric")):
+        if resolved[path].get(key) != cfg[path].get(key):
+            changed.append(f"{path}.{key} = {resolved[path][key]!r} (was {cfg[path].get(key)!r}"
+                           + ("; a named teacher judges unless you name a judge)" if key == "judge"
+                              else "; the judge's assessment is the primary metric)"))
+            cfg[path][key] = resolved[path][key]
     if changed:
         C.save(folder, cfg)
         typer.echo(f"updated streamweights.toml: {'; '.join(changed)}; the build is a new run")
@@ -177,8 +200,14 @@ def project_build(folder, student, teacher, epochs, engine, headless, executor, 
         w = max(len(names[r["comparator"]]) for r in out.table)
         for r in out.table:
             v = r["primary"]
+            shown = ("reference only, judge is the same model" if r.get("judge_excluded")
+                     else "unavailable" if v is None else f"{v:.3f}")
             typer.echo(f"{names[r['comparator']].ljust(w)}  {R.primary_name(R.metric_key(plan.cfg))} "
-                       f"{'unavailable' if v is None else f'{v:.3f}'}  ({r['rows']} rows)")
+                       f"{shown}  ({r['rows']} rows)")
+        if plan.cfg["task"]["type"] == "open" and out.snapshot:
+            from .project.common import read_json
+            for line in R.judge_findings(read_json(Path(out.snapshot) / "manifest.json").get("judge")):
+                typer.echo(f"  {line}")
     typer.echo(f"run {out.run_id}: {out.snapshot}")
     _next_hint(f"spill report {folder}")
 

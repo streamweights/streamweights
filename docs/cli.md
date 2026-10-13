@@ -63,6 +63,9 @@ Options:
   --teacher <str>       the big model that answers prompts.jsonl (default:
                         llama3.3:70b on Apple silicon; on a CPU the largest
                         whose distill estimate is under 12 h)
+  --judge <str>         project folders, open-ended output: the model that
+                        scores outputs against the rubric (a tag, a Hugging
+                        Face repo, `recommended`, or `none`)
   --compare <str>       add this model's score to the table (repeatable)
   --base <str>          train the adapter on this (big) model itself instead
                         of the student

@@ -11,6 +11,7 @@ import shutil
 from pathlib import Path
 
 from . import config as C
+from . import judge as J
 from . import scoring
 from .common import canon, read_json, read_jsonl, sha_file, sha_obj, write_json, write_jsonl
 
@@ -31,6 +32,9 @@ def names_for(task: str) -> dict:
 OVERLAP_RULES = ("words are Unicode NFKC casefolded runs of word characters; token F1 is the bag-"
                  "of-words F1, ROUGE-L the F-measure of the longest common word subsequence, "
                  "exact match equality of the word sequences; a failed generation scores 0")
+
+
+OPEN_DISAGREE = 0.25     # open-ended rows count as different when token F1 differs by this much
 
 
 def metric_key(cfg: dict) -> str:
@@ -106,10 +110,19 @@ def disagreements(task: str, preds: dict[str, list[dict]]) -> list[dict]:
             continue
         for p in rows:
             t = trained.get(p["id"])
-            if t is None or bool(t["correct"]) == bool(p["correct"]):
+            if t is None:
                 continue
+            if task == "open":      # reference overlap differs by at least a quarter
+                d = (t.get("token_f1") or 0.0) - (p.get("token_f1") or 0.0)
+                if abs(d) < OPEN_DISAGREE:
+                    continue
+                improved = d > 0
+            else:
+                if bool(t["correct"]) == bool(p["correct"]):
+                    continue
+                improved = bool(t["correct"])
             out.append({"id": p["id"], "against": name,
-                        "kind": "improvement" if t["correct"] else "regression",
+                        "kind": "improvement" if improved else "regression",
                         "gold": p["gold"], "trained": t.get("text"), "other": p.get("text")})
     return out
 
@@ -124,7 +137,8 @@ def table(task: str, comps: dict, metric: str) -> list[dict]:
             "rows", "accuracy", "macro_f1", "invalid_predictions", "inference_failures",
             "truncated", "parseable_rate", "schema_valid_rate", "whole_record_accuracy",
             "mean_field_accuracy", "records_with_extra_fields", "token_f1", "rouge_l",
-            "exact_match", "judge_mean", "judge_rows", "judge_unscored", "script_score")}})
+            "exact_match", "judge_mean", "judge_rows", "judge_unscored", "judge_excluded",
+            "script_score")}})
     return rows
 
 
@@ -169,6 +183,7 @@ def render_md(m: dict) -> str:
                          f"{_f(r['schema_valid_rate'])} | {_f(r['whole_record_accuracy'])} | "
                          f"{_f(r['mean_field_accuracy'])} | {r['rows']} | {r['inference_failures'] or 0} | "
                          f"{r['truncated'] if r['truncated'] is not None else 'n/a'} |")
+    lines += render_judge_md(m.get("judge"), names)
     lines += ["", "Invalid, unparseable and failed outputs count as wrong and stay in every "
               "denominator. `unavailable` means the metric does not exist for that row; it is "
               "never shown as 0.", ""]
@@ -221,7 +236,68 @@ def render_md(m: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def findings(task: str, comps: dict, metric: str) -> list[str]:
+def judge_findings(jm: dict | None) -> list[str]:
+    """Sentences about the judged evaluation. Every one says whose assessment it is."""
+    if not jm:
+        return []
+    out = [f"The judge {jm['judge']} is one model's assessment of each output against the rubric; its "
+           f"scores are not accuracy."]
+    for c, why in jm.get("excluded", {}).items():
+        out.append(f"{c}: {why}.")
+    for p in jm.get("pairwise", []):
+        x, y = p["pair"]
+        if not p["scored"]:
+            out.append(f"{x} vs {y}: the judge gave no parseable verdict on any of the {p['rows']} rows.")
+            continue
+        out.append(f"{x} vs {y}, both orders: {x} won {p['wins']}, tied {p['ties']}, lost {p['losses']} "
+                   f"of {p['scored']} rows; the two orders disagreed on {p['order_disagreements']} "
+                   f"({p['order_disagreement_rate']:.0%}); a disagreement counts as a tie.")
+    cal = jm.get("calibration")
+    if cal:
+        out.append(f"Calibration: the judge agreed with the exact-match check on {cal['agreement']:.0%} "
+                   f"of the {cal['rows']} rows that have one ({cal['note']}).")
+    else:
+        out.append("Calibration against exact match is not applicable: no reference is short enough "
+                   "for a word-for-word check.")
+    return out
+
+
+def render_judge_md(jm: dict | None, names: dict) -> list[str]:
+    if not jm:
+        return []
+    lines = ["## Judged evaluation (one model's assessment, not accuracy)", "",
+             f"Judge: {jm['judge']}, {jm['rows']} validation rows. The rubric, judge model identity, "
+             f"prompt templates and decoding are part of the protocol fingerprint; comparing runs "
+             f"with any of them changed is refused.", "",
+             "| comparator | judge score (1-5) | rows scored | unparseable | score counts 1/2/3/4/5 |",
+             "|---|---|---|---|---|"]
+    for c, v in jm["pointwise"].items():
+        d = v["distribution"]
+        lines.append(f"| {names.get(c, c)} | {_f(v['judge_mean'])} | {v['judge_rows'] - v['judge_unscored']} | "
+                     f"{v['judge_unscored']} | " + "/".join(str(d[str(k)]) for k in range(1, 6)) + " |")
+    for c, why in jm.get("excluded", {}).items():
+        lines.append(f"| {names.get(c, c)} | reference only | 0 | 0 | excluded: {why} |")
+    if jm.get("pairwise"):
+        lines += ["", "Pairwise, each pair judged in both orders to cancel position bias:", "",
+                  "| pair | win | tie | loss | rows scored | orders disagreed | picked first position |",
+                  "|---|---|---|---|---|---|---|"]
+        for p in jm["pairwise"]:
+            x, y = p["pair"]
+            pct = lambda v: "unavailable" if v is None else f"{v:.0%}"
+            lines.append(f"| {names.get(x, x)} vs {names.get(y, y)} | {pct(p['win_rate'])} | "
+                         f"{pct(p['tie_rate'])} | {pct(p['loss_rate'])} | {p['scored']} | "
+                         f"{p['order_disagreements']} ({pct(p['order_disagreement_rate'])}) | "
+                         f"{pct(p['first_position_pick_rate'])} |")
+    cal = jm.get("calibration")
+    lines += ["", ("Calibration: " + f"{cal['agreement']:.0%} agreement with exact match on {cal['rows']} "
+                   f"rows ({cal['note']}). Judge-only positives: {cal['judge_only']}; match-only: "
+                   f"{cal['match_only']}.") if cal else
+              "Calibration against exact match: not applicable, no reference is short enough for a "
+              "word-for-word check.", ""]
+    return lines
+
+
+def findings(task: str, comps: dict, metric: str, judge: dict | None = None) -> list[str]:
     names = names_for(task)
     sc = {k: primary(metric, v["metrics"]) for k, v in comps.items()}
     n = next(iter(comps.values()))["metrics"]["rows"]
@@ -240,7 +316,7 @@ def findings(task: str, comps: dict, metric: str) -> list[str]:
                            f"({rows} row{'s' if rows != 1 else ''}).")
             else:
                 out.append(f"The trained student and the {names[k]} scored the same.")
-    return out
+    return out + judge_findings(judge)
 
 
 def assemble(dest: Path, *, project: Path, run_id: str, cfg: dict, plan_fields: dict,
@@ -263,9 +339,14 @@ def assemble(dest: Path, *, project: Path, run_id: str, cfg: dict, plan_fields: 
         preds[cmp] = p
         comps[cmp] = {"metrics": read_json(accepted[sid] / "metrics.json"), "stage": sid}
         write_jsonl(dest / "predictions" / f"{cmp}.jsonl", p)
+    jm = None
+    if "judge" in stage_results:
+        jm = read_json(accepted["judge"] / "metrics.json")
+        J.apply_to_metrics(comps, jm)
+        shutil.copyfile(accepted["judge"] / "judgments.jsonl", dest / "judgments.jsonl")
     val_sha = sha_file(inputs_dir / "val.jsonl")
     val_ids = [r["id"] for r in read_jsonl(inputs_dir / "val.jsonl")]
-    protocol = protocol_fingerprint(cfg, schema, val_sha, val_ids)
+    protocol = protocol_fingerprint(cfg, schema, val_sha, val_ids, plan_fields.get("judge_protocol"))
     dis = disagreements(task, preds)
     write_jsonl(dest / "disagreements.jsonl", dis)
     metric = metric_key(cfg)
@@ -308,13 +389,14 @@ def assemble(dest: Path, *, project: Path, run_id: str, cfg: dict, plan_fields: 
                  "duplicate_normalization": cfg["split"]["duplicate_normalization"],
                  "warnings": warnings},
         "models": models, "dependencies": deps, "comparators": comps, "table": tbl,
-        "findings": findings(task, comps, metric),
+        "findings": findings(task, comps, metric, jm), "judge": jm,
         "stages": {sid: {"status": r.get("status"), "seconds": r.get("seconds"),
                          "producers": r.get("producers", []), "metrics_keys": sorted(r.get("metrics", {})),
                          "notes": r.get("notes", {})} for sid, r in stage_results.items()},
         "engine_transitions": trans, "attempts": attempts,
         "adapter_files_sha256": adapter_sha,
         "artifacts": {"predictions": [f"predictions/{c}.jsonl" for c in comps],
+                      **({"judgments": "judgments.jsonl"} if jm else {}),
                       "disagreements": "disagreements.jsonl", "adapter": "artifacts/adapter",
                       "inputs": "inputs/"},
         "final_test": {"used_by_this_run": False,

@@ -1570,8 +1570,8 @@ def status():
     _next_hint("spill tail")
 
 
-PARAMS = {"qwen2.5:0.5b": "0.5B", "qwen2.5:7b": "7B", "qwen2.5:32b": "32B", "llama3.3:70b": "70B"}
-MLX8_BYTES = {"qwen2.5:0.5b": 700_000_000, "qwen2.5:7b": 8_091_987_725, "qwen2.5:32b": 35_000_000_000,
+PARAMS = {"qwen2.5:0.5b": "0.5B", "qwen2.5:1.5b": "1.5B", "qwen2.5:7b": "7B", "qwen2.5:32b": "32B", "llama3.3:70b": "70B"}
+MLX8_BYTES = {"qwen2.5:0.5b": 700_000_000, "qwen2.5:1.5b": 1_640_414_038, "qwen2.5:7b": 8_091_987_725, "qwen2.5:32b": 35_000_000_000,
               "llama3.3:70b": 75_000_000_000}
 
 
@@ -1592,7 +1592,7 @@ def models(architectures: bool = typer.Option(False, "--architectures",
     from .registry import MODELS_DIR
     typer.echo(f"{'tag':14s} {'params':7s} {'family (state)':26s} {'bf16':>8s} {'8-bit':>8s} "
                f"{'placement':10s} {'disk needed':>12s} {'downloaded':>10s}")
-    fam_of = {"qwen2.5:0.5b": "qwen2", "qwen2.5:7b": "qwen2", "qwen2.5:32b": "qwen2",
+    fam_of = {"qwen2.5:0.5b": "qwen2", "qwen2.5:1.5b": "qwen2", "qwen2.5:7b": "qwen2", "qwen2.5:32b": "qwen2",
               "llama3.3:70b": "llama"}
     for name in reg:
         st = safetensors_spec(name)

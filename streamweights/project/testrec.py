@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ..errors import SpillError
 from . import config as C
+from . import judge as J
 from . import report as R
 from .common import atomic_write, new_id, read_json, read_jsonl, sha_file, write_json, write_jsonl
 from .index import records, test_uses, write_index
@@ -63,7 +64,7 @@ def run_test(project: Path, run_id: str | None = None, engine: str | None = None
            "run_protocol_sha256": m["protocol"]["sha256"], "uses_before": uses_before,
            "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "status": "running"}
     try:
-        comps, preds, protocol, test_rows = score_comparators(
+        comps, preds, protocol, test_rows, jm = score_comparators(
             project, m, cfg, test_file, stg, engine, say, "final-test")
         metric = R.metric_key(cfg)
         table = R.table(task, {c: {"metrics": v["metrics"]} for c, v in comps.items()}, metric)
@@ -71,13 +72,16 @@ def run_test(project: Path, run_id: str | None = None, engine: str | None = None
                    protocol={"sha256": protocol["sha256"]}, metric=R.primary_name(metric), metric_key=metric, metric_version=C.metric_version(cfg),
                    seconds=round(time.monotonic() - t0, 1),
                    finished=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                   findings=R.findings(task, {c: {"metrics": v["metrics"]} for c, v in comps.items()}, metric),
+                   findings=R.findings(task, {c: {"metrics": v["metrics"]} for c, v in comps.items()}, metric, jm),
+                   judge=jm,
                    holdout_note=(f"This is use {uses_before + 1} of this project's final test split. "
                                  + ("It was not consulted before." if uses_before == 0 else
                                     f"It was scored {uses_before} time(s) before, so it is not an untouched "
                                     f"holdout for this run's selection.")))
         write_json(stg / "disagreements.json", R.disagreements(task, preds))
         atomic_write(stg / "report.md", _render(rec, task).encode())
+        if jm:
+            atomic_write(stg / "judge.md", "\n".join(R.render_judge_md(jm, R.names_for(task))).encode())
     except Exception as e:
         rec.update(status="failed", error=f"{type(e).__name__}: {e}",
                    seconds=round(time.monotonic() - t0, 1),
@@ -135,8 +139,38 @@ def score_comparators(project: Path, m: dict, cfg: dict, rows_file: Path, stg: P
         preds[c] = read_jsonl(sd / "out" / "predictions.jsonl")
         write_jsonl(stg / "predictions" / f"{c}.jsonl", preds[c])
     schema = read_json(att / "inputs" / cfg["contract"]["schema_file"]) if task == "json" else None
-    protocol = R.protocol_fingerprint(cfg, schema, sha_file(rows_file), [r["id"] for r in rows])
-    return comps, preds, protocol, rows
+    jm, jproto = None, None
+    jtag = (m["models"].get("judge") or {}).get("tag")
+    if jtag and task == "open":
+        jproto = m["protocol"]["fields"].get("judge")
+        _check_judge(m, jtag)
+        plan_j = J.plan_judging(list(comps), cfg["model"]["student"], cfg["model"].get("teacher") or None, jtag)
+        sd = stg / "stages" / "judge"
+        sd.mkdir(parents=True)
+        desc = StageDesc("judge", "judge", "judge", {
+            "judge": jtag, **plan_j,
+            "pred_files": {c: str(stg / "stages" / c / "out" / "predictions.jsonl") for c in plan_j["judged"]}})
+        say(f"judging {len(plan_j['judged'])} comparators and {len(plan_j['pairs'])} pairs with {jtag} "
+            f"on {len(rows)} {what} rows (one model's assessment)")
+        out = run_stage(desc, StageContext(att, sd, engine, None, None, say))
+        if out.status != "done":
+            raise SpillError("the judge evaluation stopped before finishing")
+        jm = out.metrics
+        J.apply_to_metrics(comps, jm)
+        shutil.copyfile(sd / "out" / "judgments.jsonl", stg / "judgments.jsonl")
+    protocol = R.protocol_fingerprint(cfg, schema, sha_file(rows_file), [r["id"] for r in rows], jproto)
+    return comps, preds, protocol, rows, jm
+
+
+def _check_judge(m: dict, tag: str) -> None:
+    from . import modelid
+    ident = modelid.student_identity(tag, fetch=False)
+    want = {k: v for k, v in m["models"]["judge"]["files"].items()}
+    have = {k: v["sha256"] if isinstance(v, dict) else v for k, v in ident["files"].items()}
+    got = {k: (v["sha256"] if isinstance(v, dict) else v) for k, v in want.items()}
+    if not ident.get("present") or any(have.get(k) != v for k, v in got.items()):
+        raise SpillError(f"the judge {tag} on this machine is not the one this run was judged with "
+                         f"(file hashes differ or are missing)", f"spill plan {m['project']}")
 
 
 def _render(rec: dict, task: str) -> str:
