@@ -1,0 +1,49 @@
+{
+ "flow": "nojudge",
+ "engine": "mlx",
+ "device": "Device(gpu, 0)",
+ "allowed_models": "qwen2.5:0.5b,embedding:minilm,Qwen/Qwen2.5-0.5B-Instruct",
+ "started": "2026-10-13T16:48:37-0700",
+ "steps": [
+  {
+   "command": "spill example dolly-qa --tiny",
+   "exit": 0,
+   "seconds": 0.1,
+   "stdout": "created dolly-qa-tiny/ with NOTICE.txt, README.md, dolly-qa.csv\n\nnext: spill init dolly-qa-tiny/dolly-qa.csv --input prompt --output answer --project dolly-qa-tiny-project\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill init dolly-qa-tiny/dolly-qa.csv --input prompt --output answer --project dolly",
+   "exit": 0,
+   "seconds": 0.7,
+   "stdout": "scoring: judge (the outputs look like free text or are not a small repeated label set (84 distinct in 84 rows))\nspill init dolly-qa.csv: scoring judge (the outputs look like free text or are not a small repeated label set (84 distinct in 84 rows)). Train 58, validation 13, final test 13 rows. Cost: $0. Project -> dolly\n   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together\n\nnext: spill plan dolly\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill plan dolly --engine mlx",
+   "exit": 0,
+   "seconds": 0.8,
+   "stdout": "spill plan dolly: scoring judge, models qwen2.5:0.5b (student), bf16 weights, no quantization, on mlx (--engine mlx). Est. 26 s. Cost: $0. Run -> dolly/runs/<run id>\nmodels (each is a choice: edit streamweights.toml, or pass --student, --teacher, --judge):\n   student   qwen2.5:0.5b  Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf  safetensors bf16  0.92 GB, on disk  (qwen2.5:0.5b on mlx: the smallest curated model, so a first result takes minutes on any machine; this machine's 39 GB could also train qwen2.5:1.5b or qwen2.5:7b (--student))\n   teacher   none (a teacher runs only when you name one: spill build --teacher <model>)\n   judge     judge: none named. Judged scores need a judge; recommended: qwen2.5:7b (the largest curated model other than the student whose bf16 weights (14.0 GB) fit in 60% of this machine's memory); download 15.23 GB, disk 15.23 GB, estimated judging time 57 s. Accept with --judge recommended, or name one with --judge <model>\n   baseline  nearest training answer by TF-IDF (no model, nothing downloaded)\nengine: mlx: --engine mlx\nscoring: judge: reference overlap against your outputs; judged scores need a judge you name or accept\ndownloads:\n   qwen2.5:0.5b: 0.93 GB already on disk\n   nothing to download\ndisk:\n   checkpoints 0.29 GB (3 x 106 MB, every published checkpoint is kept; deleting them is a later feature), staging 0.14 GB, adapter 35 MB\n   export (only if you run it): merged 0.92 GB, GGUF q8_0 about 0.49 GB (assumption: 0.53 x bf16); free here 19.38 GB\nstages:\n   1. nearest training answer baseline (TF-IDF, no model): 1 s [assumption] word counting over the training inputs, no model; under a second at this size\n   2. tune qwen2.5:0.5b on 58 training rows (58 yours): 24 s [measurement] 14,990 token-passes x 6 x 0.49B params / 1.86 TFLOP/s = 24 s; rate measured by spill tune\n   3. qwen2.5:0.5b prompted, untrained, on 13 validation rows: <1 s [assumption] 13 rows, batch 512, resident: prefill 0 s (1,184 tokens, shared prefix once) + decode 0 s (1 x 20 passes x 0.01 s); no matching measurement yet (rate measured by spill tune)\n   4. qwen2.5:0.5b trained, on 13 validation rows: <1 s [assumption] 13 rows, batch 512, resident: prefill 0 s (1,182 tokens, shared prefix once) + decode 0 s (1 x 20 passes x 0.01 s); no matching measurement yet (rate measured by spill tune)\ntotal: 26 s; model loading is not included\n\nnext: spill build dolly\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill build dolly --engine mlx",
+   "exit": 0,
+   "seconds": 19.6,
+   "stdout": "spill build dolly: scoring judge, models qwen2.5:0.5b (student), bf16 weights, no quantization, on mlx (--engine mlx). Est. 26 s. Cost: $0. Run -> dolly/runs/<run id>\nstage 1/4: nearest training answer baseline (TF-IDF, no model); estimate 1 s (assumption)\nstage 1 done in <1 s; token F1 against the reference (overlap, not accuracy) 0.105 on 13 rows\nstage 2/4: tune qwen2.5:0.5b on 58 training rows (58 yours); estimate 24 s (measurement)\nstage 2 done in 13 s; 30 steps, final loss 0.51944899559021\nstage 3/4: qwen2.5:0.5b prompted, untrained, on 13 validation rows; estimate <1 s (assumption)\nstage 3 done in 4 s; token F1 against the reference (overlap, not accuracy) 0.441 on 13 rows\nstage 4/4: qwen2.5:0.5b trained, on 13 validation rows; estimate <1 s (assumption)\nstage 4 done in 2 s; token F1 against the reference (overlap, not accuracy) 0.591 on 13 rows\n\nnearest training answer (TF-IDF, no model)  token F1 against the reference (overlap, not accuracy) 0.105  (13 rows)\nstudent, prompted, untrained                token F1 against the reference (overlap, not accuracy) 0.441  (13 rows)\nstudent, trained                            token F1 against the reference (overlap, not accuracy) 0.591  (13 rows)\nrun run-20261013-164840-dc56-c295ad: dolly/runs/run-20261013-164840-dc56-c295ad\n\nnext: spill report dolly\n",
+   "stderr_tail": "batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 3.4 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 40 (0.0 s) \u00b7 212.6 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 3.4 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 41 (0.0 s) \u00b7 210.6 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 3.4 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 42 (0.0 s) \u00b7 208.7 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 3.4 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 43 (0.0 s) \u00b7 206.9 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 3.4 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 44 (0.0 s) \u00b7 205.1 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 3.4 GB peak\u001b[K\n\u001b[1Frows 13/13 \u00b7 pass 45 (0.0 s) \u00b7 202.6 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 0 \u00b7 ~0.0 s per token per prompt \u00b7 3.4 GB peak\u001b[K\n\n"
+  },
+  {
+   "command": "spill report dolly",
+   "exit": 0,
+   "seconds": 0.2,
+   "stdout": "# Run run-20261013-164840-dc56-c295ad: dolly\n\nScoring: judge: reference overlap against your outputs; judged scores need a judge you name or accept. Metric: token F1 against the reference (overlap, not accuracy) (metric version 1). Validation rows: 13. Status: completed.\n\n## Results\n\nReference overlap compares each output with the reference you provided. It measures similarity to that one answer, not whether an answer is good, and is not accuracy.\n\n| comparator | token F1 | ROUGE-L | exact match | rows | failures | truncated |\n|---|---|---|---|---|---|---|\n| nearest training answer (TF-IDF, no model) | 0.105 | 0.095 | 0.000 | 13 | 0 | n/a |\n| student, prompted, untrained | 0.441 | 0.419 | 0.077 | 13 | 0 | 1 |\n| student, trained | 0.591 | 0.591 | 0.154 | 13 | 0 | 0 |\n\nInvalid, unparseable and failed outputs count as wrong and stay in every denominator. `unavailable` means the metric does not exist for that row; it is never shown as 0.\n\n## What the numbers say\n\nOn 13 validation rows, token F1 against the reference (overlap, not accuracy): nearest training answer (TF-IDF, no model): 0.105; student, prompted, untrained: 0.441; student, trained: 0.591.\nThe trained student scored 0.487 higher than the nearest training answer (TF-IDF, no model) (6 rows).\nThe trained student scored 0.151 higher than the student, prompted, untrained (2 rows).\n\nNo significance test was run and none is implied. These are the observed differences on this validation set; a few rows can move a score on a set this size. Changing the batch shape can also move a score through numerical differences; that is a diagnostic, not evidence either way.\n\n## Data\n\nTrain 58, validation 13, final test 13 rows (split generated, seed 0). The final test split was not used by this run and is scored only by `spill test`.\n\n\n## Models\n\n- student: qwen2.5:0.5b (Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf, safetensors bf16)\n\n## How it ran\n\n- baseline: done, 0.0 s, torch-cpu on macOS arm64\n- train: done, 12.6 s, mlx on macOS arm64\n- eval:untrained: done, 3.6 s, mlx on macOS arm64\n- eval:trained: done, 1.9 s, mlx on macOS arm64\n\n## Where things are\n\n- predictions: predictions/<comparator>.jsonl; disagreements with the trained student: disagreements.jsonl\n- adapter: artifacts/adapter/\n- manifest (fingerprints, model hashes, dependency versions): manifest.json\n\n## Next\n\n- `spill export dolly`\n- `spill test dolly`\n- `spill compare dolly`\n\nreport: dolly/runs/run-20261013-164840-dc56-c295ad/report.md\nindex: dolly/REPORT.md\n\nnext: spill export dolly\n",
+   "stderr_tail": ""
+  }
+ ],
+ "models_downloaded": {},
+ "models_changed": {},
+ "ok": true,
+ "finished": "2026-10-13T16:48:59-0700",
+ "project_dir": "/var/folders/qp/pdygxybd1j5bjgp7b4yd7xp00000gn/T/cap020-zp2mrja7/run"
+}

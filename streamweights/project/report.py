@@ -183,7 +183,8 @@ def render_md(m: dict) -> str:
                          f"{_f(r['schema_valid_rate'])} | {_f(r['whole_record_accuracy'])} | "
                          f"{_f(r['mean_field_accuracy'])} | {r['rows']} | {r['inference_failures'] or 0} | "
                          f"{r['truncated'] if r['truncated'] is not None else 'n/a'} |")
-    lines += render_judge_md(m.get("judge"), names)
+    jl = render_judge_md(m.get("judge"), names)
+    lines += ([""] + jl) if jl else []
     lines += ["", "Invalid, unparseable and failed outputs count as wrong and stay in every "
               "denominator. `unavailable` means the metric does not exist for that row; it is "
               "never shown as 0.", ""]
@@ -304,16 +305,18 @@ def findings(task: str, comps: dict, metric: str, judge: dict | None = None) -> 
     parts = [f"{names[k]}: {_f(v)}" for k, v in sc.items() if v is not None]
     out = [f"On {n} validation rows, {primary_name(metric)}: " + "; ".join(parts) + "."]
     t = sc.get("trained")
+    countable = metric in ("accuracy", "macro_f1", "whole_record_accuracy", "mean_field_accuracy",
+                           "parseable_rate",
+                           "schema_valid_rate", "exact_match")      # a difference that is whole rows
     for k in ("baseline", "untrained", "teacher"):
         if k in sc and t is not None and sc[k] is not None:
             d = t - sc[k]
             rows = round(abs(d) * n)
+            tail = f" ({rows} row{'s' if rows != 1 else ''})" if countable else ""
             if d > 0:
-                out.append(f"The trained student scored {d:.3f} higher than the {names[k]} "
-                           f"({rows} row{'s' if rows != 1 else ''}).")
+                out.append(f"The trained student scored {d:.3f} higher than the {names[k]}{tail}.")
             elif d < 0:
-                out.append(f"The {names[k]} scored {-d:.3f} higher than the trained student "
-                           f"({rows} row{'s' if rows != 1 else ''}).")
+                out.append(f"The {names[k]} scored {-d:.3f} higher than the trained student{tail}.")
             else:
                 out.append(f"The trained student and the {names[k]} scored the same.")
     return out + judge_findings(judge)
