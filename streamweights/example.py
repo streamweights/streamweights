@@ -33,6 +33,11 @@ EXAMPLES = {
                  "extraction); 1,200 rows",
         "quick": {}, "tiny": {},
     },
+    "dolly-qa": {
+        "about": "questions about a short Wikipedia passage with answers a person wrote (open-ended "
+                 "output, scored by reference overlap and a judge you name); 359 rows",
+        "quick": {}, "tiny": {},
+    },
     "relay": {
         "about": "the tiny banking77 build, started on one machine and finished on another",
     },
@@ -60,6 +65,8 @@ def create(name: str, quick: bool = False, parent: Path = Path("."), force: bool
         return _create_relay(Path(parent), force)
     if name == "snips":
         return _create_snips(Path(parent), quick, tiny, force)
+    if name == "dolly-qa":
+        return _create_dolly(Path(parent), quick, tiny, force)
     src = DATA / name
     folder = Path(parent) / (f"{name}-tiny" if tiny else f"{name}-quick" if quick else name)
     if folder.exists() and any(folder.iterdir()) and not force:
@@ -95,6 +102,21 @@ def _create_snips(parent: Path, quick: bool, tiny: bool, force: bool) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     q = src / ("tiny" if tiny else "quick") if (tiny or quick) else src
     _copy(q, folder, ("snips.csv", "schema.json", "README.md", "LICENSE-CC0.txt"))
+    return folder
+
+
+def _create_dolly(parent: Path, quick: bool, tiny: bool, force: bool) -> Path:
+    if quick:
+        raise SpillError("dolly-qa comes in two sizes: the default and --tiny",
+                         "spill example dolly-qa --tiny")
+    src = DATA / "dolly-qa"
+    folder = Path(parent) / ("dolly-qa-tiny" if tiny else "dolly-qa")
+    if folder.exists() and any(folder.iterdir()) and not force:
+        raise SpillError(f"{folder} already exists and is not empty",
+                         f"spill init {folder}/dolly-qa.csv --input prompt --output answer")
+    folder.mkdir(parents=True, exist_ok=True)
+    _copy(src / "tiny" if tiny else src, folder, ("dolly-qa.csv",))
+    _copy(src, folder, ("README.md", "NOTICE.txt"))
     return folder
 
 

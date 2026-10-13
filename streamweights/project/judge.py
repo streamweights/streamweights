@@ -33,33 +33,33 @@ DEFAULT_RUBRIC = """Score the answer from 1 to 5.
 When a reference answer is given, treat it as a good answer, not the only one: an answer that
 says the same thing in other words deserves the same score. Judge the content, not the style."""
 
-POINTWISE_TEMPLATE = """You grade one answer to a task. Follow the rubric.
+POINTWISE_TEMPLATE = """You are a strict grader. Grade ONLY the text under ANSWER TO GRADE. The reference answer is a guide to what a good answer says; it is not the answer you grade. An answer that contradicts the reference, or answers a different question, scores 1 or 2.
 
 Rubric:
 {rubric}
 
-Task input:
+TASK INPUT:
 {input}
 
-{reference}Answer to grade:
+{reference}ANSWER TO GRADE:
 {output}
 
 Reply in exactly this form and nothing else:
-Rationale: <one or two sentences>
+Rationale: <one or two sentences about the answer to grade>
 Score: <an integer from 1 to 5>"""
 
-PAIRWISE_TEMPLATE = """You compare two answers to the same task. Follow the rubric to decide which answer is better.
+PAIRWISE_TEMPLATE = """You compare two answers, ANSWER A and ANSWER B, to the same task. Decide which one is better, following the rubric. The reference answer is a guide to what a good answer says; it is neither A nor B. If neither answer is better, say tie.
 
 Rubric:
 {rubric}
 
-Task input:
+TASK INPUT:
 {input}
 
-{reference}Answer A:
+{reference}ANSWER A:
 {a}
 
-Answer B:
+ANSWER B:
 {b}
 
 Reply in exactly this form and nothing else:
@@ -116,7 +116,8 @@ def same_model(a: str, b: str) -> bool:
 # ------------------------------------------------------------ prompts
 
 def _reference(ref) -> str:
-    return "" if ref is None or not str(ref).strip() else f"Reference answer:\n{str(ref).strip()}\n\n"
+    return "" if ref is None or not str(ref).strip() else \
+        f"REFERENCE ANSWER (a guide, not what you grade):\n{str(ref).strip()}\n\n"
 
 
 def pointwise_messages(rubric: str, task_input: str, output: str, reference) -> list[dict]:

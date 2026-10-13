@@ -96,7 +96,7 @@ class ScriptedBackend:
         for r in rows:
             msg = r["body"]["messages"][0]["content"]
             if r["custom_id"].startswith("pt:"):
-                score = 5 if "Answer to grade:\nItem" in msg else 2
+                score = 5 if "ANSWER TO GRADE:\nItem" in msg else 2
                 reply = f"Rationale: scripted.\nScore: {score}"
             else:
                 reply = "Rationale: scripted.\nBetter: A"
