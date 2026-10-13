@@ -15,6 +15,7 @@ Package `streamweights`, CLI `spill`. Repo: https://github.com/streamweights/str
 - Paste sets are saved verbatim in `docs/paste-sets/` and committed first.
 - Every directive ends by updating the README and the docs site to reflect the current state, with measured numbers only.
 - Never post publicly on the user's behalf: no issues, pull requests or comments on other repositories; drafts only. Commit after every numbered item of a directive.
+- Any change that narrows the product's scope, removes a capability, or demotes a pillar of VISION.md must be stated explicitly in the terminal report under a heading 'Scope changes', with the reason. Never fold a narrowing in silently.
 - Directive 013 additionally forbids model runs of any size, PyPI publishing and tags.
 
 ## Developer-experience rules (binding on every command)
