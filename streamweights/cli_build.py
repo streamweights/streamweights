@@ -352,6 +352,9 @@ def build(
                                                           "loss (default 1)"),
     kd_alpha: float = typer.Option(None, "--kd-alpha", help="project folders, mix: weight of the "
                                                             "kl term (default 0.5)"),
+    deadline: str = typer.Option(None, "--deadline", help="project folders: a duration (2h) or "
+                                 "timestamp; builds only if the project as configured is "
+                                 "estimated to fit, and never lowers a setting to make it fit"),
     kd_topk: int = typer.Option(None, "--kd-topk", help="project folders: top-k log-probs the "
                                                         "teacher keeps per token (default 20)"),
     compare: list[str] = typer.Option(None, "--compare", help="add this model's score to the table "
@@ -405,7 +408,7 @@ def build(
             project_build(folder, student, teacher, epochs, engine, headless, executor, new_run,
                           stop_after, notify, judge,
                           {"distill_loss": distill_loss, "kd_temp": kd_temp, "kd_alpha": kd_alpha,
-                           "kd_topk": kd_topk})
+                           "kd_topk": kd_topk}, deadline)
         except typer.Exit:
             raise
         except Exception as e:

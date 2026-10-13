@@ -151,12 +151,35 @@ def _lora_params(model_dir: Path | None, rank: int) -> int | None:
         return None
 
 
+def lite_identity(tag: str) -> dict:
+    """A model's identity from the registry alone: sizes and where it would come from, no hashing
+    and no network. For deadline planning, which weighs combinations and builds none of them. A
+    curated tag in the same family as another shares its tokenizer here (every curated Qwen2.5
+    does; the pins of 0.5b and 1.5b were checked to hash the same)."""
+    from ..registry import safetensors_downloaded, safetensors_spec
+    spec = safetensors_spec(tag)
+    if spec is None:
+        return modelid.student_identity(tag, fetch=False)
+    fam = tag.split(":")[0]
+    return {"tag": tag, "repo": spec["repo"], "revision": "pinned" if tag in modelid.load_pins() else "unpinned",
+            "format": "safetensors bf16", "present": safetensors_downloaded(tag), "dir": None,
+            "files": {"model.safetensors": {"sha256": "", "bytes": spec["bytes"]},
+                      "tokenizer.json": {"sha256": f"family:{fam}", "bytes": 0}}}
+
+
 def make_plan(project: Path, engine: str | None = None, verify: bool = True,
-              fetch: bool = False, frozen: Path | None = None) -> BuildPlan:
+              fetch: bool = False, frozen: Path | None = None, cfg_override: dict | None = None,
+              lite: bool = False) -> BuildPlan:
+    """The plan for a build. `cfg_override` ({"model": {...}}) replaces model roles for what-if
+    plans (deadline planning); `lite` identifies models from the registry only."""
     from .. import probe as probe_mod
     from ..calibration import load_calibration
     project = Path(project)
     cfg, shas = load_project(project, frozen)
+    if cfg_override:
+        cfg = copy.deepcopy(cfg)
+        for k, v in cfg_override.items():
+            cfg.setdefault(k, {}).update(v)
     cfg = resolve_roles(cfg)
     contract = cfg["contract"]
     C.check_metric(cfg["task"]["type"], cfg["evaluation"]["metric"])
@@ -182,13 +205,15 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
     if cfg["evaluation"]["metric"] == "judge_mean" and not use_judge:
         raise SpillError("the metric judge_mean needs a judge on an open-ended project",
                          f"spill build {project} --judge <model>   (or --judge recommended)")
-    sid = modelid.student_identity(student_tag, fetch=fetch)
-    tid = modelid.student_identity(teacher_tag, fetch=fetch) if teacher_tag else None
+    ident = (lambda t: lite_identity(t)) if lite else (lambda t: modelid.student_identity(t, fetch=fetch))
+    sid = ident(student_tag)
+    tid = ident(teacher_tag) if teacher_tag else None
     jid = None
     if use_judge:
         jid = (sid if J.same_model(judge_tag, student_tag) else tid if tid and J.same_model(judge_tag, teacher_tag)
-               else modelid.student_identity(judge_tag, fetch=fetch))
-    eid = modelid.embedding_identity(fetch=fetch) if task == "classification" else None
+               else ident(judge_tag))
+    eid = (modelid.embedding_identity(fetch=fetch) if not lite else
+           modelid.embedding_identity(fetch=False)) if task == "classification" else None
     for tag, ident in ((student_tag, sid), (teacher_tag, tid), (judge_tag, jid)):
         if ident:
             _tag_params(tag, ident)
@@ -279,7 +304,7 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
     plan = BuildPlan(project, cfg, eng, why, stages, estimates,
                      {"student": sid, "teacher": tid, "judge": jid, "embedding": eid}, downloads, disk,
                      ident_sha, fields, shas)
-    if task == "open" and not judge_tag:
+    if task == "open" and not judge_tag and not lite:
         n_j = (1 if task == "open" else 0) + 2 + (1 if teacher_tag else 0)
         plan.judge_rec = _judge_recommendation(cfg, student_tag, val, eng, cal, hw, fetch, n_j,
                                                n_j - 1)

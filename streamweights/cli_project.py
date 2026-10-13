@@ -115,10 +115,17 @@ def plan(
     calibrate: bool = typer.Option(False, "--calibrate", help="first measure this engine's matmul "
                                                               "and memory rates on synthetic "
                                                               "data (a few seconds)"),
+    deadline: str = typer.Option(None, "--deadline", help="a duration (90m, 2h, 1d12h) or timestamp "
+                                 "(2026-10-14T09:00): list the combinations of student, teacher, "
+                                 "judge and engine on this machine estimated to finish in time"),
+    student: str = typer.Option(None, "--student", help="plan with this student (not saved)"),
+    teacher: str = typer.Option(None, "--teacher", help="plan with this teacher (not saved)"),
+    judge: str = typer.Option(None, "--judge", help="plan with this judge (not saved)"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Models and engine with reasons, downloads, disk, and a duration per stage labeled
-    measurement, assumption or unknown. Loads no model, downloads nothing, trains nothing."""
+    measurement, assumption or unknown. Loads no model, downloads nothing, trains nothing. With
+    --deadline, also which combinations of models and engine are estimated to fit."""
     import streamweights.cli as cli
     cli._DEBUG = debug
     try:
@@ -129,17 +136,29 @@ def plan(
             r = engine_select.measure_rates()
             typer.echo("calibration (synthetic matmul and memory, nothing trained): "
                        + "; ".join(f"{e} {v.get('matmul_tflops', '?')} TFLOP/s" for e, v in r.items()))
-        p = P.make_plan(project, engine, fetch=False)
+        roles = {k: v for k, v in (("student", student), ("teacher", teacher), ("judge", judge)) if v}
+        if judge == "recommended":
+            roles.pop("judge")
+        p = P.make_plan(project, engine, fetch=False, cfg_override={"model": roles} if roles else None)
         for line in P.render(p):
             typer.echo(line)
+        if roles:
+            typer.echo("note: " + ", ".join(f"{k} {v}" for k, v in roles.items())
+                       + " used for this plan only; streamweights.toml is unchanged (spill build "
+                         "--student/--teacher/--judge records them)")
+        if deadline:
+            from .project import deadline as DL
+            secs, label = DL.parse_deadline(deadline)
+            for line in DL.render(DL.evaluate(project, secs, engine), secs, label):
+                typer.echo(line)
     except Exception as e:
         _fail(e)
         return
-    _next_hint(f"spill build {project}")
+    _next_hint(f"spill build {project}" + (f" --deadline {deadline}" if deadline else ""))
 
 
 def project_build(folder, student, teacher, epochs, engine, headless, executor, new_run,
-                  stop_after, notify, judge=None, kd=None):
+                  stop_after, notify, judge=None, kd=None, deadline=None):
     """`spill build <project>`: plan, run, report. Flags that change the build are written
     into streamweights.toml first (one line each), so the project stays the record."""
     from . import runtime
@@ -159,6 +178,23 @@ def project_build(folder, student, teacher, epochs, engine, headless, executor, 
                              f"{SC.scoring_of(cfg)}", f"spill build {folder}")
         judge = P.recommended_judge(student or cfg["model"]["student"])
         typer.echo(f"accepting the recommended judge: {judge}")
+    roles = {k: v for k, v in (("student", student), ("teacher", teacher), ("judge", judge)) if v}
+    if deadline:
+        from .project import deadline as DL
+        fits, lines = DL.check_configured(folder, deadline, engine, roles)
+        for line in lines:
+            typer.echo(line)
+        if not fits:
+            fit = [c for c in DL.evaluate(folder, DL.parse_deadline(deadline)[0], engine, roles) if c.recommended]
+            if fit:
+                c = fit[0]
+                flags = f"--student {c.student}" + (f" --teacher {c.teacher}" if c.teacher else "") + \
+                    (f" --judge {c.judge}" if c.judge else "") + f" --engine {c.engine}"
+                raise SpillError("this project as configured is not estimated to fit the deadline; "
+                                 "it was not started and nothing was lowered", f"spill build {folder} "
+                                 f"{flags} --deadline {deadline}   (the recommended combination that fits)")
+            raise SpillError("nothing is estimated to fit the deadline; the build was not started "
+                             "and nothing was lowered", f"spill plan {folder} --deadline <a longer time>")
     kd = kd or {}
     if kd.get("distill_loss") not in (None, "auto", "kl", "ce", "mix"):
         raise SpillError(f"--distill-loss must be kl, ce or mix, not {kd['distill_loss']!r}",
