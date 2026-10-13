@@ -11,6 +11,7 @@ import shutil
 from pathlib import Path
 
 from . import config as C
+from . import scoring
 from .common import canon, read_json, read_jsonl, sha_file, sha_obj, write_json, write_jsonl
 
 LINEAGE_NOTE = ("the parent is recorded as experiment lineage only: this run trained from the base "
@@ -20,6 +21,16 @@ NAMES = {"baseline": "embedding baseline (MiniLM + logistic regression)",
          "untrained": "student, prompted, untrained", "trained": "student, trained",
          "teacher": "teacher"}
 JSON_NAMES = {**NAMES, "untrained": "student, schema-prompted, untrained (the baseline)"}
+OPEN_NAMES = {**NAMES, "baseline": "nearest training answer (TF-IDF, no model)"}
+
+
+def names_for(task: str) -> dict:
+    return {"classification": NAMES, "json": JSON_NAMES, "open": OPEN_NAMES}[task]
+
+
+OVERLAP_RULES = ("words are Unicode NFKC casefolded runs of word characters; token F1 is the bag-"
+                 "of-words F1, ROUGE-L the F-measure of the longest common word subsequence, "
+                 "exact match equality of the word sequences; a failed generation scores 0")
 
 
 def metric_key(cfg: dict) -> str:
@@ -43,24 +54,37 @@ def key_of(label_or_key: str) -> str:
     return label_or_key if label_or_key in C.METRIC_LABELS else _LABEL_TO_KEY.get(label_or_key, label_or_key)
 
 
-def protocol_fingerprint(cfg: dict, schema: dict | None, val_sha: str, val_ids: list[str]) -> dict:
-    """Everything that decides whether two evaluations are comparable."""
+def _contract_part(cfg: dict) -> dict:
+    t = cfg["task"]["type"]
+    if t == "classification":
+        return {"labels": cfg["contract"]["labels"],
+                "normalization": cfg["contract"]["label_normalization"]}
+    if t == "open":
+        return {"kind": "open", "overlap": OVERLAP_RULES}
+    return {"schema_sha256": cfg["contract"]["schema_sha256"], "rules": cfg["contract"]["rules"]}
+
+
+def protocol_fingerprint(cfg: dict, schema: dict | None, val_sha: str, val_ids: list[str],
+                         judge: dict | None = None) -> dict:
+    """Everything that decides whether two evaluations are comparable. `judge` is the judge
+    protocol (judge model identity, rubric text, prompt templates, decoding) when a judge scores
+    the run; any change to it makes two evaluations incompatible."""
     from . import contract as K
     ev = cfg["evaluation"]
     body = {
         "task": cfg["task"]["type"],
         "rows": {"val_sha256": val_sha, "ids_sha256": sha_obj(val_ids), "n": len(val_ids)},
-        "contract": ({"labels": cfg["contract"]["labels"],
-                      "normalization": cfg["contract"]["label_normalization"]}
-                     if cfg["task"]["type"] == "classification"
-                     else {"schema_sha256": cfg["contract"]["schema_sha256"],
-                           "rules": cfg["contract"]["rules"]}),
+        "contract": _contract_part(cfg),
         "prompts": {"untrained": K.messages_untrained(cfg, schema, "{input}"),
                     "student": K.messages_student(cfg, "{input}")},
         "decoding": ev["decoding"], "max_tokens": ev["max_tokens"],
         "postprocessing": ev["postprocessing"], "metric": ev["metric"],
         "metric_version": C.metric_version(cfg), "protocol_version": C.PROTOCOL_VERSION,
         "precision": ev["precision"]}
+    if ev.get("scoring") == "script":
+        body["script_sha256"] = ev.get("script_sha256")
+    if judge:
+        body["judge"] = judge
     return {"sha256": sha_obj(body), "fields": body}
 
 
@@ -68,7 +92,8 @@ def metric_definition(cfg: dict) -> dict:
     ev = cfg["evaluation"]
     return {"metric": ev["metric"], "metric_version": C.metric_version(cfg),
             "contract": (cfg["contract"]["label_normalization"] if cfg["task"]["type"]
-                         == "classification" else cfg["contract"]["rules"])}
+                         == "classification" else OVERLAP_RULES if cfg["task"]["type"] == "open"
+                         else cfg["contract"]["rules"])}
 
 
 def disagreements(task: str, preds: dict[str, list[dict]]) -> list[dict]:
@@ -98,7 +123,8 @@ def table(task: str, comps: dict, metric: str) -> list[dict]:
         rows.append({"comparator": name, "primary": primary(metric, m), **{k: m.get(k) for k in (
             "rows", "accuracy", "macro_f1", "invalid_predictions", "inference_failures",
             "truncated", "parseable_rate", "schema_valid_rate", "whole_record_accuracy",
-            "mean_field_accuracy", "records_with_extra_fields")}})
+            "mean_field_accuracy", "records_with_extra_fields", "token_f1", "rouge_l",
+            "exact_match", "judge_mean", "judge_rows", "judge_unscored", "script_score")}})
     return rows
 
 
@@ -110,9 +136,10 @@ def _f(x, pct=True):
 
 def render_md(m: dict) -> str:
     task = m["task"]["type"]
-    names = NAMES if task == "classification" else JSON_NAMES
+    names = names_for(task)
     lines = [f"# Run {m['run_id']}: {m['project']}", "",
-             f"Task: {task}. Metric: {primary_name(m['metric_key'])} (metric version {m['metric_version']}). "
+             f"Scoring: {scoring.describe(m['config_resolved'])}. "
+             f"Metric: {primary_name(m['metric_key'])} (metric version {m['metric_version']}). "
              f"Validation rows: {m['protocol']['fields']['rows']['n']}. Status: completed.", ""]
     if m.get("lineage"):
         lines += [f"Parent run: {m['lineage']['parent']} ({m['lineage']['note']}).", ""]
@@ -123,6 +150,16 @@ def render_md(m: dict) -> str:
         for r in m["table"]:
             lines.append(f"| {names[r['comparator']]} | {_f(r['accuracy'])} | {_f(r['macro_f1'])} | "
                          f"{r['rows']} | {r['invalid_predictions']} | {r['inference_failures'] or 0} | "
+                         f"{r['truncated'] if r['truncated'] is not None else 'n/a'} |")
+    elif task == "open":
+        lines += ["Reference overlap compares each output with the reference you provided. It "
+                  "measures similarity to that one answer, not whether an answer is good, and is "
+                  "not accuracy.", "",
+                  "| comparator | token F1 | ROUGE-L | exact match | rows | failures | truncated |",
+                  "|---|---|---|---|---|---|---|"]
+        for r in m["table"]:
+            lines.append(f"| {names[r['comparator']]} | {_f(r['token_f1'])} | {_f(r['rouge_l'])} | "
+                         f"{_f(r['exact_match'])} | {r['rows']} | {r['inference_failures'] or 0} | "
                          f"{r['truncated'] if r['truncated'] is not None else 'n/a'} |")
     else:
         lines += ["| comparator | parseable | schema-valid | whole-record | mean field | rows | "
@@ -185,7 +222,7 @@ def render_md(m: dict) -> str:
 
 
 def findings(task: str, comps: dict, metric: str) -> list[str]:
-    names = NAMES if task == "classification" else JSON_NAMES
+    names = names_for(task)
     sc = {k: primary(metric, v["metrics"]) for k, v in comps.items()}
     n = next(iter(comps.values()))["metrics"]["rows"]
     parts = [f"{names[k]}: {_f(v)}" for k, v in sc.items() if v is not None]

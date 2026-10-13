@@ -3,7 +3,8 @@
   read_table      CSV (quoted, multiline) or JSONL -> raw records with file and row numbers
   build_rows      column mapping -> rows {id, input, output, group, source}, every problem
                   reported with the file, the row, what is wrong and the fix
-  suggest_task    classification | json | ambiguous (never by distinct-label count alone)
+  suggest_task    classification | json | open, chosen from the outputs (never by
+                  distinct-label count alone)
   split_rows      supplied or generated train / val / test; duplicates and shared groups are
                   connected constraints (transitively); generated splits keep each connected
                   component together; supplied splits that overlap are rejected, not reshuffled
@@ -210,8 +211,8 @@ def build_rows(cols: list[str], recs: list[Record], mapping: dict, task: str | N
                     continue
             if not isinstance(output, dict):
                 issues.append(Issue(r.file, f"row {r.row}", "output must be a JSON object "
-                                    "(a record of fields)", "wrap it in {...} or use --task "
-                                    "classification"))
+                                    "(a record of fields)", "wrap it in {...} or choose "
+                                    "--score exact|judge"))
                 continue
             out_text = json.dumps(output, sort_keys=True, ensure_ascii=False)
         else:
@@ -220,8 +221,8 @@ def build_rows(cols: list[str], recs: list[Record], mapping: dict, task: str | N
             output = outv.strip()
             if task == "classification" and len(output) > MAX_LABEL_CHARS:
                 issues.append(Issue(r.file, f"row {r.row}", f"label is {len(output)} characters "
-                                    f"long; classification labels are short", "use --task json "
-                                    "for structured outputs, or shorten the label"))
+                                    f"long; classification labels are short", "use --score judge "
+                                    "for free-text outputs, or shorten the label"))
                 continue
             out_text = output
         rows.append(Row(row_id(inp, out_text, seen), inp, output, group,
@@ -237,10 +238,14 @@ class Suggestion:
     reason: str
 
 
+MAX_LABELS = 200
+
+
 def suggest_task(rows_raw: list[Record], mapping: dict) -> Suggestion:
-    """Look at the outputs, not only at how many distinct values there are. JSON objects mean
-    json. Short, repeated, phrase-free values mean classification. Anything else is ambiguous
-    and the caller must pass --task."""
+    """Pick how outputs are scored by looking at them, not only at how many distinct values
+    there are. All JSON objects: json. A small label set (at most 200 distinct values, each
+    short, phrase-free, and shared by other rows: 80% of rows or more): exact. Anything else:
+    open (judge). The task types are "classification" (exact), "json" and "open" (judge)."""
     outs = [r.values.get(mapping["output"]) for r in rows_raw]
     outs = [o for o in outs if o is not None and str(o).strip() != ""]
     if not outs:
@@ -260,8 +265,8 @@ def suggest_task(rows_raw: list[Record], mapping: dict) -> Suggestion:
     if n_obj == len(outs):
         return Suggestion("json", f"all {len(outs)} outputs are JSON objects")
     if n_obj:
-        return Suggestion(None, f"{n_obj} of {len(outs)} outputs are JSON objects and the rest "
-                                f"are not")
+        return Suggestion("open", f"{n_obj} of {len(outs)} outputs are JSON objects and the rest "
+                                  f"are not, so they are treated as text")
     texts = [str(o).strip() for o in outs]
     distinct = {t.casefold() for t in texts}
     short = all(len(t) <= 40 and len(t.split()) <= 4 for t in texts)
@@ -270,12 +275,12 @@ def suggest_task(rows_raw: list[Record], mapping: dict) -> Suggestion:
     for t in texts:
         counts[t.casefold()] = counts.get(t.casefold(), 0) + 1
     repeated = sum(c for c in counts.values() if c >= 2) / len(texts)
-    if short and not sentence and repeated >= 0.8 and len(distinct) >= 2:
+    if short and not sentence and repeated >= 0.8 and 2 <= len(distinct) <= MAX_LABELS:
         return Suggestion("classification",
                           f"{len(distinct)} distinct short labels over {len(texts)} rows, "
                           f"{repeated:.0%} of rows share their label with another row")
-    return Suggestion(None, f"the outputs look like free text or have too few repeated values "
-                            f"({len(distinct)} distinct in {len(texts)} rows)")
+    return Suggestion("open", f"the outputs look like free text or are not a small repeated "
+                              f"label set ({len(distinct)} distinct in {len(texts)} rows)")
 
 
 # ------------------------------------------------------------ components and splits
@@ -495,7 +500,7 @@ def check_sizes(task: str | None, n_train: int, n_val: int, train_labels=()) -> 
     if n_val < MIN_VAL:
         bad.append(f"the validation set has {n_val} rows; at least {MIN_VAL} are needed to "
                    f"compare anything")
-    if task == "classification" and n_train and len({norm_dup(str(x)) for x in train_labels}) < 2:
+    if task in ("classification", "exact") and n_train and len({norm_dup(str(x)) for x in train_labels}) < 2:
         bad.append("the training set has fewer than two classes")
     return bad
 

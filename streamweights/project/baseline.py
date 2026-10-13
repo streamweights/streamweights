@@ -90,3 +90,47 @@ def run_baseline(cfg: dict, train: list[dict], val_rows: list[dict], emb_dir) ->
                          "learned_preprocessing": "none",
                          "label_policy": "predictions are training classes only; labels the "
                                          "training rows lack count as wrong"}}
+
+
+def run_baseline_open(cfg: dict, train: list[dict], val_rows: list[dict]) -> dict:
+    """The open-ended baseline: answer each held-out input with the training answer whose
+    input is closest by TF-IDF cosine over words. No model, nothing downloaded, nothing
+    fitted beyond word counts of the training inputs."""
+    import math
+    from . import scoring as SC
+    docs = [K.words(t["input"]) for t in train]
+    df: dict = {}
+    for d in docs:
+        for w in set(d):
+            df[w] = df.get(w, 0) + 1
+    n = max(1, len(docs))
+    idf = {w: math.log((1 + n) / (1 + c)) + 1.0 for w, c in df.items()}
+
+    def vec(ws):
+        v: dict = {}
+        for w in ws:
+            if w in idf:
+                v[w] = v.get(w, 0.0) + idf[w]
+        norm = math.sqrt(sum(x * x for x in v.values())) or 1.0
+        return {w: x / norm for w, x in v.items()}
+    tv = [vec(d) for d in docs]
+    items, preds = [], []
+    for v in val_rows:
+        q = vec(K.words(v["input"]))
+        best, bs = 0, -1.0
+        for i, t in enumerate(tv):
+            sc = sum(x * t.get(w, 0.0) for w, x in q.items())
+            if sc > bs:
+                best, bs = i, sc
+        text = train[best]["target"] if train else ""
+        item, rec = SC.score_row(cfg, None, None, text, v)
+        items.append(item)
+        preds.append({"id": v["id"], "gold": v["output"], "text": text, "finish_reason": None,
+                      "failed": False, **rec, "similarity": round(bs, 4)})
+    metrics = SC.aggregate(cfg, items, [v["output"] for v in val_rows], None)
+    metrics["train_rows"] = len(train)
+    return {"predictions": preds, "metrics": metrics,
+            "settings": {"kind": "tfidf-nearest-answer",
+                         "method": "the training answer whose input has the highest TF-IDF "
+                                   "cosine similarity (words, NFKC casefold)",
+                         "learned_preprocessing": "none", "downloads": "none"}}

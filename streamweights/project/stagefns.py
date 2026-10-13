@@ -17,6 +17,7 @@ from . import baseline as B
 from . import config as C
 from . import contract as K
 from . import modelid, training
+from . import scoring as SC
 from .common import read_json, read_jsonl, sha_file, write_json, write_jsonl
 
 
@@ -136,8 +137,11 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
         answers = _teacher_answers(desc, ctx)
         rows, manifest = training.build_training(cfg, train, answers, desc.params.get(
             "weight_own", training.DEFAULT_WEIGHT_OWN))
-    emb = modelid.embedding_identity(fetch=True)
-    res = B.run_baseline(cfg, rows, val, emb["dir"])
+    if cfg["task"]["type"] == "open":
+        res = B.run_baseline_open(cfg, rows, val)
+    else:
+        emb = modelid.embedding_identity(fetch=True)
+        res = B.run_baseline(cfg, rows, val, emb["dir"])
     write_jsonl(ctx.out_dir / "predictions.jsonl",
                 [{**p, "comparator": "baseline"} for p in res["predictions"]])
     metrics = {**res["metrics"], "settings": res["settings"], "training": manifest}
@@ -145,7 +149,9 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     v = modelid.dependency_versions()
     return StageOutcome("done", metrics, [{"engine": "torch-cpu", "hardware": "cpu",
                                             "numerics": {"base": "float32"}}],
-                        notes={"conditions": {"engine": "torch-cpu", "engine_impl": "embedding+logreg",
+                        notes={"conditions": {"engine": "torch-cpu",
+                                              "engine_impl": ("tfidf-nearest-answer" if cfg["task"]["type"] == "open"
+                                                              else "embedding+logreg"),
                                               "device": "cpu", "numerics": {"base": "float32"},
                                               "weight_dtype": "float32", "adapter_dtype": None,
                                               "compute_dtype": "float32",
@@ -274,9 +280,9 @@ def _eval(desc: StageDesc, ctx: StageContext) -> StageOutcome:
         return StageOutcome("interrupted", {}, res.get("producers", []))
     results = {r["custom_id"]: r for r in read_jsonl(res["results_path"])}
     preds, items = [], []
-    labels = cfg["contract"].get("labels", [])
     from jsonschema import Draft202012Validator
     validator = Draft202012Validator(schema) if schema else None
+    script = SC.script_for(cfg, ctx.inputs_dir)
     trunc = 0
     for r in val:
         row = results.get(r["id"])
@@ -288,21 +294,13 @@ def _eval(desc: StageDesc, ctx: StageContext) -> StageOutcome:
             lat = (row.get("streamweights") or {}).get("latency_s")
         if finish == "length":
             trunc += 1
-        if cfg["task"]["type"] == "classification":
-            sc = K.score_class(text, r["output"], labels)
-            rec = {"pred": sc["pred"], "correct": sc["correct"], "valid": sc["valid"]}
-        else:
-            sc = K.score_json(text, r["output"], schema, validator)
-            rec = {"pred": sc["pred"], "correct": sc["record"], "parseable": sc["parseable"],
-                   "schema_valid": sc["schema_valid"], "fields": sc["fields"],
-                   "extra_fields": sc["extra"]}
+        sc, rec = SC.score_row(cfg, schema, validator, text, r, script)
         items.append(sc)
         preds.append({"id": r["id"], "gold": r["output"], "text": text, "finish_reason": finish,
                       "completion_tokens": toks, "latency_s": lat, "failed": sc["failed"],
                       **rec, "comparator": comparator})
     golds = [r["output"] for r in val]
-    metrics = (K.agg_class(items, golds, labels) if cfg["task"]["type"] == "classification"
-               else K.agg_json(items, schema, golds))
+    metrics = SC.aggregate(cfg, items, golds, schema)
     metrics["truncated"] = trunc
     metrics["view"] = view
     metrics["prompt_cached_run"] = bool(res.get("cached"))

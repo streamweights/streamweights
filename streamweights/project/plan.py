@@ -19,6 +19,7 @@ from ..errors import SpillError
 from . import config as C
 from . import contract as K
 from . import modelid, timings, training
+from . import scoring as SC
 from .common import read_jsonl, sha_file, sha_obj
 from .stagefns import StageDesc
 
@@ -111,6 +112,14 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
     cfg, shas = load_project(project, frozen)
     contract = cfg["contract"]
     C.check_metric(cfg["task"]["type"], cfg["evaluation"]["metric"])
+    ev0 = cfg["evaluation"]
+    if frozen is None and ev0.get("scoring") == "script":
+        sp = project / ev0["script_file"]
+        if not sp.exists() or sha_file(sp) != ev0["script_sha256"]:
+            raise SpillError(f"{ev0['script_file']} changed since `spill init` recorded it; the "
+                             f"scoring script is part of the evaluation protocol",
+                             f"spill init <data> --input <col> --output <col> --score script:"
+                             f"{ev0['script_file']} --project {project} --force")
     data_dir = Path(frozen) if frozen is not None else project / "data"
     path_of = (lambda n: data_dir / f"{n}.jsonl")
     t = cfg["training"]
@@ -146,8 +155,9 @@ def make_plan(project: Path, engine: str | None = None, verify: bool = True,
                                 f"{len(train)} training prompts", {"teacher": teacher_tag},
                                 inputs[:1], ["teacher.jsonl"]))
     weight_own = training.DEFAULT_WEIGHT_OWN
-    if task == "classification":
-        stages.append(StageDesc("baseline", "baseline", "embedding + logistic regression baseline",
+    if task in ("classification", "open"):
+        stages.append(StageDesc("baseline", "baseline", ("embedding + logistic regression baseline" if task == "classification"
+                                                  else "nearest training answer baseline (TF-IDF, no model)"),
                                 {"teacher": bool(teacher_tag), "weight_own": weight_own}, inputs,
                                 ["predictions.jsonl", "metrics.json"],
                                 ["distill"] if teacher_tag else []))
@@ -218,6 +228,10 @@ def _estimates(cfg, stages, train, val, schema, eng, cal, hw) -> dict:
         except Exception:
             ws = 16 * GIB
     for s in stages:
+        if s.kind == "baseline" and cfg["task"]["type"] == "open":
+            out[s.id] = StageEst(1.0, "assumption", "word counting over the training inputs, no model; "
+                                 "under a second at this size")
+            continue
         if s.kind == "baseline":
             m = timings.lookup("torch-cpu", "embedding:minilm", "baseline")
             n = len(train) + len(val)
@@ -283,7 +297,7 @@ def pre_run_line(p: BuildPlan, verb: str = "build") -> str:
     known = sum(e.seconds for e in p.estimates.values() if e.seconds is not None)
     tot = est.fmt_dur(total) if total is not None else f"{est.fmt_dur(known)} plus unknown stages"
     n = 0
-    return (f"spill {verb} {p.project.name}: {p.cfg['task']['type']}, models {', '.join(models)}, "
+    return (f"spill {verb} {p.project.name}: scoring {SC.scoring_of(p.cfg)}, models {', '.join(models)}, "
             f"bf16 weights, no quantization, on {p.engine} ({p.engine_why}). "
             f"Est. {tot}{' (some stages unknown)' if n and total is not None else ''}. Cost: $0. "
             f"Run -> {p.project / 'runs'}/<run id>")
@@ -305,6 +319,7 @@ def render(p: BuildPlan) -> list[str]:
         e = p.models["embedding"]
         lines.append(f"   baseline  {e['repo']}@{e['revision'][:12]} + logistic regression")
     lines.append(f"engine: {p.engine}: {p.engine_why}")
+    lines.append(f"scoring: {SC.describe(p.cfg)}")
     lines.append("downloads:")
     need = [d for d in p.downloads if not d["present"]]
     for d in p.downloads:

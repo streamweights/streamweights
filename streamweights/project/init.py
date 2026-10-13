@@ -15,13 +15,15 @@ from ..errors import SpillError
 from . import config as C
 from . import contract as K
 from . import data as D
-from .common import atomic_write, now, sha_bytes, sha_file, write_json, write_jsonl
+from . import scoring as SC
+from .common import (atomic_write, norm_dup, now, sha_bytes, sha_file, write_json,
+                     write_jsonl)
 
 
 @dataclass
 class InitResult:
     folder: Path
-    task: str
+    task: str                 # the scoring method: exact | json | judge | script
     task_note: str
     sizes: dict
     warnings: list[str] = field(default_factory=list)
@@ -51,12 +53,32 @@ def _load(path: Path, mapping: dict, task: str | None):
     return cols, recs
 
 
+def _scoring_arg(score: str | None, task: str | None) -> tuple[str | None, Path | None]:
+    """(method, script path) from --score, or from the older --task spelling."""
+    if score:
+        if score.startswith("script:"):
+            return "script", Path(score[len("script:"):])
+        if score not in SC.CHOICES:
+            raise SpillError(f"--score must be exact, json, judge or script:<file>, not {score!r}",
+                             "spill init ... --score judge")
+        return score, None
+    if task:
+        legacy = {"classification": "exact", "json": "json"}
+        if task not in legacy:
+            raise SpillError(f"--task {task!r} is not a task type; the scoring method is chosen "
+                             f"from your outputs", "spill init ... --score exact|json|judge")
+        return legacy[task], None
+    return None, None
+
+
 def create_project(data: Path, folder: Path, mapping: dict, task: str | None = None,
                    system_file: Path | None = None, labels: str | None = None,
                    schema_file: Path | None = None, val: Path | None = None,
                    test: Path | None = None, seed: int = 0, val_fraction: float = 0.15,
                    test_fraction: float = 0.15, force: bool = False,
-                   say=lambda s: None) -> InitResult:
+                   say=lambda s: None, score: str | None = None,
+                   student: str | None = None, teacher: str | None = None,
+                   judge: str | None = None) -> InitResult:
     folder = Path(folder)
     if C.exists(folder) and not force:
         raise SpillError(f"{folder} already has a {C.CONFIG_NAME}", f"spill plan {folder}   "
@@ -67,18 +89,30 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
         raise D.DataErrors(missing)
     sug = D.suggest_task(recs, mapping) if all(
         mapping[k] in cols for k in ("input", "output")) else D.Suggestion(None, "")
-    if task is None:
+    scoring, script_path = _scoring_arg(score, task)
+    if scoring in (None, "script"):
         if sug.task is None:
-            raise SpillError(f"cannot tell the task from the outputs ({sug.reason}); "
-                             f"say which it is", "spill init ... --task classification|json")
-        say(f"suggested task: {sug.task} ({sug.reason})")
+            raise SpillError(f"cannot read the outputs ({sug.reason})",
+                             "spill init ... --score exact|json|judge")
         task = sug.task
-    elif sug.task and sug.task != task:
-        say(f"note: the outputs look like {sug.task} ({sug.reason}); using --task {task} as asked")
+        note = sug.reason
+        scoring_name = scoring or SC.SCORING_OF_TASK[task]
+        if scoring is None:
+            say(f"scoring: {scoring_name} ({sug.reason})")
+    else:
+        task = SC.TASK_OF[scoring]
+        scoring_name = scoring
+        note = "chosen with --" + ("task" if not score else "score")
+        if sug.task and sug.task != task:
+            say(f"note: the outputs look like {SC.SCORING_OF_TASK[sug.task]} ({sug.reason}); "
+                f"using {scoring} as asked")
+    script = None
+    if script_path is not None:
+        SC.load_script(script_path)                 # fails here, not mid-build
+        script = {"file": "score.py", "sha256": sha_file(script_path)}
+        note = f"{note}; scored by {script_path.name} (override)"
     if task not in C.TASKS:
-        raise SpillError(f"--task must be one of {', '.join(C.TASKS)}, not {task!r}; other "
-                         f"task types are not supported by the guided path",
-                         "spill init ... --task classification|json")
+        raise SpillError(f"unknown task {task!r}", "spill init ... --score exact|json|judge")
     train_rows, issues = D.build_rows(cols, recs, mapping, task, Path(data).name)
     val_rows = test_rows = None
     for role, path in (("val", val), ("test", test)):
@@ -96,7 +130,10 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
 
     splits = D.split_rows(train_rows, val_rows, test_rows, seed, val_fraction, test_fraction)
     system = Path(system_file).read_text().strip() if system_file else None
-    cfg = C.default_config(folder.name, task, mapping, system)
+    cfg = C.default_config(folder.name, task, mapping, system, script)
+    for role, tag in (("student", student), ("teacher", teacher), ("judge", judge)):
+        if tag:
+            cfg["model"][role] = tag
     cfg["split"].update({"seed": seed, "val_fraction": val_fraction,
                          "test_fraction": test_fraction, "mode": splits.mode})
     warnings: list[str] = []
@@ -105,6 +142,11 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     sizes = {"train": len(splits.train), "val": len(splits.val), "test": len(splits.test)}
     out_files: dict = {}
     if task == "classification":
+        distinct = len({norm_dup(str(r.output)) for r in splits.train + splits.val + splits.test})
+        if distinct > D.MAX_LABELS:
+            raise SpillError(f"exact scoring needs a small label set (at most {D.MAX_LABELS} "
+                             f"distinct outputs); these rows have {distinct}",
+                             "spill init ... --score judge")
         if declared:
             outside = []
             for name, rows in (("train", splits.train), ("val", splits.val),
@@ -129,6 +171,11 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
             warnings.append(f"{len(cov['missing_in_val'])} of {cov['train']} training classes "
                             f"have no validation rows, so their accuracy is not measured")
         integrity = {"coverage": cov}
+    elif task == "open":
+        cfg["contract"] = {"kind": "open", "reference": "the outputs you provided",
+                           "note": "reference-overlap metrics compare an output with your "
+                                   "reference; they are not accuracy. Judged scores need a judge."}
+        integrity = {}
     else:
         if schema_file:
             try:
@@ -192,6 +239,8 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     cfg["split"]["fingerprints"] = fps
     cfg["split"]["sizes"] = sizes
     cfg["data"]["canonical"] = {n: f"data/{n}.jsonl" for n in ("train", "val", "test")}
+    if script:
+        shutil.copyfile(script_path, folder / script["file"])
     if system:
         atomic_write(folder / "system.txt", (system + "\n").encode())
         cfg["task"]["system_file"] = "system.txt"
@@ -201,5 +250,4 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     cfg["project"]["created"] = now()
     C.save(folder, cfg)
     atomic_write(folder / ".gitignore", b".spill/\nREPORT.md.tmp\n")
-    return InitResult(folder, task, sug.reason if sug.task == task else "chosen with --task",
-                      sizes, warnings, splits.notes, cfg)
+    return InitResult(folder, scoring_name, note, sizes, warnings, splits.notes, cfg)

@@ -24,29 +24,42 @@ import tomli_w
 SCHEMA_VERSION = 1
 CONFIG_NAME = "streamweights.toml"
 LEGACY_FILES = ("evals.jsonl", "train.jsonl", "prompts.jsonl")
-TASKS = ("classification", "json")
+TASKS = ("classification", "json", "open")
 
-METRIC_VERSIONS = {"classification": "1", "json": "2"}   # json 2: invalid outputs get no credit
+METRIC_VERSIONS = {"classification": "1", "json": "2", "open": "1"}   # json 2: invalid outputs get no credit
 METRIC_VERSION = "1"                                      # kept for callers that mean classification
 PROTOCOL_VERSION = "2"                                    # 2: decoding includes stop and greedy
 SUPPORTED_METRICS = {
     "classification": ("accuracy", "macro_f1"),
     "json": ("whole_record_accuracy", "mean_field_accuracy", "schema_valid_rate", "parseable_rate"),
+    "open": ("token_f1", "rouge_l", "exact_match", "judge_mean"),
 }
+EXTRA_METRICS = ("script_score",)          # valid for every task when a scoring script is set
 METRIC_LABELS = {"accuracy": "accuracy", "macro_f1": "macro-F1",
                  "whole_record_accuracy": "whole-record accuracy",
                  "mean_field_accuracy": "mean field accuracy",
-                 "schema_valid_rate": "schema-valid rate", "parseable_rate": "parseable rate"}
+                 "schema_valid_rate": "schema-valid rate", "parseable_rate": "parseable rate",
+                 "token_f1": "token F1 against the reference (overlap, not accuracy)",
+                 "rouge_l": "ROUGE-L against the reference (overlap, not accuracy)",
+                 "exact_match": "exact match against the reference",
+                 "judge_mean": "judge score 1-5 (one model's assessment, not accuracy)",
+                 "script_score": "your scoring script's mean score"}
 DEFAULT_DECODING = {"temperature": 0.0, "top_p": 1.0, "stop": [], "greedy": True, "seed": 0}
 
 
 def metric_version(cfg: dict) -> str:
     """The version of the scorer in this code, whatever an older config file says."""
-    return METRIC_VERSIONS[cfg["task"]["type"]]
+    v = METRIC_VERSIONS[cfg["task"]["type"]]
+    ev = cfg.get("evaluation") or {}
+    if ev.get("scoring") == "script":
+        v += f"+script:{str(ev.get('script_sha256'))[:12]}"
+    return v
 
 
 def check_metric(task: str, metric: str) -> str:
     ok = SUPPORTED_METRICS.get(task)
+    if metric in EXTRA_METRICS and ok is not None:
+        return metric
     if ok is None or metric not in ok:
         raise SpillError(f"metric {metric!r} is not supported for the {task} task (choose from "
                          f"{', '.join(ok or ())})", f"set evaluation.metric in {CONFIG_NAME}")
@@ -82,7 +95,8 @@ DEFAULT_EMBEDDING = {"repo": "sentence-transformers/all-MiniLM-L6-v2", "pooling"
                      "normalize": True, "max_length": 256}
 
 
-def default_config(name: str, task: str, mapping: dict, system: str | None) -> dict:
+def default_config(name: str, task: str, mapping: dict, system: str | None,
+                   script: dict | None = None) -> dict:
     cfg = {
         "schema_version": SCHEMA_VERSION,
         "project": {"name": name, "layout": "project"},
@@ -92,19 +106,25 @@ def default_config(name: str, task: str, mapping: dict, system: str | None) -> d
         "split": {**DEFAULT_SPLIT, "mode": "generated",
                   "duplicate_normalization": DUP_NORMALIZATION,
                   "group_normalization": "same as duplicate normalization"},
-        "model": {"student": "qwen2.5:0.5b", "teacher": "", "engine": "auto"},
+        "model": {"student": "qwen2.5:0.5b", "teacher": "", "judge": "", "engine": "auto"},
         "training": dict(DEFAULT_TRAINING),
         "evaluation": {
             "protocol_version": PROTOCOL_VERSION, "metric_version": METRIC_VERSIONS[task],
-            "metric": "accuracy" if task == "classification" else "whole_record_accuracy",
+            "scoring": {"classification": "exact", "json": "json", "open": "judge"}[task],
+            "metric": {"classification": "accuracy", "json": "whole_record_accuracy",
+                       "open": "token_f1"}[task],
             "decoding": dict(DEFAULT_DECODING),
             "max_tokens": 16 if task == "classification" else 256,
             "precision": "bf16 base weights, float32 adapter",
             "postprocessing": "none beyond the contract rules",
         },
-        "baseline": {"kind": "embedding+logreg", **DEFAULT_EMBEDDING, "c": 10.0,
-                     "max_iter": 200} if task == "classification" else {},
+        "baseline": ({"kind": "embedding+logreg", **DEFAULT_EMBEDDING, "c": 10.0, "max_iter": 200}
+                     if task == "classification" else
+                     {"kind": "tfidf-nearest-answer"} if task == "open" else {}),
     }
+    if script:
+        cfg["evaluation"].update(scoring="script", metric="script_score", script_file=script["file"],
+                                 script_sha256=script["sha256"])
     if mapping.get("group"):
         cfg["task"]["group"] = mapping["group"]
     if system:
@@ -181,7 +201,8 @@ def resolved(cfg: dict, extra: dict) -> dict:
     return r
 
 
-def identity_fields(cfg: dict, split_sha: dict, model_ident: dict) -> dict:
+def identity_fields(cfg: dict, split_sha: dict, model_ident: dict,
+                    judge_protocol: dict | None = None) -> dict:
     """What a run's identity covers: the data (split fingerprints), the prompts (system text
     and the contract), the training settings, the evaluation protocol and the model identity.
     Not covered: the engine and the machine (a documented engine transition continues a run)."""
@@ -193,9 +214,12 @@ def identity_fields(cfg: dict, split_sha: dict, model_ident: dict) -> dict:
                        "protocol_version": PROTOCOL_VERSION},
         "baseline": cfg.get("baseline", {}),
         "model": {"student": model_ident.get("student"), "teacher": model_ident.get("teacher"),
-                  "embedding": model_ident.get("embedding")},
+                  "embedding": model_ident.get("embedding"),
+                  **({"judge": model_ident["judge"]} if model_ident.get("judge") else {})},
+        **({"judge_protocol": judge_protocol} if judge_protocol else {}),
     }
 
 
-def identity_sha(cfg: dict, split_sha: dict, model_ident: dict) -> str:
-    return sha_obj(identity_fields(cfg, split_sha, model_ident))
+def identity_sha(cfg: dict, split_sha: dict, model_ident: dict,
+                judge_protocol: dict | None = None) -> str:
+    return sha_obj(identity_fields(cfg, split_sha, model_ident, judge_protocol))

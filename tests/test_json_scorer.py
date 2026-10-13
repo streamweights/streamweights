@@ -42,7 +42,7 @@ def test_a_non_object_or_extra_field_never_earns_field_credit():
 
 
 def test_metric_versions_json_bumped_classification_unchanged():
-    assert C.METRIC_VERSIONS == {"classification": "1", "json": "2"}
+    assert C.METRIC_VERSIONS == {"classification": "1", "json": "2", "open": "1"}
     assert K.score_class("Billing ", "billing", ["billing", "login"])["correct"]
     assert K.agg_class([K.score_class("billing", "billing", ["billing"])], ["billing"], ["billing"])["accuracy"] == 1.0
 

@@ -40,6 +40,8 @@ def build_training(cfg: dict, train_rows: list[dict], teacher_answers: dict[str,
                     skipped += 1
                     continue
                 target = lab
+            elif task == "open":
+                target = str(ans).strip()
             else:
                 try:
                     obj = K.parse_strict(ans)

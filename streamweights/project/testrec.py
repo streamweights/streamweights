@@ -140,7 +140,7 @@ def score_comparators(project: Path, m: dict, cfg: dict, rows_file: Path, stg: P
 
 
 def _render(rec: dict, task: str) -> str:
-    names = R.NAMES if task == "classification" else R.JSON_NAMES
+    names = R.names_for(task)
     lines = [f"# Final test {rec['id']}", "",
              f"Run {rec['source_run']} (identity {rec['source_identity'][:12]}), {rec['rows']} "
              f"final-test rows, metric {rec['metric']}.", "", rec["holdout_note"], ""]

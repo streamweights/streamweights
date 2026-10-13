@@ -31,19 +31,29 @@ def _guided(folder, command: str) -> dict:
 def init(
     data: Path = typer.Argument(..., help="a CSV or JSONL of labeled examples"),
     input_col: str = typer.Option(..., "--input", help="the column holding the input text"),
-    output_col: str = typer.Option(..., "--output", help="the column holding the right answer: "
-                                                         "a label, or a JSON object"),
+    output_col: str = typer.Option(..., "--output", help="the column holding the desired output: "
+                                                         "a label, a JSON object, or free text"),
     group: str = typer.Option(None, "--group", help="a column whose rows must stay on one side "
                                                     "of every split (customer, document, ...)"),
     system: Path = typer.Option(None, "--system", help="a text file of instructions for the task"),
-    task: str = typer.Option(None, "--task", help="classification | json (default: suggested "
-                                                  "from the outputs; required when unclear)"),
+    score: str = typer.Option(None, "--score", help="exact | json | judge | script:<file.py> "
+                                                    "(default: chosen from the outputs and "
+                                                    "stated)"),
+    task: str = typer.Option(None, "--task", hidden=True, help="older spelling of --score"),
+    student: str = typer.Option(None, "--student", help="the small model to train (default: "
+                                                        "chosen from this machine, with the reason)"),
+    teacher: str = typer.Option(None, "--teacher", help="a larger model that learns your task's "
+                                                        "answers for the student to copy "
+                                                        "(optional)"),
+    judge: str = typer.Option(None, "--judge", help="a model that scores open-ended output "
+                                                    "against a rubric, or `recommended` "
+                                                    "(optional)"),
     project: Path = typer.Option(None, "--project", help="the project folder (default: the "
                                                          "data file's name)"),
     labels: str = typer.Option(None, "--labels", help="the class vocabulary: a,b,c or a file of "
                                                       "one label per line (default: the "
                                                       "training rows' labels)"),
-    schema: Path = typer.Option(None, "--schema", help="a JSON Schema file for --task json "
+    schema: Path = typer.Option(None, "--schema", help="a JSON Schema file for json outputs "
                                                        "(default: derived from the training rows)"),
     val: Path = typer.Option(None, "--val", help="your own validation file (same columns)"),
     test: Path = typer.Option(None, "--test", help="your own final-test file (same columns); "
@@ -64,7 +74,9 @@ def init(
         folder = project or Path(data.stem)
         mapping = {"input": input_col, "output": output_col, "group": group}
         res = create_project(data, folder, mapping, task, system, labels, schema, val, test, seed,
-                             val_fraction, test_fraction, force, say=typer.echo)
+                             val_fraction, test_fraction, force, say=typer.echo, score=score,
+                             student=student, teacher=teacher,
+                             judge=None if judge == "recommended" else judge)
     except D.DataErrors as e:
         for line in e.lines():
             typer.echo(f"spill: {line}", err=True)
@@ -73,7 +85,7 @@ def init(
         _fail(e)
         return
     s = res.sizes
-    typer.echo(f"spill init {data.name}: {res.task} ({res.task_note}). Train {s['train']}, "
+    typer.echo(f"spill init {data.name}: scoring {res.task} ({res.task_note}). Train {s['train']}, "
                f"validation {s['val']}, final test {s['test']} rows. Cost: $0. Project -> {folder}")
     for n in res.notes:
         typer.echo(f"   {n}")
@@ -161,7 +173,7 @@ def project_build(folder, student, teacher, epochs, engine, headless, executor, 
     typer.echo("")
     if out.table:
         task = plan.cfg["task"]["type"]
-        names = R.NAMES if task == "classification" else R.JSON_NAMES
+        names = R.names_for(task)
         w = max(len(names[r["comparator"]]) for r in out.table)
         for r in out.table:
             v = r["primary"]

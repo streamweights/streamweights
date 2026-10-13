@@ -84,20 +84,24 @@ def test_suggest_task_not_by_distinct_count_alone(tmp_path):
     assert D.suggest_task(rec(["a", "b", "a", "b", "a", "b"]), m).task == "classification"
     assert D.suggest_task(rec(['{"a": 1}'] * 4), m).task == "json"
     free = [f"This is a long free text summary number {i} of the document." for i in range(6)]
-    assert D.suggest_task(rec(free), m).task is None
+    assert D.suggest_task(rec(free), m).task == "open"
     # few distinct values but sentences: still not classification
     sent = ["The customer was happy with the service."] * 3 + ["The customer left angry."] * 3
-    assert D.suggest_task(rec(sent), m).task is None
-    # all-unique short values (ids): not classification
-    assert D.suggest_task(rec([f"id{i}" for i in range(6)]), m).task is None
+    assert D.suggest_task(rec(sent), m).task == "open"
+    # all-unique short values (ids): not a label set
+    assert D.suggest_task(rec([f"id{i}" for i in range(6)]), m).task == "open"
+    # more than 200 distinct labels: not a small label set, even when each repeats
+    many = [f"label{i % 250}" for i in range(1000)]
+    assert D.suggest_task(rec(many), m).task == "open"
 
 
-def test_ambiguous_requires_task(tmp_path):
+def test_free_text_outputs_choose_judge_scoring(tmp_path):
     rows = [(f"doc {i}", f"A free text summary that is quite long for item {i}.", "") for i in range(20)]
     p = write_csv(tmp_path / "d.csv", rows)
-    with pytest.raises(SpillError) as e:
-        create_project(p, tmp_path / "proj", MAP)
-    assert "--task classification|json" in e.value.line()
+    res = create_project(p, tmp_path / "proj", MAP)
+    assert res.task == "judge" and res.cfg["task"]["type"] == "open"
+    assert res.cfg["evaluation"]["scoring"] == "judge" and res.cfg["contract"]["kind"] == "open"
+    assert res.cfg["model"]["judge"] == "" and res.cfg["model"]["teacher"] == ""
 
 
 def test_transitive_components_and_generated_split_keeps_them(tmp_path):
@@ -225,6 +229,6 @@ def test_init_cli_prints_one_line_and_next(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     r = CliRunner().invoke(app, ["init", str(p), "--input", "text", "--output", "label"])
     assert r.exit_code == 0, r.output
-    assert "suggested task: classification" in r.output and "next: spill plan t" in r.output
+    assert "scoring: exact" in r.output and "next: spill plan t" in r.output
     r2 = CliRunner().invoke(app, ["init", str(p), "--input", "text", "--output", "nope", "--project", "other"])
     assert r2.exit_code == 1 and "no column named 'nope'" in r2.output

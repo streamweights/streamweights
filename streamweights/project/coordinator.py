@@ -133,6 +133,11 @@ def _inputs_dir(plan: P.BuildPlan, dest: Path) -> dict:
         shutil.copyfile(p / cfg["contract"]["schema_file"], dest / cfg["contract"]["schema_file"])
     if (p / "system.txt").exists():
         shutil.copyfile(p / "system.txt", dest / "system.txt")
+    ev = cfg["evaluation"]
+    if ev.get("scoring") == "script":
+        shutil.copyfile(p / ev["script_file"], dest / ev["script_file"])
+    if (p / "rubric.md").exists() and plan.cfg["model"].get("judge"):
+        shutil.copyfile(p / "rubric.md", dest / "rubric.md")
     ident = {"identity": plan.identity, "fields": plan.identity_fields,
              "split_sha256": plan.split_sha}
     write_json(dest / "identity.json", ident)
