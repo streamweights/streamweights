@@ -83,6 +83,7 @@ def main():
     ap.add_argument("--flow", required=True, choices=sorted(FLOWS))
     ap.add_argument("--engine", required=True, choices=["mlx", "torch-cpu"])
     ap.add_argument("--out", required=True)
+    ap.add_argument("--keep", action="store_true", help="keep the scratch project directory")
     a = ap.parse_args()
     os.environ.pop("SPILL_DEVICE", None)
     device = "cpu"
@@ -133,8 +134,10 @@ def main():
     res["models_changed"] = {k: v for k, v in after.items() if k in before and before[k] != v}
     res["ok"] = all(s["exit"] == 0 for s in res["steps"]) and len(res["steps"]) == len(FLOWS[a.flow])
     res["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    res["project_dir"] = str(run)
     Path(a.out).write_text(json.dumps(res, indent=1))
+    if not a.keep:
+        import shutil
+        shutil.rmtree(work, ignore_errors=True)
     sys.exit(0 if res["ok"] else 1)
 
 
