@@ -44,8 +44,16 @@ run (spill build <project dir> --new-run), it never continues the original.
 
 def _asset_dirs(cfg: dict) -> list[tuple[str, str, Path, str]]:
     """(role, tag, source dir, path under assets/models) for every model the workflow uses."""
-    out = []
-    for role, tag in (("student", cfg["model"]["student"]), ("teacher", cfg["model"].get("teacher"))):
+    out, seen = [], set()
+    judge = (cfg["model"].get("judge") or "")
+    judge = "" if judge == "none" else judge
+    if not judge and cfg["task"]["type"] == "open":
+        judge = cfg["model"].get("teacher") or ""          # a named teacher judges by default
+    for role, tag in (("student", cfg["model"]["student"]), ("teacher", cfg["model"].get("teacher")),
+                      ("judge", judge if cfg["task"]["type"] == "open" else "")):
+        if tag in seen:
+            continue                                        # one copy of a model that has two roles
+        seen.add(tag)
         if tag and tag in load_pins():
             out.append((role, tag, safetensors_dir(tag), f"{tag.replace(':', '-')}/bf16-st"))
         elif tag:
