@@ -2,7 +2,7 @@
 
 Package `streamweights`, CLI `spill`. Repo: https://github.com/streamweights/streamweights
 
-**Purpose:** Build a small model for your task, on hardware you control. Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux. Fine-tune and distill from a 70B teacher locally with MLX, even when the model is bigger than RAM. Data stays local by default; remote storage is used when explicitly configured.
+**Purpose:** Build a small model for your task, on hardware you control. Bring examples of your task. Learn from a large model running on your own machine, train a small one, measure it honestly, and export it. Any task of the shape "input in, desired output out" is one kind of project: labeling, extraction, open-ended answers. A teacher and a judge may be bigger than the machine's memory (they stream from disk), and both are optional. Data stays local by default; remote storage is used when explicitly configured. The product's pillars are in `VISION.md`.
 
 ## Never-stop rules (binding in every session)
 
@@ -15,6 +15,7 @@ Package `streamweights`, CLI `spill`. Repo: https://github.com/streamweights/str
 - Paste sets are saved verbatim in `docs/paste-sets/` and committed first.
 - Every directive ends by updating the README and the docs site to reflect the current state, with measured numbers only.
 - Never post publicly on the user's behalf: no issues, pull requests or comments on other repositories; drafts only. Commit after every numbered item of a directive.
+- Any change that narrows the product's scope, removes a capability, or demotes a pillar of VISION.md must be stated explicitly in the terminal report under a heading 'Scope changes', with the reason. Never fold a narrowing in silently.
 - Directive 013 additionally forbids model runs of any size, PyPI publishing and tags.
 
 ## Developer-experience rules (binding on every command)
@@ -40,9 +41,9 @@ Inference backends elsewhere are upstream llama.cpp, unmodified, never vendored.
 - `ring.py`: the framework-free streaming ring (safetensors layer index, pread ring, read modes nocache, fadvise, odirect). `engines/torch_common.py`, `torch_stream.py`, `torch_resident.py`: the PyTorch engines (transformers layers on the meta device bound from the ring; CPU and CUDA). `engine_select.py`: mlx, torch-cuda or torch-cpu from the hardware.
 - `portable/`: fsspec stores, the hardware-neutral checkpoint (float32 safetensors plus state.json, COMMIT marker last), row-job segments, weight staging. `headless.py`, `runtime.py`, `jobconfig.py`: JSON-lines events, SIGTERM then exit 75, `--state`, `--config`, `--emit-config`.
 - `tune/torch_job.py`, `tune/torch_train.py`: the PyTorch tune (PEFT resident, streamed saved-input reverse-stream VJP). `gates.py`, `verify_cuda.py`: the identity and resume gates, runnable on a CUDA machine.
-- `project/`: the guided workflow. `config.py` (streamweights.toml, schema_version), `data.py` and `init.py` (intake, validation, leakage-aware splits), `contract.py` (label vocabulary or JSON schema, prompts, scoring), `plan.py`, `stagefns.py` (stage descriptions and what each stage does), `coordinator.py` (owns runs; executors are `LocalExecutor` and the `SubprocessExecutor` test backend, `worker.py`), `control.py` (the fenced control object: local flock or S3 conditional writes), `payloads.py` and `runstate.py` (immutable payloads, accepted stages, completion), `caps.py` (backend capability probes), `move.py` and `remote.py` (handoff, `resume <uri>`), `bundle.py`, `migrate.py`, `report.py`, `compare.py`, `testrec.py`, `exportrec.py`, `verify_export.py`, `baseline.py`, `modelid.py` (pinned model identity), `hooks.py` (deterministic test hooks, SPILL_HOOK_*).
+- `project/`: the guided workflow. `config.py` (streamweights.toml, schema_version), `data.py` and `init.py` (intake, validation, leakage-aware splits, unlabeled prompts), `contract.py` (label vocabulary or JSON schema, prompts, scorers including reference overlap), `scoring.py` (exact, json, judge or script, chosen from the outputs), `judge.py` (rubric, pointwise and both-order pairwise prompts, calibration, self-judge exclusion), `deadline.py` (`plan --deadline`, local planning only), `plan.py`, `stagefns.py` (stage descriptions and what each stage does), `coordinator.py` (owns runs; executors are `LocalExecutor` and the `SubprocessExecutor` test backend, `worker.py`), `control.py` (the fenced control object: local flock or S3 conditional writes), `payloads.py` and `runstate.py` (immutable payloads, accepted stages, completion), `caps.py` (backend capability probes), `move.py` and `remote.py` (handoff, `resume <uri>`), `bundle.py`, `migrate.py`, `report.py`, `compare.py`, `testrec.py`, `exportrec.py`, `verify_export.py`, `baseline.py`, `modelid.py` (pinned model identity), `hooks.py` (deterministic test hooks, SPILL_HOOK_*).
 - `jobs/`: OpenAI-batch-compatible job engine, per-row checkpoint, resume.
-- `tune/`: LoRA training, resident (mlx-lm tuner) and streamed (saved layer inputs, reverse recompute VJP, two weight streams per micro-batch).
+- `tune/`: LoRA training, resident (mlx-lm tuner) and streamed (saved layer inputs, reverse recompute VJP, two weight streams per micro-batch); `tune/kd.py` is the logit-distillation loss (kl, ce, mix) for numpy (the float64 reference), PyTorch and MLX.
 - `build.py`: stage planner and runner over a folder; `export.py` and `safetensors_np.py`: merge adapters with numpy, GGUF via llama.cpp's converter.
 - `estimate.py`, `calibration.py`: one cost model (decode disk-bound, prefill 2 x params x tokens, training 6 x params x tokens, divided by the achieved TFLOP/s).
 
@@ -66,7 +67,7 @@ The product is the local half of building your own model: run, distill, tune, ev
 
 ## Where things are
 
-`docs/plan.md` (phases and what is next), `docs/linux.md` (the Linux and NVIDIA to-do), `docs/cli.md` (generated from `--help`), `docs/formats.md`, `docs/models.md`, `docs/reports/` (measured results per phase).
+`VISION.md` (what the product is and where it is going), `docs/plan.md` (phases and what is next), `docs/linux.md` (the Linux and NVIDIA to-do), `docs/cli.md` (generated from `--help`), `docs/formats.md`, `docs/models.md`, `docs/reports/` (measured results per phase).
 
 ## Run-anywhere principle
 

@@ -45,7 +45,7 @@ def run_evaluate(project: Path, run_id: str | None = None, engine: str | None = 
            "val_sha256": sha_file(val_file), "evaluator_engine_requested": engine or "auto",
            "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "status": "running"}
     try:
-        comps, preds, protocol, rows = score_comparators(project, m, cfg, val_file, stg, engine, say,
+        comps, preds, protocol, rows, jm = score_comparators(project, m, cfg, val_file, stg, engine, say,
                                                          "validation")
         table = R.table(task, {c: {"metrics": v["metrics"]} for c, v in comps.items()}, metric)
         orig = {t["comparator"]: t["primary"] for t in m["table"]}
@@ -62,8 +62,11 @@ def run_evaluate(project: Path, run_id: str | None = None, engine: str | None = 
                    original_protocol_sha256=m["protocol"]["sha256"], vs_original=change,
                    seconds=round(time.monotonic() - t0, 1),
                    finished=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                   findings=R.findings(task, {c: {"metrics": v["metrics"]} for c, v in comps.items()}, metric),
+                   findings=R.findings(task, {c: {"metrics": v["metrics"]} for c, v in comps.items()}, metric, jm),
+                   judge=jm,
                    note="This record does not modify the run. The final test is not used here.")
+        if jm:
+            atomic_write(stg / "judge.md", "\n".join(R.render_judge_md(jm, R.names_for(task))).encode())
         write_json(stg / "disagreements.json", R.disagreements(task, preds))
         atomic_write(stg / "report.md", _render(rec).encode())
     except Exception as e:

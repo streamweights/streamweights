@@ -29,6 +29,7 @@ from ..errors import SpillError
 from ..headless import QuantumAbandoned, protected
 from ..jobs.engine import Job
 from . import budget as bud
+from . import kd as KD
 from . import lora as lo
 from .checkpointer import Checkpointer
 from .data import BatchPlan, DataStats, Example, load_examples, steps_for
@@ -134,7 +135,7 @@ def train_streamed(prep: Prepared, job: Job, log: StepLog, stop, start_step: int
     cfg = spec.lora()
     tr = StreamedTrainer(Path(spec.model_dir), cfg,
                          params=init[0] if init else None,
-                         resident_weights=spec.resident_weights, note=note)
+                         resident_weights=spec.resident_weights, note=note, kd=spec.kd())
     opt = make_optimizer(cfg, spec.steps)
     if init:
         _opt_from_canon(opt, tr.params, init[1])
@@ -147,7 +148,7 @@ def train_streamed(prep: Prepared, job: Job, log: StepLog, stop, start_step: int
                 for a in range(spec.grad_accum):
                     m = step * spec.grad_accum + a
                     b = prep.plan.batch(m)
-                    loss, grads, _ = tr.micro_batch(b.inputs, b.targets, b.mask, m)
+                    loss, grads, _ = tr.micro_batch(b.inputs, b.targets, b.mask, m, b.kd)
                     losses.append(loss)
                     toks += b.n_tokens
                     acc = grads if acc is None else {k: acc[k] + grads[k] for k in acc}
@@ -249,8 +250,18 @@ def train_resident(prep: Prepared, job: Job, log: StepLog, stop, start_step: int
     accum = spec.grad_accum
     size_gb = prep.size_bytes / GIB
 
-    def loss_fn(m, inputs, targets, mask):
-        return masked_ce(m(inputs), targets, mask)
+    kdc = spec.kd()
+
+    def loss_fn(m, inputs, targets, mask, *kdb):
+        if not kdb:
+            return masked_ce(m(inputs), targets, mask)
+        logits = m(inputs)
+        B, T, V = logits.shape
+        K = kdb[0].shape[-1]
+        pos = KD.mlx_losses(logits.reshape(B * T, V), targets.reshape(-1), kdb[0].reshape(-1, K),
+                            kdb[1].reshape(-1, K), kdb[2].reshape(-1), kdc).reshape(B, T)
+        ntoks = mask.sum()
+        return (pos * mask).astype(mx.float32).sum() / ntoks, ntoks
 
     consumed = {"micro": 0}
     cb_state = {"tokens": 0, "base": start_step}
@@ -287,7 +298,8 @@ def train_resident(prep: Prepared, job: Job, log: StepLog, stop, start_step: int
                     b = prep.plan.batch(_base + i)
                     consumed["micro"] = i + 1
                     cb_state["tokens"] += b.n_tokens
-                    yield mx.array(b.inputs), mx.array(b.targets), mx.array(b.mask)
+                    extra = tuple(mx.array(x) for x in b.kd) if (b.kd is not None and kdc.uses_kl) else ()
+                    yield (mx.array(b.inputs), mx.array(b.targets), mx.array(b.mask), *extra)
 
             args = TrainingArgs(
                 batch_size=spec.micro_batch, iters=seg * accum, steps_per_report=accum,

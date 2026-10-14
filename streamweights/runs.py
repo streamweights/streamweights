@@ -36,6 +36,13 @@ def sha256_file(path: Path, chunk: int = 8 * 1024 * 1024) -> str:
     return h.hexdigest()
 
 
+def tokenizer_fingerprint(path: Path) -> str | None:
+    """sha256 of a model directory's tokenizer.json: two models with the same value share a
+    vocabulary and its token ids (what logit distillation needs)."""
+    f = Path(path) / "tokenizer.json"
+    return hashlib.sha256(f.read_bytes()).hexdigest() if f.exists() else None
+
+
 def fingerprint_model(path: Path) -> str:
     """Content fingerprint of a model directory without reading tensor data:
     sha256 over config.json, every shard's name and size, and every safetensors

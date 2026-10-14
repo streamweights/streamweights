@@ -63,6 +63,21 @@ Options:
   --teacher <str>       the big model that answers prompts.jsonl (default:
                         llama3.3:70b on Apple silicon; on a CPU the largest
                         whose distill estimate is under 12 h)
+  --judge <str>         project folders, open-ended output: the model that
+                        scores outputs against the rubric (a tag, a Hugging
+                        Face repo, `recommended`, or `none`)
+  --distill-loss <str>  project folders with a teacher: kl | ce | mix
+                        (default: mix when the teacher and student share a
+                        tokenizer, otherwise ce)
+  --kd-temp <float>     project folders: temperature of the kl loss (default
+                        1)
+  --kd-alpha <float>    project folders, mix: weight of the kl term (default
+                        0.5)
+  --deadline <str>      project folders: a duration (2h) or timestamp; builds
+                        only if the project as configured is estimated to fit,
+                        and never lowers a setting to make it fit
+  --kd-topk <int>       project folders: top-k log-probs the teacher keeps per
+                        token (default 20)
   --compare <str>       add this model's score to the table (repeatable)
   --base <str>          train the adapter on this (big) model itself instead
                         of the student
@@ -102,7 +117,8 @@ Usage: spill example [OPTIONS] [name]
   untrained models).
 
 Arguments:
-  name  which example (banking77, snips, relay)  [default: banking77]
+  name  which example (banking77, snips, dolly-qa, relay)  [default:
+        banking77]
 
 Options:
   --quick  the under-an-hour variant: 100 evals, 500 train rows, student
@@ -230,6 +246,12 @@ Options:
                         (automatic when stdout is not a terminal)
   --config <path>       run the invocation stored in this job.json
   --emit-config <path>  write this invocation to job.json and exit
+  --distill-loss <str>  kl | ce | mix: how to learn from a teacher's log-probs
+                        (default: mix when the file has them and the
+                        tokenizers match, otherwise ce)
+  --kd-temp <float>     temperature of the kl loss  [default: 1.0]
+  --kd-alpha <float>    mix: weight of the kl term (the rest is cross-entropy)
+                        [default: 0.5]
   --help                Show this message and exit.
 
   Example: spill tune qwen2.5:0.5b banking77-quick/train.jsonl --name banking

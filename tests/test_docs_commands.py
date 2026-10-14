@@ -194,7 +194,7 @@ def test_execute_the_small_model_commands_on_tiny_data(tmp_path):
     (work / "prompts.jsonl").write_text("".join(
         json.dumps({"prompt": json.loads(l)["prompt"]}) + "\n"
         for l in (tiny / "train.jsonl").read_text().splitlines()))
-    for name in ("my-tickets.csv", "orders.csv", "schema.json"):          # the README's own-data files
+    for name in ("my-tickets.csv", "orders.csv", "schema.json", "answers.csv"):          # the README's own-data files
         shutil.copyfile(ROOT / "tests/fixtures/own-data" / name, work / name)
     inv = inventory()
     ordered = []

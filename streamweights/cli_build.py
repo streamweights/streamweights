@@ -94,10 +94,10 @@ class RealBackend(build_mod.Backend):
         import io
         return contextlib.redirect_stdout(io.StringIO())
 
-    def distill(self, teacher, prompts, out, max_tokens, resume_job):
+    def distill(self, teacher, prompts, out, max_tokens, resume_job, logprobs=None):
         with self._silenced():
             job, prog = _run_impl(teacher, str(prompts), None, out, 4096, None, self.quiet,
-                                  RunOpts(mode="generate", logprobs=None, kind="distill"))
+                                  RunOpts(mode="generate", logprobs=logprobs, kind="distill"))
             done = prog.done >= prog.total
             dest = _finalize_distill(job) if done else None
         res = {"job_id": job.id, "rows": prog.done,
@@ -342,6 +342,21 @@ def build(
                                 help="the big model that answers prompts.jsonl (default: "
                                      "llama3.3:70b on Apple silicon; on a CPU the largest whose "
                                      "distill estimate is under 12 h)"),
+    judge: str = typer.Option(None, "--judge", help="project folders, open-ended output: the model "
+                                                    "that scores outputs against the rubric (a tag, a "
+                                                    "Hugging Face repo, `recommended`, or `none`)"),
+    distill_loss: str = typer.Option(None, "--distill-loss", help="project folders with a teacher: "
+                                     "kl | ce | mix (default: mix when the teacher and student "
+                                     "share a tokenizer, otherwise ce)"),
+    kd_temp: float = typer.Option(None, "--kd-temp", help="project folders: temperature of the kl "
+                                                          "loss (default 1)"),
+    kd_alpha: float = typer.Option(None, "--kd-alpha", help="project folders, mix: weight of the "
+                                                            "kl term (default 0.5)"),
+    deadline: str = typer.Option(None, "--deadline", help="project folders: a duration (2h) or "
+                                 "timestamp; builds only if the project as configured is "
+                                 "estimated to fit, and never lowers a setting to make it fit"),
+    kd_topk: int = typer.Option(None, "--kd-topk", help="project folders: top-k log-probs the "
+                                                        "teacher keeps per token (default 20)"),
     compare: list[str] = typer.Option(None, "--compare", help="add this model's score to the table "
                                                               "(repeatable)"),
     base: str = typer.Option(None, "--base", help="train the adapter on this (big) model itself "
@@ -391,7 +406,9 @@ def build(
         try:
             from .cli_project import project_build
             project_build(folder, student, teacher, epochs, engine, headless, executor, new_run,
-                          stop_after, notify)
+                          stop_after, notify, judge,
+                          {"distill_loss": distill_loss, "kd_temp": kd_temp, "kd_alpha": kd_alpha,
+                           "kd_topk": kd_topk}, deadline)
         except typer.Exit:
             raise
         except Exception as e:
@@ -584,7 +601,7 @@ def _doctor_impl():
 @app.command(short_help="Create a ready-to-run example folder",
              epilog="Example: spill example banking77 --quick")
 def example(
-    name: str = typer.Argument("banking77", help="which example (banking77, snips, relay)"),
+    name: str = typer.Argument("banking77", help="which example (banking77, snips, dolly-qa, relay)"),
     quick: bool = typer.Option(False, "--quick", help="the under-an-hour variant: 100 evals, "
                                                       "500 train rows, student qwen2.5:0.5b"),
     tiny: bool = typer.Option(False, "--tiny", help="the CI-sized variant: 20 evals, 100 train "
@@ -605,6 +622,9 @@ def example(
         elif name == "snips":
             _next_hint(f"spill init {folder}/snips.csv --input text --output json "
                        f"--schema {folder}/schema.json --project {folder}-project")
+        elif name == "dolly-qa":
+            _next_hint(f"spill init {folder}/dolly-qa.csv --input prompt --output answer "
+                       f"--project {folder}-project")
         else:
             _next_hint(f"spill build {folder}")
     except Exception as e:

@@ -999,6 +999,12 @@ def tune(
                                                        "job.json"),
     emit_config: Path = typer.Option(None, "--emit-config", help="write this invocation to "
                                                                  "job.json and exit"),
+    distill_loss: str = typer.Option(None, "--distill-loss", help="kl | ce | mix: how to learn from "
+                                     "a teacher's log-probs (default: mix when the file has them "
+                                     "and the tokenizers match, otherwise ce)"),
+    kd_temp: float = typer.Option(1.0, "--kd-temp", help="temperature of the kl loss"),
+    kd_alpha: float = typer.Option(0.5, "--kd-alpha", help="mix: weight of the kl term (the rest "
+                                   "is cross-entropy)"),
     stop_after: int = typer.Option(None, "--stop-after", hidden=True),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
@@ -1011,7 +1017,8 @@ def tune(
             with _long_job("spill tune " + name, notify):
                 _tune_impl(model, train_jsonl, name, rank, 2 * rank, 0.0, targets, lr, "cosine",
                            0.01, steps, epochs, batch, grad_accum, max_seq, 0, path, 50,
-                           overwrite, quiet)
+                           overwrite, quiet, distill_loss=distill_loss, kd_temp=kd_temp,
+                           kd_alpha=kd_alpha)
         except typer.Exit:
             raise
         except Exception as e:
@@ -1193,9 +1200,58 @@ def _tune_report(prep, job, res, train_path: Path | None = None) -> None:
                    f"{s.model} {s.model}+{s.name}")
 
 
+def _tune_teacher_data(train_jsonl: Path, mdir: Path, distill_loss: str | None, kd_temp: float,
+                       kd_alpha: float) -> tuple[Path, str]:
+    """Turn a `spill distill` file into training lines (with the teacher's top-k log-probs when
+    its tokenizer is the student's) and settle the distillation loss: --distill-loss as given,
+    else mix when log-probs are present and the tokenizers match, otherwise ce. -> (file, loss)."""
+    import tempfile
+
+    from .errors import SpillError
+    from .runs import tokenizer_fingerprint
+    from .tune import kd as KD
+    from .tune.data import distill_as_training, is_distill_file, scan_teacher
+    if distill_loss is not None:
+        KD.KDConfig(distill_loss, kd_temp, kd_alpha).validate()
+    stok = tokenizer_fingerprint(mdir)
+    if is_distill_file(train_jsonl):                 # the output of `spill distill` trains as it is
+        train_jsonl, n_d, info = distill_as_training(
+            train_jsonl, Path(tempfile.mkdtemp(prefix="spill-distill-")) / "train.jsonl", stok)
+        typer.echo(f"   training on {n_d} teacher answers from the distill file"
+                   + (f" ({info['teacher_rows']} with the teacher's log-probs)" if info["teacher_rows"] else
+                      f" ({info['tokenizer_mismatch_rows']} have log-probs from a different tokenizer, "
+                      f"used as text)" if info["tokenizer_mismatch_rows"] else ""))
+    sc = scan_teacher(train_jsonl)
+    has_lp = sc["teacher_rows"] > 0
+    match = has_lp and sc["tokenizers"] == {stok} and stok is not None
+    if has_lp and not match:         # another tokenizer's token ids mean nothing here: use the text
+        import json as _json
+        lines = [_json.loads(l) for l in train_jsonl.read_text().splitlines() if l.strip()]
+        for d in lines:
+            d.pop("teacher", None)
+        train_jsonl = Path(tempfile.mkdtemp(prefix="spill-notopk-")) / "train.jsonl"
+        train_jsonl.write_text("".join(_json.dumps(d) + "\n" for d in lines))
+        typer.echo("   the teacher's tokenizer is not the student's: its answers train as text, "
+                   "without its log-probs")
+        has_lp = False
+    if distill_loss is None:
+        distill_loss = KD.default_mode(has_lp, match)
+        if has_lp:
+            typer.echo(f"   distillation loss: {distill_loss} ("
+                       + ("log-probs present and the tokenizers match" if match else
+                          "log-probs present but the tokenizers differ") + ")")
+    elif distill_loss in ("kl", "mix") and not has_lp:
+        raise SpillError(f"--distill-loss {distill_loss} needs the teacher's log-probs, and "
+                         f"{train_jsonl.name} has none (a teacher with another tokenizer than the "
+                         f"student's contributes text only)",
+                         "spill distill <teacher> <prompts> --logprobs 20, then spill tune ... "
+                         "<that file>")
+    return train_jsonl, distill_loss
+
+
 def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, schedule,
                weight_decay, steps, epochs, batch, grad_accum, max_seq, seed, path,
-               ckpt_every, overwrite, quiet):
+               ckpt_every, overwrite, quiet, distill_loss=None, kd_temp=1.0, kd_alpha=0.5):
     from . import adapters as adapters_mod
     from . import runs as runs_mod
     from .calibration import load_calibration
@@ -1209,12 +1265,6 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
                          "spill example banking77 --quick")
     if path not in ("auto", "resident", "streamed"):
         raise SpillError("--path must be auto, resident or streamed")
-    from .tune.data import distill_as_training, is_distill_file
-    if is_distill_file(train_jsonl):                 # the output of `spill distill` trains as it is
-        import tempfile
-        train_jsonl, n_d = distill_as_training(
-            train_jsonl, Path(tempfile.mkdtemp(prefix="spill-distill-")) / "train.jsonl")
-        typer.echo(f"   training on {n_d} teacher answers from the distill file")
     choice = engine_select.choose_engine(runtime.ENV.engine)
     runtime.set_engine(choice.name)
     tj = _tune_module(choice.name)
@@ -1230,6 +1280,7 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
         ws = memory_total_bytes(choice.name)
     label, mdir = _tune_model_dir(model)
     size = sum(f.stat().st_size for f in mdir.glob("*.safetensors"))
+    train_jsonl, distill_loss = _tune_teacher_data(train_jsonl, mdir, distill_loss, kd_temp, kd_alpha)
     chosen = tj.decide_path(size, ws, path)
     spec = tj.TuneSpec(
         model=label, quant="bf16", model_dir=str(mdir), data=str(train_jsonl), name=name,
@@ -1238,7 +1289,9 @@ def _tune_impl(model, train_jsonl, name, rank, alpha, dropout, targets, lr, sche
         weight_decay=weight_decay, schedule=schedule, seed=seed, max_seq=max_seq,
         micro_batch=batch or 4, grad_accum=grad_accum, steps=steps or 1, epochs=epochs,
         ckpt_every=ckpt_every, overwrite=overwrite, engine=choice.name,
-        state=runtime.state_uri(), stop_after=runtime.ENV.stop_after)
+        state=runtime.state_uri(), stop_after=runtime.ENV.stop_after,
+        distill_loss=distill_loss, kd_temp=kd_temp, kd_alpha=kd_alpha)
+    spec.kd()                                    # validates the three settings in one line
     if spec.grad_accum < 1:
         raise SpillError("--grad-accum must be at least 1")
     prep = tj.prepare(spec, working_set=ws, calibration=load_calibration(), hw=hw,
@@ -1487,8 +1540,10 @@ def _resume_impl(job: str | None):
 
 
 def _teacher_info(m: dict) -> dict:
+    from .runs import tokenizer_fingerprint
     return {"model": m["model"]["id"], "quant": m["model"]["quant"],
             "weight_hash": m["model"]["weight_hash"][:16],
+            "tokenizer_sha256": tokenizer_fingerprint(Path(m["model"]["path"])),
             "adapter_hash": (m["adapter"]["hash"][:16] if m.get("adapter") else None),
             "run_id": m["id"]}
 
@@ -1570,8 +1625,8 @@ def status():
     _next_hint("spill tail")
 
 
-PARAMS = {"qwen2.5:0.5b": "0.5B", "qwen2.5:7b": "7B", "qwen2.5:32b": "32B", "llama3.3:70b": "70B"}
-MLX8_BYTES = {"qwen2.5:0.5b": 700_000_000, "qwen2.5:7b": 8_091_987_725, "qwen2.5:32b": 35_000_000_000,
+PARAMS = {"qwen2.5:0.5b": "0.5B", "qwen2.5:1.5b": "1.5B", "qwen2.5:7b": "7B", "qwen2.5:32b": "32B", "llama3.3:70b": "70B"}
+MLX8_BYTES = {"qwen2.5:0.5b": 700_000_000, "qwen2.5:1.5b": 1_640_414_038, "qwen2.5:7b": 8_091_987_725, "qwen2.5:32b": 35_000_000_000,
               "llama3.3:70b": 75_000_000_000}
 
 
@@ -1592,7 +1647,7 @@ def models(architectures: bool = typer.Option(False, "--architectures",
     from .registry import MODELS_DIR
     typer.echo(f"{'tag':14s} {'params':7s} {'family (state)':26s} {'bf16':>8s} {'8-bit':>8s} "
                f"{'placement':10s} {'disk needed':>12s} {'downloaded':>10s}")
-    fam_of = {"qwen2.5:0.5b": "qwen2", "qwen2.5:7b": "qwen2", "qwen2.5:32b": "qwen2",
+    fam_of = {"qwen2.5:0.5b": "qwen2", "qwen2.5:1.5b": "qwen2", "qwen2.5:7b": "qwen2", "qwen2.5:32b": "qwen2",
               "llama3.3:70b": "llama"}
     for name in reg:
         st = safetensors_spec(name)

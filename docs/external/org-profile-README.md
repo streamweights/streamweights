@@ -2,7 +2,7 @@
 
 **Build a small model for your task, on hardware you control.**
 
-Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux.
+Bring examples of your task. Learn from a large model running on your own machine, train a small one, measure it honestly, and export it.
 
 ```
 pip install git+https://github.com/streamweights/streamweights

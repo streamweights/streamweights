@@ -141,3 +141,21 @@ def machine_inputs(engine: str, hw: dict, cal: dict) -> tuple[int, int, float | 
     except (KeyError, TypeError):
         rate = None
     return int(ws), int(free), rate
+
+
+def guided_student(engine: str, working_set: int) -> tuple[str, str]:
+    """The default student of a guided project, with the reason stated. The guided path starts
+    from the smallest curated model on every machine so the first result takes minutes
+    (rule 3); the reason says what this machine could take instead. A larger student is a
+    choice (`--student`), never a surprise."""
+    larger = []
+    for tag in ("qwen2.5:1.5b", "qwen2.5:7b"):
+        if est.model_bytes(tag) * 2.5 <= working_set:         # weights plus adapter, optimizer, activations
+            larger.append(tag)
+    reason = (f"{SMALL} on {engine}: the smallest curated model, so a first result takes minutes on "
+              f"any machine")
+    if larger:
+        reason += f"; this machine's {_gb(working_set)} could also train {' or '.join(larger)} (--student)"
+    else:
+        reason += f"; {_gb(working_set)} of memory is the limit here"
+    return SMALL, reason

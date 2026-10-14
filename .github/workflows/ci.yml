@@ -66,6 +66,46 @@ jobs:
           SPILL_DEVICE: cpu
           SPILL_REQUIRE_FIXTURE_MODEL: "1"
 
+  vision-gate:
+    name: An open-ended project end to end on torch-cpu, 1.5B teacher and judge (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 170
+    env:
+      SPILL_DEVICE: cpu
+      SPILL_MIN_FREE_GB: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev]"
+      - uses: actions/cache@v4
+        with:
+          path: models
+          key: models-qwen05-qwen15-minilm-v1
+      - name: Download the student, the teacher and judge, and the embedding baseline at their pinned revisions
+        run: |
+          python -c "from streamweights.registry import download_safetensors; download_safetensors('qwen2.5:0.5b'); download_safetensors('qwen2.5:1.5b')"
+          python -c "from streamweights.project.modelid import ensure_embedding; ensure_embedding()"
+      - name: Labeled project, no teacher; open-ended project, no judge (only the student may load)
+        run: |
+          python scripts/capture_020.py --flow labeled --engine torch-cpu --out cap-labeled.json
+          python scripts/capture_020.py --flow nojudge --engine torch-cpu --out cap-nojudge.json
+      - name: Open-ended project with a 1.5B teacher and judge, init to export
+        run: python scripts/capture_020.py --flow judged --engine torch-cpu --out cap-judged.json
+      - name: Check the captures against the gates
+        if: always()
+        run: python scripts/check_020_capture.py cap-labeled.json cap-nojudge.json cap-judged.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vision-gate
+          path: cap-*.json
+
   object-store:
     name: S3 ownership and handoff against a pinned MinIO (Linux)
     runs-on: ubuntu-latest

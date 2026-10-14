@@ -112,6 +112,8 @@ def labels_outside(labels: list[str], rows) -> list:
 
 def contract_text(cfg: dict, schema: dict | None) -> str:
     c = cfg["contract"]
+    if cfg["task"]["type"] == "open":
+        return ""
     if cfg["task"]["type"] == "classification":
         return ("Classify the input into exactly one of these labels. Reply with the label "
                 "only, spelled exactly as listed.\nLabels: " + ", ".join(c["labels"]))
@@ -123,7 +125,8 @@ def contract_text(cfg: dict, schema: dict | None) -> str:
 def messages_untrained(cfg: dict, schema: dict | None, text: str) -> list[dict]:
     """The prompted student's (and the teacher's) view: user instructions plus the contract."""
     sysm = "\n\n".join(x for x in (cfg["task"].get("system"), contract_text(cfg, schema)) if x)
-    return [{"role": "system", "content": sysm}, {"role": "user", "content": text}]
+    head = [{"role": "system", "content": sysm}] if sysm else []
+    return head + [{"role": "user", "content": text}]
 
 
 def messages_student(cfg: dict, text: str) -> list[dict]:
@@ -136,8 +139,9 @@ def messages_student(cfg: dict, text: str) -> list[dict]:
 
 
 def target_text(cfg: dict, output) -> str:
-    if cfg["task"]["type"] == "classification":
-        return str(output)
+    if cfg["task"]["type"] in ("classification", "open"):
+        return output if isinstance(output, str) else json.dumps(output, ensure_ascii=False,
+                                                                 sort_keys=True)
     return json.dumps(output, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
@@ -281,4 +285,60 @@ def agg_json(items: list[dict], schema: dict, golds: list[dict]) -> dict:
             "field_accuracy": per,
             "mean_field_accuracy": (sum(per.values()) / len(per)) if per else None,
             "records_with_extra_fields": sum(1 for i in items if i["extra"]),
+            "inference_failures": sum(1 for i in items if i["failed"])}
+
+
+# ------------------------------------------------------------ scoring: open-ended output
+
+_WORD = re.compile(r"\w+", re.UNICODE)
+
+
+def words(text: str) -> list[str]:
+    """The reference-overlap tokenization: Unicode NFKC, casefold, runs of word characters."""
+    return _WORD.findall(unicodedata.normalize("NFKC", text).casefold())
+
+
+def _lcs(a: list[str], b: list[str]) -> int:
+    if not a or not b:
+        return 0
+    prev = [0] * (len(b) + 1)
+    for x in a:
+        cur = [0]
+        for j, y in enumerate(b, 1):
+            cur.append(prev[j - 1] + 1 if x == y else max(prev[j], cur[j - 1]))
+        prev = cur
+    return prev[-1]
+
+
+def score_open(text: str | None, gold: str) -> dict:
+    """Reference overlap against the provided output, never a judgment of quality: token F1
+    (bag of words), ROUGE-L F (longest common subsequence of words) and exact match after
+    normalization. An output that failed to generate scores 0 on all three."""
+    if text is None:
+        return {"failed": True, "token_f1": 0.0, "rouge_l": 0.0, "exact_match": False,
+                "pred_words": 0, "pred": None}
+    p, g = words(text), words(str(gold))
+    common: dict = {}
+    for w in p:
+        common[w] = common.get(w, 0) + 1
+    overlap = 0
+    for w in g:
+        if common.get(w, 0) > 0:
+            overlap += 1
+            common[w] -= 1
+    f1 = 0.0 if not overlap else 2 * overlap / (len(p) + len(g))
+    lcs = _lcs(p, g)
+    rl = 0.0 if not lcs else 2 * lcs / (len(p) + len(g))
+    return {"failed": False, "token_f1": f1, "rouge_l": rl, "exact_match": p == g,
+            "pred_words": len(p), "pred": text.strip()}
+
+
+def agg_open(items: list[dict], golds: list[str]) -> dict:
+    n = len(items)
+    mean = lambda k: (sum(float(i[k]) for i in items) / n) if n else None
+    gw = [len(words(str(g))) for g in golds]
+    return {"rows": n, "token_f1": mean("token_f1"), "rouge_l": mean("rouge_l"),
+            "exact_match": mean("exact_match"),
+            "mean_output_words": (sum(i["pred_words"] for i in items) / n) if n else None,
+            "mean_reference_words": (sum(gw) / n) if n else None,
             "inference_failures": sum(1 for i in items if i["failed"])}

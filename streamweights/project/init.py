@@ -15,13 +15,15 @@ from ..errors import SpillError
 from . import config as C
 from . import contract as K
 from . import data as D
-from .common import atomic_write, now, sha_bytes, sha_file, write_json, write_jsonl
+from . import scoring as SC
+from .common import (atomic_write, norm_dup, now, sha_bytes, sha_file, write_json,
+                     write_jsonl)
 
 
 @dataclass
 class InitResult:
     folder: Path
-    task: str
+    task: str                 # the scoring method: exact | json | judge | script
     task_note: str
     sizes: dict
     warnings: list[str] = field(default_factory=list)
@@ -51,12 +53,86 @@ def _load(path: Path, mapping: dict, task: str | None):
     return cols, recs
 
 
+def _scoring_arg(score: str | None, task: str | None) -> tuple[str | None, Path | None]:
+    """(method, script path) from --score, or from the older --task spelling."""
+    if score:
+        if score.startswith("script:"):
+            return "script", Path(score[len("script:"):])
+        if score not in SC.CHOICES:
+            raise SpillError(f"--score must be exact, json, judge or script:<file>, not {score!r}",
+                             "spill init ... --score judge")
+        return score, None
+    if task:
+        legacy = {"classification": "exact", "json": "json"}
+        if task not in legacy:
+            raise SpillError(f"--task {task!r} is not a task type; the scoring method is chosen "
+                             f"from your outputs", "spill init ... --score exact|json|judge")
+        return legacy[task], None
+    return None, None
+
+
+def _student_why() -> str:
+    """Why the default student is the default, from the probed machine (nothing is probed here
+    if the machine has not been probed yet)."""
+    from .. import build_defaults, engine_select
+    from .. import probe as probe_mod
+    try:
+        eng = engine_select.choose_engine(None).name
+        hw = probe_mod.load(probe_if_missing=False)
+        ws = build_defaults.machine_inputs(eng, hw, {})[0]
+        return build_defaults.guided_student(eng, ws)[1]
+    except Exception:
+        return (f"{build_defaults.SMALL}: the smallest curated model, so a first result takes minutes "
+                f"on any machine")
+
+
+def _read_unlabeled(path: Path, mapping: dict, splits) -> tuple[list[dict], list[str]]:
+    """Unlabeled prompts: inputs only, for a teacher to answer. Leakage rule: a prompt that
+    matches any training, validation or test input (after the duplicate normalization) is
+    removed, so no evaluation input can reach the teacher's training answers."""
+    cols, recs, issues = D.read_table(path)
+    if issues:
+        raise D.DataErrors(issues)
+    col = mapping["input"] if mapping["input"] in cols else "prompt" if "prompt" in cols else None
+    if col is None:
+        raise SpillError(f"{path.name} has no column {mapping['input']!r} or 'prompt' for the unlabeled "
+                         f"prompts", f"name the input column {mapping['input']!r} in {path.name}")
+    known = {norm_dup(r.input) for r in splits.train + splits.val + splits.test}
+    rows, seen, leaked, dup, empty = [], set(), 0, 0, 0
+    for r in recs:
+        text = D._cell_text(r.values.get(col)).strip()
+        if not text:
+            empty += 1
+            continue
+        key = norm_dup(text)
+        if key in known:
+            leaked += 1
+        elif key in seen:
+            dup += 1
+        else:
+            seen.add(key)
+            rows.append({"id": "u-" + sha_bytes(text.encode())[:12], "input": text,
+                         "source": {"file": r.file, "row": r.row}})
+    notes = []
+    if leaked:
+        notes.append(f"{leaked} unlabeled prompt(s) matched a training, validation or test input and "
+                     f"were removed (an evaluation input must never reach the teacher)")
+    if dup or empty:
+        notes.append(f"{dup} duplicate and {empty} empty unlabeled prompt(s) were removed")
+    if not rows:
+        raise SpillError(f"{path.name} leaves no unlabeled prompts after the leakage check",
+                         "give prompts that are not in your examples")
+    return rows, notes
+
+
 def create_project(data: Path, folder: Path, mapping: dict, task: str | None = None,
                    system_file: Path | None = None, labels: str | None = None,
                    schema_file: Path | None = None, val: Path | None = None,
                    test: Path | None = None, seed: int = 0, val_fraction: float = 0.15,
                    test_fraction: float = 0.15, force: bool = False,
-                   say=lambda s: None) -> InitResult:
+                   say=lambda s: None, score: str | None = None,
+                   student: str | None = None, teacher: str | None = None,
+                   judge: str | None = None, unlabeled: Path | None = None) -> InitResult:
     folder = Path(folder)
     if C.exists(folder) and not force:
         raise SpillError(f"{folder} already has a {C.CONFIG_NAME}", f"spill plan {folder}   "
@@ -67,18 +143,30 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
         raise D.DataErrors(missing)
     sug = D.suggest_task(recs, mapping) if all(
         mapping[k] in cols for k in ("input", "output")) else D.Suggestion(None, "")
-    if task is None:
+    scoring, script_path = _scoring_arg(score, task)
+    if scoring in (None, "script"):
         if sug.task is None:
-            raise SpillError(f"cannot tell the task from the outputs ({sug.reason}); "
-                             f"say which it is", "spill init ... --task classification|json")
-        say(f"suggested task: {sug.task} ({sug.reason})")
+            raise SpillError(f"cannot read the outputs ({sug.reason})",
+                             "spill init ... --score exact|json|judge")
         task = sug.task
-    elif sug.task and sug.task != task:
-        say(f"note: the outputs look like {sug.task} ({sug.reason}); using --task {task} as asked")
+        note = sug.reason
+        scoring_name = scoring or SC.SCORING_OF_TASK[task]
+        if scoring is None:
+            say(f"scoring: {scoring_name} ({sug.reason})")
+    else:
+        task = SC.TASK_OF[scoring]
+        scoring_name = scoring
+        note = "chosen with --" + ("task" if not score else "score")
+        if sug.task and sug.task != task:
+            say(f"note: the outputs look like {SC.SCORING_OF_TASK[sug.task]} ({sug.reason}); "
+                f"using {scoring} as asked")
+    script = None
+    if script_path is not None:
+        SC.load_script(script_path)                 # fails here, not mid-build
+        script = {"file": "score.py", "sha256": sha_file(script_path)}
+        note = f"{note}; scored by {script_path.name} (override)"
     if task not in C.TASKS:
-        raise SpillError(f"--task must be one of {', '.join(C.TASKS)}, not {task!r}; other "
-                         f"task types are not supported by the guided path",
-                         "spill init ... --task classification|json")
+        raise SpillError(f"unknown task {task!r}", "spill init ... --score exact|json|judge")
     train_rows, issues = D.build_rows(cols, recs, mapping, task, Path(data).name)
     val_rows = test_rows = None
     for role, path in (("val", val), ("test", test)):
@@ -96,7 +184,11 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
 
     splits = D.split_rows(train_rows, val_rows, test_rows, seed, val_fraction, test_fraction)
     system = Path(system_file).read_text().strip() if system_file else None
-    cfg = C.default_config(folder.name, task, mapping, system)
+    cfg = C.default_config(folder.name, task, mapping, system, script)
+    for role, tag in (("student", student), ("teacher", teacher), ("judge", judge)):
+        if tag:
+            cfg["model"][role] = tag
+    cfg["model"]["student_why"] = ("chosen with --student" if student else _student_why())
     cfg["split"].update({"seed": seed, "val_fraction": val_fraction,
                          "test_fraction": test_fraction, "mode": splits.mode})
     warnings: list[str] = []
@@ -105,6 +197,11 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     sizes = {"train": len(splits.train), "val": len(splits.val), "test": len(splits.test)}
     out_files: dict = {}
     if task == "classification":
+        distinct = len({norm_dup(str(r.output)) for r in splits.train + splits.val + splits.test})
+        if distinct > D.MAX_LABELS:
+            raise SpillError(f"exact scoring needs a small label set (at most {D.MAX_LABELS} "
+                             f"distinct outputs); these rows have {distinct}",
+                             "spill init ... --score judge")
         if declared:
             outside = []
             for name, rows in (("train", splits.train), ("val", splits.val),
@@ -129,6 +226,11 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
             warnings.append(f"{len(cov['missing_in_val'])} of {cov['train']} training classes "
                             f"have no validation rows, so their accuracy is not measured")
         integrity = {"coverage": cov}
+    elif task == "open":
+        cfg["contract"] = {"kind": "open", "reference": "the outputs you provided",
+                           "note": "reference-overlap metrics compare an output with your "
+                                   "reference; they are not accuracy. Judged scores need a judge."}
+        integrity = {}
     else:
         if schema_file:
             try:
@@ -173,6 +275,11 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     for why in D.check_usable(splits, task):
         warnings.append(f"{why}; a build will be refused until this is fixed")
 
+    unl_rows = []
+    if unlabeled is not None:
+        unl_rows, unl_notes = _read_unlabeled(Path(unlabeled), mapping, splits)
+        warnings += unl_notes
+
     # ---- write the project
     folder.mkdir(parents=True, exist_ok=True)
     srcs = []
@@ -192,6 +299,15 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     cfg["split"]["fingerprints"] = fps
     cfg["split"]["sizes"] = sizes
     cfg["data"]["canonical"] = {n: f"data/{n}.jsonl" for n in ("train", "val", "test")}
+    if unl_rows:
+        write_jsonl(folder / "data" / "unlabeled.jsonl", unl_rows)
+        cfg["data"]["unlabeled"] = {"file": "data/unlabeled.jsonl", "rows": len(unl_rows),
+                                    "sha256": sha_file(folder / "data" / "unlabeled.jsonl"),
+                                    "use": "inputs only; a teacher answers them, they are never "
+                                           "evaluation rows"}
+        sizes["unlabeled"] = len(unl_rows)
+    if script:
+        shutil.copyfile(script_path, folder / script["file"])
     if system:
         atomic_write(folder / "system.txt", (system + "\n").encode())
         cfg["task"]["system_file"] = "system.txt"
@@ -201,5 +317,4 @@ def create_project(data: Path, folder: Path, mapping: dict, task: str | None = N
     cfg["project"]["created"] = now()
     C.save(folder, cfg)
     atomic_write(folder / ".gitignore", b".spill/\nREPORT.md.tmp\n")
-    return InitResult(folder, task, sug.reason if sug.task == task else "chosen with --task",
-                      sizes, warnings, splits.notes, cfg)
+    return InitResult(folder, scoring_name, note, sizes, warnings, splits.notes, cfg)

@@ -1,0 +1,48 @@
+{
+ "flow": "kd",
+ "engine": "mlx",
+ "device": "Device(gpu, 0)",
+ "allowed_models": null,
+ "started": "2026-10-13T17:08:28-0700",
+ "steps": [
+  {
+   "command": "spill example dolly-qa --tiny",
+   "exit": 0,
+   "seconds": 0.1,
+   "stdout": "created dolly-qa-tiny/ with NOTICE.txt, README.md, dolly-qa.csv\n\nnext: spill init dolly-qa-tiny/dolly-qa.csv --input prompt --output answer --project dolly-qa-tiny-project\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill init dolly-qa-tiny/dolly-qa.csv --input prompt --output answer --project dolly --teacher qwen2.5:1.5b --judge none",
+   "exit": 0,
+   "seconds": 0.7,
+   "stdout": "scoring: judge (the outputs look like free text or are not a small repeated label set (84 distinct in 84 rows))\nspill init dolly-qa.csv: scoring judge (the outputs look like free text or are not a small repeated label set (84 distinct in 84 rows)). Train 58, validation 13, final test 13 rows. Cost: $0. Project -> dolly\n   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together\n\nnext: spill plan dolly\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill build dolly --distill-loss ce --engine mlx",
+   "exit": 0,
+   "seconds": 57.3,
+   "stdout": "updated streamweights.toml: training.distill_loss = 'ce' (was 'auto'); the build is a new run\nspill build dolly: scoring judge, models qwen2.5:0.5b (student), qwen2.5:1.5b (teacher), bf16 weights, no quantization, on mlx (--engine mlx). Est. 79 s. Cost: $0. Run -> dolly/runs/<run id>\nstage 1/6: teacher qwen2.5:1.5b answers the 58 training prompts; estimate 4 s (assumption)\nstage 1 done in 14 s\nstage 2/6: nearest training answer baseline (TF-IDF, no model); estimate 1 s (assumption)\nstage 2 done in <1 s; token F1 against the reference (overlap, not accuracy) 0.108 on 13 rows\nstage 3/6: tune qwen2.5:0.5b on 174 training rows (58 yours x2 plus 58 from the teacher, loss ce); estimate 72 s (measurement)\nstage 3 done in 33 s; 88 steps, final loss 0.20668469369411469\nstage 4/6: qwen2.5:0.5b prompted, untrained, on 13 validation rows; estimate <1 s (assumption)\nstage 4 done in 4 s; token F1 against the reference (overlap, not accuracy) 0.441 on 13 rows\nstage 5/6: qwen2.5:0.5b trained, on 13 validation rows; estimate <1 s (assumption)\nstage 5 done in 2 s; token F1 against the reference (overlap, not accuracy) 0.562 on 13 rows\nstage 6/6: teacher qwen2.5:1.5b on 13 validation rows; estimate 1 s (assumption)\nstage 6 done in 4 s; token F1 against the reference (overlap, not accuracy) 0.459 on 13 rows\n\nnearest training answer (TF-IDF, no model)  token F1 against the reference (overlap, not accuracy) 0.108  (13 rows)\nstudent, prompted, untrained                token F1 against the reference (overlap, not accuracy) 0.441  (13 rows)\nstudent, trained                            token F1 against the reference (overlap, not accuracy) 0.562  (13 rows)\nteacher                                     token F1 against the reference (overlap, not accuracy) 0.459  (13 rows)\nrun run-20261013-170829-aed6-b1be79: dolly/runs/run-20261013-170829-aed6-b1be79\n\nnext: spill report dolly\n",
+   "stderr_tail": "1 \u00b7 ~0.0 s per token per prompt \u00b7 4.1 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 102 (0.0 s) \u00b7 147.1 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 4.1 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 103 (0.0 s) \u00b7 146.6 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 4.1 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 104 (0.0 s) \u00b7 146.0 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 4.1 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 105 (0.0 s) \u00b7 145.4 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 4.1 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 106 (0.0 s) \u00b7 144.9 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 4.1 GB peak\u001b[K\n\u001b[1Frows 13/13 \u00b7 pass 107 (0.0 s) \u00b7 144.1 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 0 \u00b7 ~0.0 s per token per prompt \u00b7 4.1 GB peak\u001b[K\n\n"
+  },
+  {
+   "command": "spill build dolly --distill-loss mix --engine mlx",
+   "exit": 0,
+   "seconds": 53.2,
+   "stdout": "updated streamweights.toml: training.distill_loss = 'mix' (was 'ce'); the build is a new run\nspill build dolly: scoring judge, models qwen2.5:0.5b (student), qwen2.5:1.5b (teacher), bf16 weights, no quantization, on mlx (--engine mlx). Est. 48 s. Cost: $0. Run -> dolly/runs/<run id>\nstage 1/6: teacher qwen2.5:1.5b answers the 58 training prompts, keeping its top-20 log-probs; estimate 4 s (assumption)\nstage 1 done in 14 s\nstage 2/6: nearest training answer baseline (TF-IDF, no model); estimate 1 s (assumption)\nstage 2 done in <1 s; token F1 against the reference (overlap, not accuracy) 0.108 on 13 rows\nstage 3/6: tune qwen2.5:0.5b on 174 training rows (58 yours x2 plus 58 from the teacher, loss mix); estimate 35 s (measurement)\nstage 3 done in 36 s; 88 steps, final loss 0.2399120032787323\nstage 4/6: qwen2.5:0.5b prompted, untrained, on 13 validation rows; estimate 2 s (measurement)\nstage 4 done in <1 s; token F1 against the reference (overlap, not accuracy) 0.441 on 13 rows\nstage 5/6: qwen2.5:0.5b trained, on 13 validation rows; estimate 2 s (measurement)\nstage 5 done in 2 s; token F1 against the reference (overlap, not accuracy) 0.590 on 13 rows\nstage 6/6: teacher qwen2.5:1.5b on 13 validation rows; estimate 4 s (measurement)\nstage 6 done in <1 s; token F1 against the reference (overlap, not accuracy) 0.459 on 13 rows\n\nnearest training answer (TF-IDF, no model)  token F1 against the reference (overlap, not accuracy) 0.108  (13 rows)\nstudent, prompted, untrained                token F1 against the reference (overlap, not accuracy) 0.441  (13 rows)\nstudent, trained                            token F1 against the reference (overlap, not accuracy) 0.590  (13 rows)\nteacher                                     token F1 against the reference (overlap, not accuracy) 0.459  (13 rows)\nrun run-20261013-170927-fd18-f93dd3: dolly/runs/run-20261013-170927-fd18-f93dd3\n\nnext: spill report dolly\n",
+   "stderr_tail": "batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 7.6 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 26 (0.0 s) \u00b7 236.9 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 7.6 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 27 (0.0 s) \u00b7 234.1 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 7.6 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 28 (0.0 s) \u00b7 231.5 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 7.6 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 29 (0.0 s) \u00b7 228.9 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 7.6 GB peak\u001b[K\n\u001b[1Frows 12/13 \u00b7 pass 30 (0.0 s) \u00b7 226.4 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 1 \u00b7 ~0.0 s per token per prompt \u00b7 7.6 GB peak\u001b[K\n\u001b[1Frows 13/13 \u00b7 pass 31 (0.0 s) \u00b7 222.7 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 0 \u00b7 ~0.0 s per token per prompt \u00b7 7.6 GB peak\u001b[K\n\n"
+  },
+  {
+   "command": "spill compare dolly",
+   "exit": 0,
+   "seconds": 0.2,
+   "stdout": "run  evaluation  metric  trained  baseline  untrained  rows  protocol  engine\nrun-20261013-170829-aed6-b1be79  run-20261013-170829-aed6-b1be79/original  token F1 against the reference (overlap, not accuracy) v1  0.562  0.108  0.441  13  f38adbdddf3c  mlx\nrun-20261013-170927-fd18-f93dd3  run-20261013-170927-fd18-f93dd3/original  token F1 against the reference (overlap, not accuracy) v1  0.590  0.108  0.441  13  f38adbdddf3c  mlx\nevaluation used for run-20261013-170829-aed6-b1be79: run-20261013-170829-aed6-b1be79/original (the run's original evaluation; no --use given)\nevaluation used for run-20261013-170927-fd18-f93dd3: run-20261013-170927-fd18-f93dd3/original (the run's original evaluation; no --use given)\nrun run-20261013-170927-fd18-f93dd3 has parent run-20261013-170829-aed6-b1be79: experiment lineage only: the new run trained from the base model, not from the parent's weights\n\ncommon evaluator: ranked by the trained model's token F1 against the reference (overlap, not accuracy): run-20261013-170927-fd18-f93dd3 (run-20261013-170927-fd18-f93dd3/original) > run-20261013-170829-aed6-b1be79 (run-20261013-170829-aed6-b1be79/original)\n   a higher number is an observed difference on these rows, not a statistical claim\n\ndifferences run-20261013-170829-aed6-b1be79 vs run-20261013-170927-fd18-f93dd3:\n   training: training.distill_loss\n\nnext: spill export dolly\n",
+   "stderr_tail": ""
+  }
+ ],
+ "models_downloaded": {},
+ "models_changed": {},
+ "ok": true,
+ "finished": "2026-10-13T17:10:19-0700"
+}

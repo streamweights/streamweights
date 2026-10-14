@@ -1,0 +1,56 @@
+{
+ "device": "Device(gpu, 0)",
+ "started": "2026-10-13T17:00:12-0700",
+ "steps": [
+  {
+   "command": "spill example banking77 --tiny",
+   "exit": 0,
+   "seconds": 0.1,
+   "stdout": "created banking77-tiny/ with README.md, banking77.csv, evals.jsonl, instructions.txt, spill.json, train.jsonl\n\nnext: spill build banking77-tiny\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill init banking77-tiny/banking77.csv --input text --output label --project tickets",
+   "exit": 0,
+   "seconds": 0.7,
+   "stdout": "scoring: exact (10 distinct short labels over 120 rows, 100% of rows share their label with another row)\nspill init banking77.csv: scoring exact (10 distinct short labels over 120 rows, 100% of rows share their label with another row). Train 84, validation 18, final test 18 rows. Cost: $0. Project -> tickets\n   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together\n   warning: 3 of 10 training classes have no validation rows, so their accuracy is not measured\n\nnext: spill plan tickets\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill plan tickets",
+   "exit": 0,
+   "seconds": 0.7,
+   "stdout": "spill plan tickets: scoring exact, models qwen2.5:0.5b (student), all-MiniLM-L6-v2 (baseline embedding), bf16 weights, no quantization, on mlx (Apple silicon: MLX). Est. 12 s plus unknown stages. Cost: $0. Run -> tickets/runs/<run id>\nmodels (each is a choice: edit streamweights.toml, or pass --student, --teacher, --judge):\n   student   qwen2.5:0.5b  Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf  safetensors bf16  0.92 GB, on disk  (qwen2.5:0.5b on mlx: the smallest curated model, so a first result takes minutes on any machine; this machine's 39 GB could also train qwen2.5:1.5b or qwen2.5:7b (--student))\n   teacher   none (a teacher runs only when you name one: spill build --teacher <model>)\n   baseline  sentence-transformers/all-MiniLM-L6-v2@1110a243fdf4 + logistic regression\nengine: mlx: Apple silicon: MLX\nscoring: exact\ndownloads:\n   qwen2.5:0.5b: 0.93 GB already on disk\n   embedding:minilm: 92 MB already on disk\n   nothing to download\ndisk:\n   checkpoints 0.49 GB (5 x 106 MB, every published checkpoint is kept; deleting them is a later feature), staging 0.14 GB, adapter 35 MB\n   export (only if you run it): merged 0.92 GB, GGUF q8_0 about 0.49 GB (assumption: 0.53 x bf16); free here 46.02 GB\nstages:\n   1. embedding + logistic regression baseline: unknown [unknown] no measurement of the embedding on this machine yet (102 texts to embed)\n   2. tune qwen2.5:0.5b on 84 training rows (84 yours): 11 s [measurement] 7,050 token-passes x 6 x 0.49B params / 1.86 TFLOP/s = 11 s; rate measured by spill tune\n   3. qwen2.5:0.5b prompted, untrained, on 18 validation rows: <1 s [assumption] 18 rows, batch 512, resident: prefill 0 s (463 tokens, shared prefix once) + decode 0 s (1 x 9 passes x 0.01 s); no matching measurement yet (rate measured by spill tune)\n   4. qwen2.5:0.5b trained, on 18 validation rows: <1 s [assumption] 18 rows, batch 512, resident: prefill 0 s (375 tokens, shared prefix once) + decode 0 s (1 x 9 passes x 0.01 s); no matching measurement yet (rate measured by spill tune)\ntotal: 12 s plus unknown (baseline: no measurement on this machine yet); model loading is not included\n\nnext: spill build tickets\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill build tickets",
+   "exit": 0,
+   "seconds": 13.4,
+   "stdout": "spill build tickets: scoring exact, models qwen2.5:0.5b (student), all-MiniLM-L6-v2 (baseline embedding), bf16 weights, no quantization, on mlx (Apple silicon: MLX). Est. 12 s plus unknown stages. Cost: $0. Run -> tickets/runs/<run id>\nstage 1/4: embedding + logistic regression baseline\nstage 1 done in 2 s; accuracy 1.000 on 18 rows\nstage 2/4: tune qwen2.5:0.5b on 84 training rows (84 yours); estimate 11 s (measurement)\nstage 2 done in 8 s; 42 steps, final loss 0.001835554838180542\nstage 3/4: qwen2.5:0.5b prompted, untrained, on 18 validation rows; estimate <1 s (assumption)\nstage 3 done in 1 s; accuracy 0.333 on 18 rows\nstage 4/4: qwen2.5:0.5b trained, on 18 validation rows; estimate <1 s (assumption)\nstage 4 done in 1 s; accuracy 0.889 on 18 rows\n\nembedding baseline (MiniLM + logistic regression)  accuracy 1.000  (18 rows)\nstudent, prompted, untrained                       accuracy 0.333  (18 rows)\nstudent, trained                                   accuracy 0.889  (18 rows)\nrun run-20261013-170014-ca24-66a834: tickets/runs/run-20261013-170014-ca24-66a834\n\nnext: spill report tickets\n",
+   "stderr_tail": " pass 2 (0.0 s) \u00b7 77.4 tok/s \u00b7 ETA 0m 03s \u00b7 bf16 \u00b7 batch 18 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\u001b[1Frows 1/18 \u00b7 pass 3 (0.0 s) \u00b7 109.4 tok/s \u00b7 ETA 0m 02s \u00b7 bf16 \u00b7 batch 17 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\u001b[1Frows 10/18 \u00b7 pass 4 (0.0 s) \u00b7 133.6 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 8 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\u001b[1Frows 11/18 \u00b7 pass 5 (0.0 s) \u00b7 143.3 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 7 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\u001b[1Frows 18/18 \u00b7 pass 6 (0.0 s) \u00b7 149.8 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 0 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\n"
+  },
+  {
+   "command": "spill report tickets",
+   "exit": 0,
+   "seconds": 0.2,
+   "stdout": "# Run run-20261013-170014-ca24-66a834: tickets\n\nScoring: exact. Metric: accuracy (metric version 1). Validation rows: 18. Status: completed.\n\n## Results\n\n| comparator | accuracy | macro-F1 | rows | invalid predictions | failures | truncated |\n|---|---|---|---|---|---|---|\n| embedding baseline (MiniLM + logistic regression) | 1.000 | 1.000 | 18 | 0 | 0 | n/a |\n| student, prompted, untrained | 0.333 | 0.270 | 18 | 1 | 0 | 0 |\n| student, trained | 0.889 | 0.905 | 18 | 1 | 0 | 0 |\n\nInvalid, unparseable and failed outputs count as wrong and stay in every denominator. `unavailable` means the metric does not exist for that row; it is never shown as 0.\n\n## What the numbers say\n\nOn 18 validation rows, accuracy: embedding baseline (MiniLM + logistic regression): 1.000; student, prompted, untrained: 0.333; student, trained: 0.889.\nThe embedding baseline (MiniLM + logistic regression) scored 0.111 higher than the trained student (2 rows).\nThe trained student scored 0.556 higher than the student, prompted, untrained (10 rows).\n\nNo significance test was run and none is implied. These are the observed differences on this validation set; a few rows can move a score on a set this size. Changing the batch shape can also move a score through numerical differences; that is a diagnostic, not evidence either way.\n\n## Data\n\nTrain 84, validation 18, final test 18 rows (split generated, seed 0). The final test split was not used by this run and is scored only by `spill test`.\n\n- 3 training classes have no validation rows\n\n## Models\n\n- student: qwen2.5:0.5b (Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf, safetensors bf16)\n- embedding: embedding:minilm (sentence-transformers/all-MiniLM-L6-v2@1110a243fdf4, safetensors float32)\n\n## How it ran\n\n- baseline: done, 1.7 s, torch-cpu on macOS arm64\n- train: done, 8.0 s, mlx on macOS arm64\n- eval:untrained: done, 1.1 s, mlx on macOS arm64\n- eval:trained: done, 1.3 s, mlx on macOS arm64\n\n## Where things are\n\n- predictions: predictions/<comparator>.jsonl; disagreements with the trained student: disagreements.jsonl\n- adapter: artifacts/adapter/\n- manifest (fingerprints, model hashes, dependency versions): manifest.json\n\n## Next\n\n- `spill export tickets`\n- `spill test tickets`\n- `spill compare tickets`\n\nreport: tickets/runs/run-20261013-170014-ca24-66a834/report.md\nindex: tickets/REPORT.md\n\nnext: spill export tickets\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill export tickets",
+   "exit": 0,
+   "seconds": 9.1,
+   "stdout": "spill export tickets: merge the run's LoRA adapter into its bf16 base, then load the artifact in an independent runtime on 8 validation rows. Cost: $0. Record -> tickets/exports/<id>\n   merging the adapter into the bf16 base (float32 arithmetic, rounded back to bf16)\n   merged shard 1/1: model.safetensors\n   verifying safetensors with Transformers on 8 validation rows\nverified safetensors: transformers 5.19.0, torch 2.14.1, float32 on CPU (12 cores); 0 of 8 predictions differ from the training engine's. Quality on these 8 rows (accuracy): source engine 0.875, artifact 0.875, change +0.000. Verified means it loaded and ran, not that quality was kept\n   time to first token cold 0.0749 s, warm 0.063 s; 35.01 tokens/s; peak memory 3.41 GB\nrecord: tickets/exports/export-20261013-170027-3c19da\n\nnext: python tickets/exports/export-20261013-170027-3c19da/run_safetensors.py \"<text>\"\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "python tickets/exports/*/run_safetensors.py \"Can I change my PIN at any ATM?\"",
+   "exit": 0,
+   "seconds": 2.7,
+   "stdout": "change_pin\n",
+   "stderr_tail": "\nLoading weights:   0%|          | 0/290 [00:00<?, ?it/s]\nLoading weights: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 290/290 [00:00<00:00, 4443.15it/s]\n"
+  }
+ ],
+ "ok": true
+}

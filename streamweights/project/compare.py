@@ -117,12 +117,22 @@ def protocol_differences(a: dict, b: dict) -> list[str]:
         why.append(f"the metric definition or version differs ({fa.get('metric')} v{fa.get('metric_version')} "
                    f"vs {fb.get('metric')} v{fb.get('metric_version')}"
                    + (", or the label vocabulary or schema" if ma["contract"] != mb["contract"] else "") + ")")
-    rest = _diff({k: v for k, v in fa.items() if k not in ("rows", "prompts", "decoding", "max_tokens",
-                                                           "postprocessing", "metric", "metric_version",
-                                                           "contract")},
-                 {k: v for k, v in fb.items() if k not in ("rows", "prompts", "decoding", "max_tokens",
-                                                           "postprocessing", "metric", "metric_version",
-                                                           "contract")})
+    ja, jb = fa.get("judge"), fb.get("judge")
+    if ja != jb:
+        keys = _diff({"judge": ja}, {"judge": jb})
+        parts = []
+        for label, pre in (("judge model identity", "judge.model"), ("rubric", "judge.rubric"),
+                           ("judge prompt templates", "judge.templates"),
+                           ("judge decoding", "judge.decoding")):
+            if any(k.startswith(pre) for k in keys):
+                parts.append(label)
+        if ja is None or jb is None:
+            parts = ["one evaluation was judged and the other was not"]
+        why.append("the judge protocol differs (" + (", ".join(parts) or ", ".join(keys[:4])) + ")")
+    skip = ("rows", "prompts", "decoding", "max_tokens", "postprocessing", "metric",
+            "metric_version", "contract", "judge")
+    rest = _diff({k: v for k, v in fa.items() if k not in skip},
+                 {k: v for k, v in fb.items() if k not in skip})
     if rest:
         why.append("other protocol fields differ (" + ", ".join(rest[:4]) + ")")
     return why

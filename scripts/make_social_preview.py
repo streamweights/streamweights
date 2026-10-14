@@ -56,7 +56,7 @@ def arrow(x0, y0, x1, y1, color=LINE):
 text((64, 40), "streamweights", 40, ACCENT, bold=True)
 text((64, 100), "Build a small model for your task,", 54, INK, bold=True)
 text((64, 166), "on hardware you control.", 54, INK, bold=True)
-text((64, 250), "Bring labeled examples. Fine-tune locally, compare against baselines, export.", 27, MUTE)
+text((64, 250), "Bring examples. Learn from a large model, train a small one, export it.", 27, MUTE)
 
 for i, (name, sub) in enumerate((("examples.csv", "labeled rows"), ("baselines", "embedding, untrained"),
                                  ("validation rows", "held out"))):

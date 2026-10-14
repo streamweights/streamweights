@@ -26,24 +26,46 @@ def _guided(folder, command: str) -> dict:
     return cfg
 
 
+def _init_judge(judge: str | None, student: str | None) -> str | None:
+    if judge != "recommended":
+        return judge
+    from .project import plan as P
+    tag = P.recommended_judge(student or "qwen2.5:0.5b")
+    typer.echo(f"accepting the recommended judge: {tag}")
+    return tag
+
+
 @app.command(short_help="Start a project from a CSV or JSONL of examples",
              epilog="Example: spill init tickets.csv --input text --output label")
 def init(
     data: Path = typer.Argument(..., help="a CSV or JSONL of labeled examples"),
     input_col: str = typer.Option(..., "--input", help="the column holding the input text"),
-    output_col: str = typer.Option(..., "--output", help="the column holding the right answer: "
-                                                         "a label, or a JSON object"),
+    output_col: str = typer.Option(..., "--output", help="the column holding the desired output: "
+                                                         "a label, a JSON object, or free text"),
     group: str = typer.Option(None, "--group", help="a column whose rows must stay on one side "
                                                     "of every split (customer, document, ...)"),
     system: Path = typer.Option(None, "--system", help="a text file of instructions for the task"),
-    task: str = typer.Option(None, "--task", help="classification | json (default: suggested "
-                                                  "from the outputs; required when unclear)"),
+    score: str = typer.Option(None, "--score", help="exact | json | judge | script:<file.py> "
+                                                    "(default: chosen from the outputs and "
+                                                    "stated)"),
+    task: str = typer.Option(None, "--task", hidden=True, help="older spelling of --score"),
+    student: str = typer.Option(None, "--student", help="the small model to train (default: "
+                                                        "chosen from this machine, with the reason)"),
+    teacher: str = typer.Option(None, "--teacher", help="a larger model that learns your task's "
+                                                        "answers for the student to copy "
+                                                        "(optional)"),
+    judge: str = typer.Option(None, "--judge", help="a model that scores open-ended output "
+                                                    "against a rubric, or `recommended` "
+                                                    "(optional)"),
+    unlabeled: Path = typer.Option(None, "--unlabeled", help="a CSV or JSONL of prompts with no "
+                                                             "answers (same input column, or "
+                                                             "`prompt`); a teacher answers them"),
     project: Path = typer.Option(None, "--project", help="the project folder (default: the "
                                                          "data file's name)"),
     labels: str = typer.Option(None, "--labels", help="the class vocabulary: a,b,c or a file of "
                                                       "one label per line (default: the "
                                                       "training rows' labels)"),
-    schema: Path = typer.Option(None, "--schema", help="a JSON Schema file for --task json "
+    schema: Path = typer.Option(None, "--schema", help="a JSON Schema file for json outputs "
                                                        "(default: derived from the training rows)"),
     val: Path = typer.Option(None, "--val", help="your own validation file (same columns)"),
     test: Path = typer.Option(None, "--test", help="your own final-test file (same columns); "
@@ -64,7 +86,9 @@ def init(
         folder = project or Path(data.stem)
         mapping = {"input": input_col, "output": output_col, "group": group}
         res = create_project(data, folder, mapping, task, system, labels, schema, val, test, seed,
-                             val_fraction, test_fraction, force, say=typer.echo)
+                             val_fraction, test_fraction, force, say=typer.echo, score=score,
+                             student=student, teacher=teacher,
+                             judge=_init_judge(judge, student), unlabeled=unlabeled)
     except D.DataErrors as e:
         for line in e.lines():
             typer.echo(f"spill: {line}", err=True)
@@ -73,7 +97,7 @@ def init(
         _fail(e)
         return
     s = res.sizes
-    typer.echo(f"spill init {data.name}: {res.task} ({res.task_note}). Train {s['train']}, "
+    typer.echo(f"spill init {data.name}: scoring {res.task} ({res.task_note}). Train {s['train']}, "
                f"validation {s['val']}, final test {s['test']} rows. Cost: $0. Project -> {folder}")
     for n in res.notes:
         typer.echo(f"   {n}")
@@ -91,10 +115,17 @@ def plan(
     calibrate: bool = typer.Option(False, "--calibrate", help="first measure this engine's matmul "
                                                               "and memory rates on synthetic "
                                                               "data (a few seconds)"),
+    deadline: str = typer.Option(None, "--deadline", help="a duration (90m, 2h, 1d12h) or timestamp "
+                                 "(2026-10-14T09:00): list the combinations of student, teacher, "
+                                 "judge and engine on this machine estimated to finish in time"),
+    student: str = typer.Option(None, "--student", help="plan with this student (not saved)"),
+    teacher: str = typer.Option(None, "--teacher", help="plan with this teacher (not saved)"),
+    judge: str = typer.Option(None, "--judge", help="plan with this judge (not saved)"),
     debug: bool = typer.Option(False, "--debug", hidden=True),
 ):
     """Models and engine with reasons, downloads, disk, and a duration per stage labeled
-    measurement, assumption or unknown. Loads no model, downloads nothing, trains nothing."""
+    measurement, assumption or unknown. Loads no model, downloads nothing, trains nothing. With
+    --deadline, also which combinations of models and engine are estimated to fit."""
     import streamweights.cli as cli
     cli._DEBUG = debug
     try:
@@ -105,17 +136,29 @@ def plan(
             r = engine_select.measure_rates()
             typer.echo("calibration (synthetic matmul and memory, nothing trained): "
                        + "; ".join(f"{e} {v.get('matmul_tflops', '?')} TFLOP/s" for e, v in r.items()))
-        p = P.make_plan(project, engine, fetch=False)
+        roles = {k: v for k, v in (("student", student), ("teacher", teacher), ("judge", judge)) if v}
+        if judge == "recommended":
+            roles.pop("judge")
+        p = P.make_plan(project, engine, fetch=False, cfg_override={"model": roles} if roles else None)
         for line in P.render(p):
             typer.echo(line)
+        if roles:
+            typer.echo("note: " + ", ".join(f"{k} {v}" for k, v in roles.items())
+                       + " used for this plan only; streamweights.toml is unchanged (spill build "
+                         "--student/--teacher/--judge records them)")
+        if deadline:
+            from .project import deadline as DL
+            secs, label = DL.parse_deadline(deadline)
+            for line in DL.render(DL.evaluate(project, secs, engine), secs, label):
+                typer.echo(line)
     except Exception as e:
         _fail(e)
         return
-    _next_hint(f"spill build {project}")
+    _next_hint(f"spill build {project}" + (f" --deadline {deadline}" if deadline else ""))
 
 
 def project_build(folder, student, teacher, epochs, engine, headless, executor, new_run,
-                  stop_after, notify):
+                  stop_after, notify, judge=None, kd=None, deadline=None):
     """`spill build <project>`: plan, run, report. Flags that change the build are written
     into streamweights.toml first (one line each), so the project stays the record."""
     from . import runtime
@@ -124,15 +167,54 @@ def project_build(folder, student, teacher, epochs, engine, headless, executor, 
     from .project import data as D
     from .project import plan as P
     from .project import report as R
+    from .project import scoring as SC
     from .project.common import read_jsonl
     folder = Path(folder)
     cfg = C.load(folder)
     changed = []
+    if judge == "recommended":
+        if cfg["task"]["type"] != "open":
+            raise SpillError(f"judged scoring is for open-ended output; this project scores by "
+                             f"{SC.scoring_of(cfg)}", f"spill build {folder}")
+        judge = P.recommended_judge(student or cfg["model"]["student"])
+        typer.echo(f"accepting the recommended judge: {judge}")
+    roles = {k: v for k, v in (("student", student), ("teacher", teacher), ("judge", judge)) if v}
+    if deadline:
+        from .project import deadline as DL
+        fits, lines = DL.check_configured(folder, deadline, engine, roles)
+        for line in lines:
+            typer.echo(line)
+        if not fits:
+            fit = [c for c in DL.evaluate(folder, DL.parse_deadline(deadline)[0], engine, roles) if c.recommended]
+            if fit:
+                c = fit[0]
+                flags = f"--student {c.student}" + (f" --teacher {c.teacher}" if c.teacher else "") + \
+                    (f" --judge {c.judge}" if c.judge else "") + f" --engine {c.engine}"
+                raise SpillError("this project as configured is not estimated to fit the deadline; "
+                                 "it was not started and nothing was lowered", f"spill build {folder} "
+                                 f"{flags} --deadline {deadline}   (the recommended combination that fits)")
+            raise SpillError("nothing is estimated to fit the deadline; the build was not started "
+                             "and nothing was lowered", f"spill plan {folder} --deadline <a longer time>")
+    kd = kd or {}
+    if kd.get("distill_loss") not in (None, "auto", "kl", "ce", "mix"):
+        raise SpillError(f"--distill-loss must be kl, ce or mix, not {kd['distill_loss']!r}",
+                         f"spill build {folder} --distill-loss mix")
     for key, val, path in (("student", student, "model"), ("teacher", teacher, "model"),
-                           ("epochs", epochs, "training")):
+                           ("judge", judge, "model"), ("epochs", epochs, "training"),
+                           ("distill_loss", kd.get("distill_loss"), "training"),
+                           ("kd_temp", kd.get("kd_temp"), "training"),
+                           ("kd_alpha", kd.get("kd_alpha"), "training"),
+                           ("kd_topk", kd.get("kd_topk"), "training")):
         if val is not None and cfg[path].get(key) != val:
             changed.append(f"{path}.{key} = {val!r} (was {cfg[path].get(key)!r})")
             cfg[path][key] = val
+    resolved = P.resolve_roles(cfg)
+    for path, key in (("model", "judge"), ("evaluation", "metric")):
+        if resolved[path].get(key) != cfg[path].get(key):
+            changed.append(f"{path}.{key} = {resolved[path][key]!r} (was {cfg[path].get(key)!r}"
+                           + ("; a named teacher judges unless you name a judge)" if key == "judge"
+                              else "; the judge's assessment is the primary metric)"))
+            cfg[path][key] = resolved[path][key]
     if changed:
         C.save(folder, cfg)
         typer.echo(f"updated streamweights.toml: {'; '.join(changed)}; the build is a new run")
@@ -161,12 +243,18 @@ def project_build(folder, student, teacher, epochs, engine, headless, executor, 
     typer.echo("")
     if out.table:
         task = plan.cfg["task"]["type"]
-        names = R.NAMES if task == "classification" else R.JSON_NAMES
+        names = R.names_for(task)
         w = max(len(names[r["comparator"]]) for r in out.table)
         for r in out.table:
             v = r["primary"]
+            shown = ("reference only, judge is the same model" if r.get("judge_excluded")
+                     else "unavailable" if v is None else f"{v:.3f}")
             typer.echo(f"{names[r['comparator']].ljust(w)}  {R.primary_name(R.metric_key(plan.cfg))} "
-                       f"{'unavailable' if v is None else f'{v:.3f}'}  ({r['rows']} rows)")
+                       f"{shown}  ({r['rows']} rows)")
+        if plan.cfg["task"]["type"] == "open" and out.snapshot:
+            from .project.common import read_json
+            for line in R.judge_findings(read_json(Path(out.snapshot) / "manifest.json").get("judge")):
+                typer.echo(f"  {line}")
     typer.echo(f"run {out.run_id}: {out.snapshot}")
     _next_hint(f"spill report {folder}")
 

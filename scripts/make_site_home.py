@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 GITHUB = "https://github.com/streamweights/streamweights/blob/main/"
 TREE = "https://github.com/streamweights/streamweights/tree/main/"
 TITLE = "streamweights: build a small model for your task, on hardware you control"
-DESCRIPTION = ("Build a small model for your task, on hardware you control. Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux.")
+DESCRIPTION = ("Build a small model for your task, on hardware you control. Bring examples of your task. Learn from a large model running on your own machine, train a small one, measure it honestly, and export it.")
 GUIDES = [
     ("Fine-tune an LLM on a Mac", "guides/finetune-llm-on-a-mac.md"),
     ("Run a 70B model on a 48 GB Mac", "guides/run-a-70b-model-on-a-48gb-mac.md"),

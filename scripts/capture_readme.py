@@ -64,6 +64,8 @@ def main():
             break
     res["ok"] = all(s["exit"] == 0 for s in res["steps"])
     Path(a.out).write_text(json.dumps(res, indent=1))
+    import shutil
+    shutil.rmtree(work, ignore_errors=True)
     sys.exit(0 if res["ok"] else 1)
 
 

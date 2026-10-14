@@ -25,6 +25,7 @@ from ..errors import SpillError
 from . import config as C
 from . import contract as K
 from . import report as R
+from . import scoring as SC
 from .common import new_id, read_json, read_jsonl, sha_file, write_json
 from .index import records, write_index
 from .runstate import make_readonly
@@ -188,6 +189,7 @@ def run_export(project: Path, run_id: str | None = None, gguf: str | None = None
         rows = [{"id": r["id"], "messages": K.messages_student(cfg, r["input"]), "max_tokens": mt}
                 for r in val]
         schema = read_json(rdir / "inputs" / cfg["contract"]["schema_file"]) if task == "json" else None
+        script = SC.script_for(cfg, rdir / "inputs")
         from .. import probe as probe_mod
         from ..runs import hardware_summary
         try:
@@ -222,17 +224,15 @@ def run_export(project: Path, run_id: str | None = None, gguf: str | None = None
                     ref = tr.get(r["id"], {}).get("text")
                     if (ref or "").strip() != ex_text.strip():
                         diffs.append({"id": r["id"], "engine_prediction": ref, "export_prediction": ex_text})
-                    items.append(K.score_class(ex_text, r["output"], cfg["contract"]["labels"])
-                                 if task == "classification" else K.score_json(ex_text, r["output"], schema))
+                    items.append(SC.score_row(cfg, schema, None, ex_text, r, script)[0])
                     golds.append(r["output"])
-                metrics = (K.agg_class(items, golds, cfg["contract"]["labels"]) if task == "classification"
-                           else K.agg_json(items, schema, golds))
-                src_items = [K.score_class(tr.get(r["id"], {}).get("text"), r["output"], cfg["contract"]["labels"])
-                             if task == "classification" else
-                             K.score_json(tr.get(r["id"], {}).get("text"), r["output"], schema) for r in val]
-                src_metrics = (K.agg_class(src_items, golds, cfg["contract"]["labels"]) if task == "classification"
-                               else K.agg_json(src_items, schema, golds))
+                metrics = SC.aggregate(cfg, items, golds, schema)
+                src_items = [SC.score_row(cfg, schema, None, tr.get(r["id"], {}).get("text"), r, script)[0]
+                             for r in val]
+                src_metrics = SC.aggregate(cfg, src_items, golds, schema)
                 mk = R.metric_key(cfg)
+                if mk == "judge_mean":            # the export check uses no judge: overlap with the reference
+                    mk = "token_f1"
                 src_p, art_p = R.primary(mk, src_metrics), R.primary(mk, metrics)
                 entry.update(prediction_differences={"count": len(diffs), "of": len(val), "rows": diffs},
                              metrics=metrics, primary=art_p,

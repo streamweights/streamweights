@@ -1,0 +1,265 @@
+prompt,answer
+"Passage: Multi-spectral camouflage is the use of counter-surveillance techniques to conceal objects from detection across several parts of the electromagnetic spectrum at the same time. While traditional military camouflage attempts to hide an object in the visible spectrum, multi-spectral camouflage also tries to simultaneously hide objects from detection methods such as infrared, radar, and millimetre-wave radar imaging.
+
+Question: Based on this article, what is a potential weakness of traditional military camouflage?","Traditional military camouflage only protects against tools which use the visual spectrum to detect objects, and so if a tool is based on infrared or radar the traditional camouflage doesn't offer any protection."
+"Passage: Final Fantasy is a Japanese science fantasy anthology media franchise created by Hironobu Sakaguchi and developed and owned by Square Enix (formerly Square). The franchise centers on a series of fantasy and science fantasy role-playing video games. The first game in the series was released in 1987, with 15 numbered main entries having been released to date.
+
+Question: Based on this paragraph about the Final Fantasy series, who created it?",Hironobu Sakaguchi
+"Passage: Jukebox is the eleventh studio album by Australian pop vocal group Human Nature released in October 2014. It contains covers from the 1950s and 1960s, with one original song, ""End of Days""
+
+Question: Does Jukebox contain many original songs?","No, it contains covers from the 1950s and 1960s, with only one original song."
+"Passage: The artificer is a playable character class in the Dungeons & Dragons (D&D) fantasy role-playing game. The Artificer first appeared as a full class in the 3.5 edition of D&D and was introduced in the Eberron campaign setting. The artificer is a unique base class that reflects many of the core themes of Eberron.
+
+Question: When did the Artificer class first appear in D&D",The Artificer first appeared as a full class in the 3.5 edition of D&D and was introduced in the Eberron campaign setting.
+"Passage: Belgrandia varica is a species of minute freshwater snail with an operculum, an aquatic gastropod mollusc or micromollusc in the family Hydrobiidae.
+
+Question: Does Belgrandia varica live in the ocean?","No, Belgrandia varica lives in freshwater."
+"Passage: There are two subgroups of austenitic stainless steel. 300 series stainless steels achieve their austenitic structure primarily by a nickel addition while 200 series stainless steels substitute manganese and nitrogen for nickel, though there is still a small nickel content.
+
+Question: Given this paragraph about stainless steel, which of the two series contains the most nickel content?",The 300 series contains the most nickel content.
+"Passage: Tamil Nadu (/ˌtæmɪl ˈnɑːduː/; Tamil: [ˈtamiɻ ˈnaːɽɯ] (listen), abbr. TN) is the southern-most state of India. The tenth largest Indian state by area and the sixth largest by population, Tamil Nadu is the home of the Tamil people, whose Tamil language—one of the longest surviving classical languages in the world—is widely spoken in the state and serves as its official language. The capital and largest city is Chennai.
+
+Question: What is the capital of Tamilnadu?",Chennai
+"Passage: The name Birkenhead probably means ""headland overgrown with birch"", from the Old English bircen meaning birch tree, of which many once grew on the headland which jutted into the river at Woodside. The name is not derived from the Birket, a stream which enters the Mersey between Birkenhead and Seacombe. The Birket is a later name which was introduced by Ordnance Survey.
+
+Question: Given this paragraph about the town of Birkenhead, what the does the name Birkenhead probably mean?","It probably means ""headland overgrown with birch""."
+"Passage: Thomas Attewell (7 November 1869 – 6 July 1937) was an English first-class cricketer. Attewell was a right-handed batsman who bowled right-arm medium pace. He was born at Keyworth, Nottinghamshire.
+
+His brother William played first-class cricket for Nottinghamshire and the Marylebone Cricket Club, as well as Test cricket for England. His cousin Walter Attewell played first-class cricket for Nottinghamshire.
+
+Question: What was the first name of Thomas Attewell's brother and cousin?",William and Walter
+"Passage: The new building opened on November 13, 2001, with a dedication ceremony held on November 17. The opening of the Fairview branch marked the first of many mixed use buildings in the county system. The library, with a floor area of 4,000 square feet (370 m2), is on the ground floor, and four apartments are on the upper floor.
+
+Question: When did the new building open?","The new building opened on November 13, 2001."
+"Passage: In the UK, the recommended daily values for magnesium are 300 mg for men and 270 mg for women. In the U.S. the Recommended Dietary Allowances (RDAs) are 400 mg for men ages 19–30 and 420 mg for older; for women 310 mg for ages 19–30 and 320 mg for older.
+
+Question: Given this reference test, what is the daily recommended amount of magnesium for men in the UK?",The daily recommended amount of magnesium for men in the UK is 300 mg.
+"Passage: Washington's death came more swiftly than expected. On his deathbed, out of fear of being entombed alive, he instructed his private secretary Tobias Lear to wait three days before his burial. According to Lear, Washington died between 10 p.m. and 11 p.m. on December 14, 1799, with Martha seated at the foot of his bed. His last words were ""'Tis well"", from his conversation with Lear about his burial. He was 67.
+
+Question: In what year did George Washington die and how old was he?",George Washington died in the year 1799 at the age of 67.
+"Passage: Following an agreement to merge the NFL with the rival American Football League (AFL), the Super Bowl was first held in 1967 to determine a champion between the best teams from the two leagues and has remained as the final game of each NFL season since the merger was completed in 1970
+
+Question: Given this paragraph about the NFL, in what year was the Super Bowl first held?",1967
+"Passage: The French Revolution (French: Révolution française [ʁevɔlysjɔ̃ fʁɑ̃sɛːz]) was a period of radical political and societal change in France that began with the Estates General of 1789 and ended with the formation of the French Consulate in November 1799.
+
+Question: When was the french revolution",The French revolution started in 1789 and ended in November 1799
+"Passage: Königsfeld is a municipality in the district of Ahrweiler, in Rhineland-Palatinate, Germany.
+
+Question: Where is Koenigsfeld","Koenigsfeld is a municipality in the district of Ahrweiler, in Rhineland-Palatinate, Germany."
+"Passage: Kirchenlamitz is a town in the district of Wunsiedel, in Bavaria, Germany. It is situated in the Fichtelgebirge, 13 km northwest of Wunsiedel and 19 km south of Hof.
+
+Question: In which country is the town of Kirchenlamitz located?",Germany
+"Passage: Rudzk Duży [ˈrut͡sk ˈduʐɨ] is a village in the administrative district of Gmina Piotrków Kujawski, within Radziejów County, Kuyavian-Pomeranian Voivodeship, in north-central Poland. It lies approximately 6 kilometres (4 mi) south-west of Piotrków Kujawski, 15 km (9 mi) south-west of Radziejów, and 59 km (37 mi) south of Toruń.
+
+Question: Which of the other locations mentioned in this article is closest to Rudzk Duży?",Piotrków Kujawski. Rudzk Duży is closest to Piotrków Kujawski.
+"Passage: The Vietnam War (also known by other names) was a conflict in Vietnam, Laos, and Cambodia from 1 November 1955 to the fall of Saigon on 30 April 1975. It was the second of the Indochina Wars and was officially fought between North Vietnam and South Vietnam
+
+Question: When did the Vietnam War Start?",The Vietnam War started on 1 November 1955
+"Passage: The euro area, commonly called eurozone (EZ), is a currency union of 20 member states of the European Union (EU) that have adopted the euro (€) as their primary currency and sole legal tender, and have thus fully implemented EMU policies.
+
+Question: How many countries in Europe do have the Euro as monetary currency?",20
+"Passage: USS Rachel Seaman was a wooden schooner purchased by the Union Navy during the American Civil War.
+
+Question: Was the USS Rachel Seaman built in the 20th century?","No, it was purchased during the American Civil War, so it was likely built in the 19th century."
+"Passage: Saint-Germain-les-Belles is a railway station in Saint-Germain-les-Belles, Nouvelle-Aquitaine, France. The station is located on the Orléans–Montauban railway line. The station is served by TER (local) services operated by SNCF.
+
+Question: Who services the Saint-Germain-les-Belles station?",Saint-Germain-les-Belles station is serviced by the TER services operated by SNCF.
+"Passage: Phrynobatrachus tokba is a species of frog in the family Phrynobatrachidae. It is found in West Africa from Ghana westward to Côte d'Ivoire, Liberia, Guinea, Sierra Leone, and Guinea-Bissau. Common names Tokba river frog, Tokba puddle frog, and—when referring to the formerly recognized Phrynobatrachus alticola, forest river frog—have been proposed for it.
+
+Question: Given a reference text about phrynobatrachus tokba, what are common names for it?","Common names for Phrynobatrachus tokba are Tokba river frog, Tokba puddle frog, and forest river frog."
+"Passage: Born in Chicago, Illinois, Brazelton initially played basketball for the Rich East High School, but transferred to the rival Rich Central High School during his senior year. He led the latter team to a championship in the Big Dipper tournament and was named as the most valuable player of the tournament.
+
+Question: What high school did Tyrone Brazelton go to?",Tyrone Brazelton attended Rich East High School and then transferred to Rich Central High School for his senior year.
+"Passage: The European Union (EU) is a political and economic union of 27 member states that are signatories to the founding treaties of the union and thereby share in the privileges and obligations of membership.
+
+Question: As of 2022, how many member states make up the European Union?",27
+"Passage: Lei, gli amici e tutto il resto (She, friends and everything else), is the fourth studio album by Italian singer-songwriter Nek. It was released in 1996, as his first studio album with Warner Music Group. It was re-released on 1 March 1997, after the success of the single ""Laura non c'è"", which had not been included in the album.
+
+Since 1999 there have been reported sales of over 2 million copies all over the world.
+
+Question: What was the hit single on Nek's 1996 Album Lei, gli amici e tutto il resto?","Laura non c'è"" was the hit single, but wasn't added until the album was released in 1997."
+"Passage: In 2003, Yang Liwei was launched aboard Shenzhou 5, becoming the first person sent into space by the Chinese space program. This achievement made China the third country to independently send humans into space.
+
+Question: Who is the first astronaut to get into space in China?","Yang Liwei, who reached space in 2003 onboard the Shenzhou 5 space ship, is the first astronaut in China to reach space."
+"Passage: Breezy Point is a city in Crow Wing County, Minnesota, United States. It is part of the Brainerd Micropolitan Statistical Area. The population was 2,346 at the 2010 census.
+
+Question: What is the population of Breezy Point city in Minnesota?","Breezy Point's population was 2,346 at the 2010 census."
+"Passage: Reid attended the University of Virginia, where she made 83 appearances and scored two goals. Her senior year, she started all 21 games, scored a golden goal at No. 2 West Virginia, and had two game-winning assists. Also in her senior year, she was named to the All-ACC second team and the ACC Women's Soccer All-Academic team.
+
+Question: Given a reference text about Megan Reid, American professional soccer player, what college did she attend and how many soccer games did she start in her senior year of college?",Reid attended the University of Virginia and during her senior year she started all 21 games.
+"Passage: The song was written by Sumney with American singer-songwriter Tom Gallo. Sumney also solely produced the track.
+
+Question: Who produced the song Polly?",The song was written and produced by American singer-songwriter Moses Sumney.
+"Passage: August (2001), is the first novel by author Gerard Woodward. It was shortlisted for Whitbread Book Award (2001).
+
+Question: Given this paragraph, who wrote ""August?""",Gerard Woodward
+"Passage: Kingdom Hearts is a fantasy action role-playing game franchise created by Japanese game designers Tetsuya Nomura and Shinji Hashimoto, being developed and published by Square Enix (originally by Square). It is a collaboration between Square Enix and The Walt Disney Company and is under the leadership of Nomura, a longtime Square Enix employee.
+
+Question: Based on this questio about Kingdom Hearts, what company published it?",Square Enix
+"Passage: A love hotel is a type of short-stay hotel found around the world operated primarily for the purpose of allowing guests privacy for sexual activities. The name originates from ""Hotel Love"" in Osaka, which was built in 1968 and had a rotating sign. Although love hotels exist all over the world, the term ""love hotel"" is often used to refer specifically to those located within Japan.
+
+Question: What is a ""love hotel""?",A love hotel is a type of short-stay hotel found around the world operated primarily for the purpose of allowing guests privacy for sexual activities.
+"Passage: A herbivore is an animal anatomically and physiologically adapted to eating plant material, for example foliage or marine algae, for the main component of its diet. As a result of their plant diet, herbivorous animals typically have mouthparts adapted to rasping or grinding. Horses and other herbivores have wide flat teeth that are adapted to grinding grass, tree bark, and other tough plant material.
+
+Question: What is a herbivore?","A herbivore is an animal anatomically and physiologically adapted to eating plant material, for example foliage or marine algae, for the main component of its diet."
+"Passage: In 2011 Kathy Ryan, director of photography for The New York Times Magazine commissioned Prager to shoot 12, 1 minute films with some film actors from that year, inspired by ""cinematic villainy"". Prager won a News and Documentary Emmy Award for New Approaches to News & Documentary Programming: Arts, Lifestyle & Culture for her Touch of Evil short films.
+
+Question: What magazine was Alex Prager the director of Photography for?",Alex Prager was the director of photography for the New York Times Magazine.
+"Passage: USS Rachel Seaman was a wooden schooner purchased by the Union Navy during the American Civil War.
+
+Question: Is the USS Rachel Seaman made of metal?","No, it is made of wood."
+"Passage: Black Oak is a community in White River Township, Washington County, Arkansas, United States. It is located between Greenland and Elkins and lies six miles southeast of Fayetteville.
+
+The community lies along the west bank of the Middle Fork of the White River. The community of Sulphur City lies on the east bank of the river approximately 1.5 mile to the southeast.
+
+Question: Where is Black Oak?","Black Oak is a community is Arkansas, United States."
+"Passage: Skiing is the use of skis to glide on snow. Variations of purpose include basic transport, a recreational activity, or a competitive winter sport. Many types of competitive skiing events are recognized by the International Olympic Committee (IOC), and the International Ski Federation (FIS).
+
+Question: what is snow skiing",skiing is a form of outdoor winter sport. Done in the mountains. You can ski on piste and off piste.
+"Passage: A Half-pistole was a Scottish gold coin minted in 1701 under the reign of King William III. Along with the Pistole it was one of last gold coin minted for the Kingdom of Scotland before the Acts of Union 1707. The Half-pistole was equal to 6 Scottish pounds with an approximate value equal to the British Half guinea.
+
+Question: According to this article, how many Scottish pounds would four Half-pistole be worth?",Four Half-pistole would be worth twenty-four (24) Scottish pounds. Each Half-pistole is 6 Scottish pounds and 6 x 4 = 24.
+"Passage: The Ford Telstar is an automobile that was sold by Ford in Asia, Australasia and Africa, comparable in size to the European Ford Sierra and the North American Ford Tempo. It was progressively replaced by the Ford Mondeo. It was named after the Telstar satellite.
+
+Question: Based on this paragraph, where was the The Ford Telstar sold?","Asia, Australasia and Africa"
+"Passage: Wakesurfing is a water sport in which a rider trails behind a boat, riding the boat's wake without being directly pulled by the boat. After getting up on the wake, typically by use of a tow rope, the wakesurfers will drop the rope, and ride the steep face below the wave's peak in a fashion reminiscent of surfing. Wakesurfers generally use special boards, designed specifically for wakes.
+
+Question: Given this paragraph about the description of wakesurfing, what is needed to generate the wave?",a boat
+"Passage: James Frederick Moriarty (May 8, 1896 – January 30, 1981) was a highly decorated officer in the United States Marine Corps with the rank of brigadier general. A veteran of World War I, he distinguished himself several times as a company officer with the 6th Machine Gun Battalion and received four awards of the Silver Star.
+
+Question: How many Silver Star awards did James Frederick Moriarty receive?",James Frederick Moriarty received four awards of the Silver Star
+"Passage: Mark Arminski is an American rock concert poster artist born in 1950 in Detroit, Michigan. He began studying art at the Oakland Community College and pursued printmaking in stone lithography at the Kalamazoo Institute of Arts. Rounding out his formal education was his stay at the Dynamic Graphics Education Foundation in Peoria, Illinois, where he studied computer generated art.
+
+Question: Given this paragraph about Mark Arminski, why was he famous and what did he study last while still at school?",Mark Arminski is an American rock concert poster artist.  He finished his formal education studying computer generated art.
+"Passage: Bon Iver (/ˌboʊn iːˈvɛər/ BOHN ee-VAIR) is an American indie folk band founded in 2006 by singer-songwriter Justin Vernon.
+
+Question: Who is the singer in Bon Iver?",Justin Vernon is the singer-songwriter in Bon Iver.
+"Passage: The Town of Pittsford (formerly part of the town of Northfield) was settled in 1789 and incorporated in 1796. The Village of Pittsford was incorporated in 1827. It was named by Colonel Caleb Hopkins, War of 1812 hero and subsequently Pittsford Town Supervisor, for the town of his birth, Pittsford, Vermont.
+
+Question: Given this paragraph about Pittsford, New York, what year was the town settled?",The town of Pittsford was settled in 1789.
+"Passage: John Henry Barrett MBE (21 July 1913 – 9 February 1999) was a pioneering conservationist, author and broadcaster, who was the first Warden at Dale Fort Field Centre in Pembrokeshire.
+
+Barrett was born in King's Lynn, Norfolk. He read Economics and Geography at Cambridge University.
+
+Question: When and where was John Barrett born?","He was born in 1913 in King's Lynn, Norfolk."
+"Passage: The Sanremo Music Festival (Italian: Festival di Sanremo [ˈfɛstival di sanˈrɛːmo, festiˈval -]), officially the Italian Song Festival (Italian: Festival della canzone italiana), is the most popular Italian song contest and awards ceremony, held annually in the city of Sanremo, Liguria
+
+Question: Which is the most popular Italian Song Festival",The Sanremo Music Festival
+"Passage: Manis Lamond (born 14 September 1966) is a retired soccer player from Papua New Guinea. An international who played as a striker, Lamond played professionally in Australia for Canberra City, Sydney United, A.P.I.A. Leichhardt Tigers, Wollongong City, Marconi Stallions and Newcastle United and in Singapore for Sembawang Rangers.
+
+Question: What position did Manis Lamond play?",Manis Lamond was a striker
+"Passage: Euxoa brevipennis is a moth of the family Noctuidae first described by Smith in 1888. In Canada, it is found in British Columbia, Alberta and Saskatchewan. In the United States, it has been recorded from Utah, Colorado and California.
+
+Question: Which family of moth does the Euxoa brevipennis belong to?",The Euxoa brevipennis moth belongs to the Noctuidae family of moths.
+"Passage: Black Bear Road is open a few months of the year, from late summer (usually the last week of July) to early fall. The road is traveled only downhill from Red Mountain Pass — except for the annual Jeeper's Jamboree in which travel is reversed for one day only. The start of the trail was formerly marked along U.S. 550 with a sign that read:
+
+Question: Can someone drive on Black Bear Road all year?","No, it is only open for a few months of the year."
+"Passage: Black Bear Road is open a few months of the year, from late summer (usually the last week of July) to early fall. The road is traveled only downhill from Red Mountain Pass — except for the annual Jeeper's Jamboree in which travel is reversed for one day only. The start of the trail was formerly marked along U.S. 550 with a sign that read:
+
+Question: Can someone drive on Black Bear Road during the winter?","No, it is only open from late summer to early fall."
+"Passage: Berwick is a borough in Columbia County, Pennsylvania, United States. It is part of Northeastern Pennsylvania and is located 28 miles (45 km) southwest of Wilkes-Barre. As of the 2020 census, Berwick had a population of 10,355. It is one of the two principal communities of the Bloomsburg–Berwick metropolitan area, which covers Columbia and Montour counties, and had a combined population of 85,562 at the 2010 census.
+
+Question: Given this paragraph about Berwick, what was its population during the most up to date census?","10,355"
+"Passage: Fyre Festival was a fraudulent luxury music festival founded by con artist Billy McFarland and rapper Ja Rule. It was created with the intent of promoting the company's Fyre app for booking music talent. The festival was scheduled to take place on April 28–30 and May 5–7, 2017, on the Bahamian island of Great Exuma.
+
+Question: Given this paragraph about Fyre Festival, would you say that it was a successful event?","No, Fyre Festival was a fraudulent luxury music festival founded by con artist Billy McFarland and rapper Ja Rule"
+"Passage: Niksar, historically known as Neocaesarea (Νεοκαισάρεια), is a city in Tokat Province, Turkey. It was settled by many empires, being once the capital city of the province. Niksar is known as ""Çukurova of North-Anatolia"" due to its production of many kinds of fruits and vegetables. On May 2, 2018, Niksar was included in the World Heritage tentative list
+
+Question: Does Niksar have a castle?","Yes, Niksar has a historic castle overlooking the old city. It is used during Roman, Byzantium and Ottoman times."
+"Passage: The Tesla Model 3 became the world's all-time best-selling electric car in early 2020, and in June 2021 became the first electric car to pass 1 million global sales. Together with other emerging automotive technologies such as autonomous driving, connected vehicles and shared mobility, electric cars form a future mobility vision called Autonomous, Connected, Electric and Shared (ACES) Mobility.
+
+Question: When was the Tesla Model 3 unit one million sold?",June 2021
+"Passage: Michel Warschawski (Mikado) (born 25 July 1949) is an Israeli anti-Zionist activist. He led the Marxist Revolutionary Communist League (previously Matzpen-Jerusalem) until its demise in the 1990s, and founded the Alternative Information Center, a joint Palestinian-Israeli non-governmental organization, in 1984.
+
+Question: Given this paragraph about Michel Warschawski, tell me the two organizations that Warschawski led during his life.","Michel Warschawski, an anti-Zionist activist, led the Marxist Revolutionary Communist League and later the Alternative Information Center."
+"Passage: Thomas Attewell (7 November 1869 – 6 July 1937) was an English first-class cricketer. Attewell was a right-handed batsman who bowled right-arm medium pace. He was born at Keyworth, Nottinghamshire.
+
+His brother William played first-class cricket for Nottinghamshire and the Marylebone Cricket Club, as well as Test cricket for England. His cousin Walter Attewell played first-class cricket for Nottinghamshire.
+
+Question: Did Thomas Attewell bat with a right or left hand?",right hand
+"Passage: Domestically, the club has won 19 League titles, eight FA Cups, a record nine League Cups and 16 FA Community Shields. In international competitions, the club has won six European Cups, three UEFA Cups, four UEFA Super Cups—all English records—and one FIFA Club World Cup.
+
+Question: How many titles have Liverpool won?","Liverpool has won 19 League titles, 8 FA cups, 9 League cups, 16 FA community shields and 6 European cups."
+"Passage: The 2018 UCI Track Cycling World Championships were the World Championships for track cycling in 2018. They took place in the Netherlands at the Omnisport Apeldoorn from 28 February to 4 March 2018.
+
+Question: Where was the 2018 UCI Track Cycling World Championships held?","The UCI Track Cycling World Championships were held in Omnisport Apeldoorn velodrome, in the Netherlands."
+"Passage: A first-degree relative (FDR) is a person's parent (father or mother), full sibling (brother or sister) or child. It constitutes a category of family members that largely overlaps with the term nuclear family, but without spouses.
+
+Question: How do the definitions of ""first-degree relative"" and ""nuclear family"" differ?",Nuclear family includes spouses while first-degree relatives are only blood related.
+"Passage: New York, often called New York City or NYC, is the most populous city in the United States. With a 2020 population of 8,804,190 distributed over 300.46 square miles (778.2 km2), New York City is the most densely populated major city in the United States and more than twice as populous as Los Angeles, the nation's second-largest city.
+
+Question: Which is the most populous city in the United States",New York
+"Passage: Veganism is the practice of abstaining from the use of animal product—particularly in diet—and an associated philosophy that rejects the commodity status of animals. An individual who follows the diet or philosophy is known as a vegan.
+
+Question: What is the definition of Vegan?",Veganism is the practice of abstaining from the use of animal product
+"Passage: USS West Gate (ID-3216) was a cargo ship for the United States Navy during World War I. The ship was laid down as SS War Agate, but she was launched in January 1918 as SS West Gate instead.
+
+Question: Given this reference text about cargo ships, when was the USS West Gate launched?",January 1918
+"Passage: Oakland population in 2022 is estimated to be 439,483
+
+Question: How many people live in the city of Oakland in 2022?","About 450,000 people live in Oakland, Ca during the last census"
+"Passage: Urodacus novaehollandiae, also known as the coastal burrowing scorpion or black sand scorpion, is a species of scorpion in the Urodacidae family. It is endemic to Australia, and was first described in 1861 by German naturaliat Wilhelm Peters.
+
+Question: Given this paragraph about a specific breed of scorpion, where can the coastal burrowing scorpion be found?","The coastal burrowing scorpion, whose scientific name is Urodacus novaehollandiae, can only be found in Australia."
+"Passage: Timothy Francis Leary (October 22, 1920 – May 31, 1996) was an American psychologist and author known for his strong advocacy of psychedelic drugs. Evaluations of Leary are polarized, ranging from bold oracle to publicity hound. He was ""a hero of American consciousness"", according to Allen Ginsberg, and Tom Robbins called him a ""brave neuronaut""
+
+Question: Who called Timothy Leary a brave neuronaut?","Tom Robbins called Timothy Leary a ""brave neuronaut""."
+"Passage: Ayahuasca[note 1] is a South American psychoactive and entheogenic brewed drink traditionally used both socially and as a ceremonial or shamanic spiritual medicine among the indigenous peoples of the Amazon basin, and more recently in North America and Europe. The tea causes altered states of consciousness often known as ""psychedelic experiences"" which include visual hallucinations and altered perceptions of reality.
+
+Question: What types of ritual use Ayahuasca?",Ayahuasca is used both socially and as a ceremonial or shamanic spiritual medicine
+"Passage: Professor Tatyana Grigorievna Nazarenko is one of the leading Russian contemporary painters who has set new directions in Russian Art and Painting starting from the 1970s. She was born in Moscow where she still lives and works.
+
+Question: Does Grigorievna Nazarenko live in Moscow?","Yes, she lives in Moscow"
+"Passage: Atlantic Hall is a private coeducational secondary school in Epe, Lagos State, Nigeria which holds about 600 students and is located about 70 kilometres from Lagos. It opened in 1989 in the Maryland area, Ikeja, Lagos State, with dormitories close to Eko Hospital Ikeja, before relocating to Poka Epe in the mid-nineties. Its landmark include Pobuna Junior and Senior High School with close proximity to Araga in Epe.
+
+Question: Given this paragraph about Atlantic Hall in Nigeria, how many students does it hold, where is located and when did it open?","Atlantic Hall can hold 600 students, is located 70 kilometers from Lagos and was opened in 1989."
+"Passage: Jens Stub (3 March 1764 – 24 October 1819) was a Norwegian priest and politician. He was vicar on the island of Veøya and served as a representative at the Norwegian Constitutional Assembly at Eidsvoll in 1814.
+
+Question: Was Jens Stub Swedish?","No, he was Norwegian."
+"Passage: The Missouri and North Arkansas (reporting mark M&NA) was a railroad in Missouri and Arkansas from 1906 to 1946.
+
+The railroad began as the Eureka Springs Railway in 1883 as a line from the St. Louis–San Francisco Railway in Seligman, MO, reaching the resort town of Eureka Springs, AR in 1883.
+
+Question: In which country did the M&NA railroad exist.","The M&NA was a railroad in Missouri and Arkansas, which made it part of the United States."
+"Passage: Hot pot or hotpot (simplified Chinese: 火锅; traditional Chinese: 火鍋; pinyin: huǒguō; lit. 'fire pot'), also known as soup-food or steamboat, is a dish whereby a heat source placed on the dining table keeps a pot of soup stock simmering, and a variety of Chinese foodstuffs and ingredients are served beside the pot for the diners to put into the hot stock.
+
+Question: Given a reference text that describes about hotpot, from which country does this dish originate?",Hot pot or Hotpot is originated from China.
+"Passage: Irina Vysheslavska was born in Kiev on February 20, 1939, into a family of great cultural traditions. Her father Leonid Vysheslavsky was a noted poet and her mother Agnes Baltaga was a writer. Several of her ancestors were priests in Greece, Romania and Ukraine.
+
+Question: When was Irina Vysheslavska born?","Irina Vysheslavska was born on February 20, 1939."
+"Passage: Lawson, Inc. (株式会社ローソン, Kabushiki gaisha Rōson) is a convenience store franchise chain in Japan. The store originated in the United States in Cuyahoga Falls, Ohio, but exists today as a Japanese company based in Shinagawa, Tokyo.
+
+Question: What is Lawson in Japan?",Lawson is a convenience store franchise chain in Japan
+"Passage: The village has a population of 1473 of which 728 are males while 745 are females as per Population Census 2011. The number of children with age 0-6 is 174 which makes up 11.81% of total population of village. Average Sex Ratio of Madaria village is 1023 which is higher than Uttar Pradesh state average of 912.
+
+Question: What is the male population in Madaria?",The male population in Madaria is 728.
+"Passage: What is the total number of goals scored by this player when he played for the Sevilla team?
+
+Question: https://en.wikipedia.org/wiki/Wissam_Ben_Yedder#Club",38
+"Passage: The Instituto de Enseñanza Secundaria Lope de Vega (IES Lope de Vega) is a public high school in Madrid, Spain. It is located in the calle de San Bernardo. It is operated by the regional administration of the Community of Madrid.
+
+Question: In which European country is this school located?",Spain
+"Passage: Dieveniškės (in Lithuanian literally: Place of gods; Polish: Dziewieniszki; Belarusian: Дзевянішкі Dzevyanishki) is a town in the Vilnius County of Lithuania, about 6 kilometres (3.7 mi) from the Belarusian border in the so-called Dieveniškės appendix. It is surrounded by the Dieveniškės Regional Park.
+
+Question: Where is Dieveniskes located","Dieveniskes, in Lithuanian literally: Place of gods is a town in the Vilnius County of Lithuania, about 6 kilometres (3.7 mi) from the Belarusian border in the so-called Dieveniskes appendix. It is surrounded by the Dieveniskes Regional Park."
+"Passage: A diploma is a document awarded by an educational institution (such as a college or university) testifying the recipient has graduated by successfully completing their courses of studies. Historically, it has also referred to a charter or official document of diplomacy.
+
+Question: What is the significance of a diploma?",A diploma testifies the recipient has graduated by successfully completing their courses of studies.
+"Passage: Luigi Fagioli is the oldest winner of a Formula One Grand Prix; he was 53 years and 22 days old when he won the 1951 French Grand Prix
+
+Question: Who is the oldest driver to win a Formula 1 race?","The oldest driver to win a Formula 1 race is the Italian named Luigi Fagioli while 53 years and 22 days old, with his only win at the 1951 France Grand Prix."
+"Passage: Massimo Bray is an academic publisher and a magazine editor. He was on the editorial board of the Italian Institute of Human Sciences until 1994. He is the cofounder of Notte della Taranta, which is among the most popular music festivals in Europe. He launched a blog on the Italian-language version of the Huffington Post.
+
+Question: Based on this paragraph about Massimo Bray, what language do you think he writes in?",Massimo Bray likely writes in Italian.
+"Passage: Jens Stub (3 March 1764 – 24 October 1819) was a Norwegian priest and politician. He was vicar on the island of Veøya and served as a representative at the Norwegian Constitutional Assembly at Eidsvoll in 1814.
+
+Question: In what month did Jens Stub die?",Jens Stub died in October.
+"Passage: Polyvinyl chloride (alternatively: poly(vinyl chloride), colloquial: polyvinyl, or simply vinyl; abbreviated: PVC) is the world's third-most widely produced synthetic polymer of plastic (after polyethylene and polypropylene). About 40 million tons of PVC are produced each year.
+
+Question: How much PVC produced each year?",Each year about 40 million tons of PVC are produced.
+"Passage: Wilcox is a Canadian drama film, directed by Denis Côté and released in 2019. Told entirely without dialogue, the film tells the story of Wilcox (Guillaume Tremblay), a mysterious drifter travelling in an apparent search for adventure. Although he does interact with other characters in the film, the dialogue taking place in the story is not heard by the audience.
+
+Question: How can the dialogue be described in this film?",There is no dialogue.
+"Passage: Sweet Tree Holdings is a Vermont, United States, company that produces maple products from a sugarbush and processing facility in Island Pond.
+
+Question: Where does this company produce its products?","Island Pond, Vermont"

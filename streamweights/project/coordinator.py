@@ -133,6 +133,13 @@ def _inputs_dir(plan: P.BuildPlan, dest: Path) -> dict:
         shutil.copyfile(p / cfg["contract"]["schema_file"], dest / cfg["contract"]["schema_file"])
     if (p / "system.txt").exists():
         shutil.copyfile(p / "system.txt", dest / "system.txt")
+    if (p / "data" / "unlabeled.jsonl").exists() and (cfg["data"] or {}).get("unlabeled"):
+        shutil.copyfile(p / "data" / "unlabeled.jsonl", dest / "unlabeled.jsonl")
+    ev = cfg["evaluation"]
+    if ev.get("scoring") == "script":
+        shutil.copyfile(p / ev["script_file"], dest / ev["script_file"])
+    if (p / "rubric.md").exists() and plan.cfg["model"].get("judge"):
+        shutil.copyfile(p / "rubric.md", dest / "rubric.md")
     ident = {"identity": plan.identity, "fields": plan.identity_fields,
              "split_sha256": plan.split_sha}
     write_json(dest / "identity.json", ident)
@@ -302,6 +309,8 @@ class Coordinator:
 
     def _verify_inputs(self, inputs: Path, plan: P.BuildPlan) -> None:
         want = {"train.jsonl": plan.split_sha["train"], "val.jsonl": plan.split_sha["val"]}
+        if "unlabeled" in plan.split_sha:
+            want["unlabeled.jsonl"] = plan.split_sha["unlabeled"]
         ident = read_json(inputs / "identity.json")
         if ident["identity"] != plan.identity:
             raise SpillError("the run's frozen inputs do not match this project's identity",

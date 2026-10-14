@@ -1,0 +1,41 @@
+{
+ "flow": "labeled",
+ "engine": "mlx",
+ "device": "Device(gpu, 0)",
+ "allowed_models": "qwen2.5:0.5b,embedding:minilm,Qwen/Qwen2.5-0.5B-Instruct",
+ "started": "2026-10-13T17:08:12-0700",
+ "steps": [
+  {
+   "command": "spill example banking77 --tiny",
+   "exit": 0,
+   "seconds": 0.1,
+   "stdout": "created banking77-tiny/ with README.md, banking77.csv, evals.jsonl, instructions.txt, spill.json, train.jsonl\n\nnext: spill build banking77-tiny\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill init banking77-tiny/banking77.csv --input text --output label --project tickets",
+   "exit": 0,
+   "seconds": 0.7,
+   "stdout": "scoring: exact (10 distinct short labels over 120 rows, 100% of rows share their label with another row)\nspill init banking77.csv: scoring exact (10 distinct short labels over 120 rows, 100% of rows share their label with another row). Train 84, validation 18, final test 18 rows. Cost: $0. Project -> tickets\n   train, validation and test were generated with seed 0; duplicate inputs and shared groups stay together\n   warning: 3 of 10 training classes have no validation rows, so their accuracy is not measured\n\nnext: spill plan tickets\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill plan tickets --engine mlx",
+   "exit": 0,
+   "seconds": 0.7,
+   "stdout": "spill plan tickets: scoring exact, models qwen2.5:0.5b (student), all-MiniLM-L6-v2 (baseline embedding), bf16 weights, no quantization, on mlx (--engine mlx). Est. 12 s plus unknown stages. Cost: $0. Run -> tickets/runs/<run id>\nmodels (each is a choice: edit streamweights.toml, or pass --student, --teacher, --judge):\n   student   qwen2.5:0.5b  Qwen/Qwen2.5-0.5B-Instruct@7ae557604adf  safetensors bf16  0.92 GB, on disk  (qwen2.5:0.5b on mlx: the smallest curated model, so a first result takes minutes on any machine; this machine's 39 GB could also train qwen2.5:1.5b or qwen2.5:7b (--student))\n   teacher   none (a teacher runs only when you name one: spill build --teacher <model>)\n   baseline  sentence-transformers/all-MiniLM-L6-v2@1110a243fdf4 + logistic regression\nengine: mlx: --engine mlx\nscoring: exact\ndownloads:\n   qwen2.5:0.5b: 0.93 GB already on disk\n   embedding:minilm: 92 MB already on disk\n   nothing to download\ndisk:\n   checkpoints 0.49 GB (5 x 106 MB, every published checkpoint is kept; deleting them is a later feature), staging 0.14 GB, adapter 35 MB\n   export (only if you run it): merged 0.92 GB, GGUF q8_0 about 0.49 GB (assumption: 0.53 x bf16); free here 43.77 GB\nstages:\n   1. embedding + logistic regression baseline: unknown [unknown] no measurement of the embedding on this machine yet (102 texts to embed)\n   2. tune qwen2.5:0.5b on 84 training rows (84 yours): 11 s [measurement] 7,050 token-passes x 6 x 0.49B params / 1.86 TFLOP/s = 11 s; rate measured by spill tune\n   3. qwen2.5:0.5b prompted, untrained, on 18 validation rows: <1 s [assumption] 18 rows, batch 512, resident: prefill 0 s (463 tokens, shared prefix once) + decode 0 s (1 x 9 passes x 0.01 s); no matching measurement yet (rate measured by spill tune)\n   4. qwen2.5:0.5b trained, on 18 validation rows: <1 s [assumption] 18 rows, batch 512, resident: prefill 0 s (375 tokens, shared prefix once) + decode 0 s (1 x 9 passes x 0.01 s); no matching measurement yet (rate measured by spill tune)\ntotal: 12 s plus unknown (baseline: no measurement on this machine yet); model loading is not included\n\nnext: spill build tickets\n",
+   "stderr_tail": ""
+  },
+  {
+   "command": "spill build tickets --engine mlx",
+   "exit": 0,
+   "seconds": 13.7,
+   "stdout": "spill build tickets: scoring exact, models qwen2.5:0.5b (student), all-MiniLM-L6-v2 (baseline embedding), bf16 weights, no quantization, on mlx (--engine mlx). Est. 12 s plus unknown stages. Cost: $0. Run -> tickets/runs/<run id>\nstage 1/4: embedding + logistic regression baseline\nstage 1 done in 2 s; accuracy 1.000 on 18 rows\nstage 2/4: tune qwen2.5:0.5b on 84 training rows (84 yours); estimate 11 s (measurement)\nstage 2 done in 8 s; 42 steps, final loss 0.001835554838180542\nstage 3/4: qwen2.5:0.5b prompted, untrained, on 18 validation rows; estimate <1 s (assumption)\nstage 3 done in 1 s; accuracy 0.333 on 18 rows\nstage 4/4: qwen2.5:0.5b trained, on 18 validation rows; estimate <1 s (assumption)\nstage 4 done in 1 s; accuracy 0.889 on 18 rows\n\nembedding baseline (MiniLM + logistic regression)  accuracy 1.000  (18 rows)\nstudent, prompted, untrained                       accuracy 0.333  (18 rows)\nstudent, trained                                   accuracy 0.889  (18 rows)\nrun run-20261013-170815-029a-66a834: tickets/runs/run-20261013-170815-029a-66a834\n\nnext: spill report tickets\n",
+   "stderr_tail": "r prompt \u00b7 2.0 GB peak\u001b[K\n\n   admission: mode=count, auto_batch=18\nrows 0/18 \u00b7 pass 1 (0.4 s) \u00b7 42.1 tok/s \u00b7 ETA 0m 06s \u00b7 bf16 \u00b7 batch 18 \u00b7 ~0.4 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\u001b[1Frows 0/18 \u00b7 pass 2 (0.0 s) \u00b7 78.5 tok/s \u00b7 ETA 0m 03s \u00b7 bf16 \u00b7 batch 18 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\u001b[1Frows 1/18 \u00b7 pass 3 (0.0 s) \u00b7 111.0 tok/s \u00b7 ETA 0m 02s \u00b7 bf16 \u00b7 batch 17 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\u001b[1Frows 10/18 \u00b7 pass 4 (0.0 s) \u00b7 136.2 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 8 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\u001b[1Frows 11/18 \u00b7 pass 5 (0.0 s) \u00b7 146.3 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 7 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\u001b[1Frows 18/18 \u00b7 pass 6 (0.0 s) \u00b7 152.9 tok/s \u00b7 ETA 0m 00s \u00b7 bf16 \u00b7 batch 0 \u00b7 ~0.0 s per token per prompt \u00b7 2.1 GB peak\u001b[K\n\n"
+  }
+ ],
+ "models_downloaded": {},
+ "models_changed": {},
+ "ok": true,
+ "finished": "2026-10-13T17:08:28-0700"
+}

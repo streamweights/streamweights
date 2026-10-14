@@ -1,0 +1,17 @@
+Attribution, license and changes
+
+The questions, passages and answers in this folder are adapted from databricks-dolly-15k
+(https://huggingface.co/datasets/databricks/databricks-dolly-15k, revision
+bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a), created by Databricks employees, released under the
+Creative Commons Attribution-ShareAlike 3.0 Unported license:
+https://creativecommons.org/licenses/by-sa/3.0/legalcode
+
+Passages are from Wikipedia, which is also licensed CC BY-SA.
+
+Changes: only the closed_qa category; rows chosen by a fixed hash of their text; passages
+longer than a limit left out (the tiny variant 420 characters, the default 900); footnote markers
+like [1] removed; each row's passage and question joined into one `prompt` column and the
+person's answer kept as `answer`. scripts/make_dolly_example.py rebuilds the files.
+
+Because the license is ShareAlike, copies and adaptations of these data files must be shared
+under CC BY-SA 3.0 as well. The rest of this repository stays under Apache-2.0.

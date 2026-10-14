@@ -182,9 +182,27 @@ def test_a_distill_file_trains_as_the_teachers_answers(tmp_path):
                  + json.dumps({"custom_id": "b", "messages": [{"role": "user", "content": "q2"}],
                                "completion": ""}) + "\n")
     assert is_distill_file(f)
-    out, n = distill_as_training(f, tmp_path / "t" / "train.jsonl")
+    out, n, info = distill_as_training(f, tmp_path / "t" / "train.jsonl")
     rows = [json.loads(l) for l in out.read_text().splitlines()]
     assert n == 1 and rows[0]["messages"][-1] == {"role": "assistant", "content": "yes"}
+    assert info == {"rows": 1, "teacher_rows": 0, "tokenizer_mismatch_rows": 0}
     plain = tmp_path / "p.jsonl"
     plain.write_text('{"prompt": "a", "answer": "b"}\n')
     assert not is_distill_file(plain)
+
+
+def test_a_distill_file_with_logprobs_carries_the_teachers_top_k_only_for_the_students_tokenizer(tmp_path):
+    from streamweights.tune.data import distill_as_training, scan_teacher
+    rec = lambda cid, sha: {"custom_id": cid, "messages": [{"role": "user", "content": "q"}],
+                            "completion": "ab", "completion_token_ids": [5, 6, 2],
+                            "teacher": {"model": "t", "tokenizer_sha256": sha},
+                            "logprobs": [{"token_id": t, "logprob": -0.1, "top": [[t, -0.1], [9, -2.5]]}
+                                         for t in (5, 6, 2)]}
+    f = tmp_path / "d.jsonl"
+    f.write_text(json.dumps(rec("a", "same")) + "\n" + json.dumps(rec("b", "other")) + "\n")
+    out, n, info = distill_as_training(f, tmp_path / "t.jsonl", "same")
+    assert n == 2 and info == {"rows": 2, "teacher_rows": 1, "tokenizer_mismatch_rows": 1}
+    rows = [json.loads(l) for l in out.read_text().splitlines()]
+    assert rows[0]["teacher"]["token_ids"] == [5, 6, 2] and rows[0]["teacher"]["top_ids"][0] == [5, 9]
+    assert rows[0]["teacher"]["top_lps"][0] == [-0.1, -2.5] and "teacher" not in rows[1]
+    assert scan_teacher(out) == {"rows": 2, "teacher_rows": 1, "tokenizers": {"same"}, "k": 2}

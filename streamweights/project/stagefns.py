@@ -17,6 +17,8 @@ from . import baseline as B
 from . import config as C
 from . import contract as K
 from . import modelid, training
+from . import judge as J
+from . import scoring as SC
 from .common import read_json, read_jsonl, sha_file, write_json, write_jsonl
 
 
@@ -118,7 +120,8 @@ def _normalize_producers(items: list[dict]) -> list[dict]:
 def run_stage(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     ctx.out_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.monotonic()
-    fn = {"baseline": _baseline, "distill": _distill, "train": _train, "eval": _eval}[desc.kind]
+    fn = {"baseline": _baseline, "distill": _distill, "train": _train, "eval": _eval,
+          "judge": _judge}[desc.kind]
     out = fn(desc, ctx)
     out.seconds = round(time.monotonic() - t0, 2)
     out.producers = _normalize_producers(out.producers)
@@ -133,11 +136,14 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
         rows = read_jsonl(Path(desc.params["training_rows"]))
         manifest = read_json(Path(desc.params["training_rows"]).with_name("training.manifest.json"))
     else:
-        answers = _teacher_answers(desc, ctx)
+        answers, fields = _teacher_answers(desc, ctx)
         rows, manifest = training.build_training(cfg, train, answers, desc.params.get(
-            "weight_own", training.DEFAULT_WEIGHT_OWN))
-    emb = modelid.embedding_identity(fetch=True)
-    res = B.run_baseline(cfg, rows, val, emb["dir"])
+            "weight_own", training.DEFAULT_WEIGHT_OWN), fields, _unlabeled(ctx))
+    if cfg["task"]["type"] == "open":
+        res = B.run_baseline_open(cfg, rows, val)
+    else:
+        emb = modelid.embedding_identity(fetch=True)
+        res = B.run_baseline(cfg, rows, val, emb["dir"])
     write_jsonl(ctx.out_dir / "predictions.jsonl",
                 [{**p, "comparator": "baseline"} for p in res["predictions"]])
     metrics = {**res["metrics"], "settings": res["settings"], "training": manifest}
@@ -145,7 +151,9 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     v = modelid.dependency_versions()
     return StageOutcome("done", metrics, [{"engine": "torch-cpu", "hardware": "cpu",
                                             "numerics": {"base": "float32"}}],
-                        notes={"conditions": {"engine": "torch-cpu", "engine_impl": "embedding+logreg",
+                        notes={"conditions": {"engine": "torch-cpu",
+                                              "engine_impl": ("tfidf-nearest-answer" if cfg["task"]["type"] == "open"
+                                                              else "embedding+logreg"),
                                               "device": "cpu", "numerics": {"base": "float32"},
                                               "weight_dtype": "float32", "adapter_dtype": None,
                                               "compute_dtype": "float32",
@@ -153,12 +161,25 @@ def _baseline(desc: StageDesc, ctx: StageContext) -> StageOutcome:
                                               "decoding_applied": None}})
 
 
-def _teacher_answers(desc: StageDesc, ctx: StageContext) -> dict | None:
+def _teacher_answers(desc: StageDesc, ctx: StageContext) -> tuple[dict | None, dict | None]:
+    """({row id: the teacher's completion}, {row id: its tokens and top-k log-probs}) from the
+    distill stage, or (None, None) without a teacher."""
     if not desc.params.get("teacher"):
-        return None
+        return None, None
+    from ..tune.data import teacher_record
     d = ctx.dep_dir("distill")
     recs = read_jsonl(d / "teacher.jsonl")
-    return {r["custom_id"]: r["completion"] for r in recs}
+    fields = {}
+    for r in recs:
+        t = teacher_record(r, (r.get("teacher") or {}).get("tokenizer_sha256"))
+        if t is not None:
+            fields[r["custom_id"]] = t
+    return {r["custom_id"]: r["completion"] for r in recs}, fields or None
+
+
+def _unlabeled(ctx: StageContext) -> list[dict] | None:
+    f = ctx.inputs_dir / "unlabeled.jsonl"
+    return read_jsonl(f) if f.exists() else None
 
 
 def _backend():
@@ -201,14 +222,17 @@ def _distill(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     training partition's inputs go in: no validation or test row reaches the teacher."""
     cfg = _config(ctx)
     train = read_jsonl(ctx.inputs_dir / "train.jsonl")
+    unl = _unlabeled(ctx) or []
     schema = _schema(ctx, cfg)
     mt = cfg["evaluation"]["max_tokens"]
     f = ctx.stage_dir / "prompts.jsonl"
-    write_jsonl(f, [{**p} for p in _prompt_rows(cfg, schema, train, "untrained", mt)])
+    asked = train + [{**u, "output": ""} for u in unl]
+    write_jsonl(f, [{**p} for p in _prompt_rows(cfg, schema, asked, "untrained", mt)])
     from .. import runtime
     runtime.ENV.state = str(ctx.stage_dir / "state")
     runtime.ENV.in_build = True
-    res = _backend().distill(desc.params["teacher"], f, ctx.out_dir / "teacher.jsonl", mt, None)
+    res = _backend().distill(desc.params["teacher"], f, ctx.out_dir / "teacher.jsonl", mt, None,
+                             desc.params.get("logprobs"))
     if res.get("interrupted"):
         return StageOutcome("interrupted", {"rows": res.get("rows")}, res.get("producers", []))
     return StageOutcome("done", {"rows": res.get("rows")}, res.get("producers", []))
@@ -220,9 +244,13 @@ def _train(desc: StageDesc, ctx: StageContext) -> StageOutcome:
     cfg = _config(ctx)
     t = cfg["training"]
     train = read_jsonl(ctx.inputs_dir / "train.jsonl")
-    answers = _teacher_answers(desc, ctx)
+    answers, fields = _teacher_answers(desc, ctx)
     rows, manifest = training.build_training(cfg, train, answers,
-                                             desc.params.get("weight_own", training.DEFAULT_WEIGHT_OWN))
+                                             desc.params.get("weight_own", training.DEFAULT_WEIGHT_OWN),
+                                             fields, _unlabeled(ctx))
+    loss = desc.params.get("distill_loss", "ce") if manifest["teacher_rows_with_logprobs"] else "ce"
+    manifest.update(distill_loss=loss, kd_temp=desc.params.get("kd_temp", 1.0),
+                    kd_alpha=desc.params.get("kd_alpha", 0.5))
     write_jsonl(ctx.out_dir / "training.rows.jsonl", rows)
     write_json(ctx.out_dir / "training.manifest.json", manifest)
     chat = ctx.stage_dir / "train.chat.jsonl"
@@ -236,7 +264,8 @@ def _train(desc: StageDesc, ctx: StageContext) -> StageOutcome:
         job, res = cli._tune_impl(
             desc.params["model"], chat, name, t["rank"], t["alpha"], t["dropout"], None, t["lr"],
             t["schedule"], t["weight_decay"], None, t["epochs"], t["micro_batch"],
-            t["grad_accum"], t["max_seq"], t["seed"], "auto", t["ckpt_every"], True, True)
+            t["grad_accum"], t["max_seq"], t["seed"], "auto", t["ckpt_every"], True, True,
+            distill_loss=loss, kd_temp=manifest["kd_temp"], kd_alpha=manifest["kd_alpha"])
     from ..cli_build import _tune_producers
     producers = _tune_producers(runtime.state_uri())
     if res["interrupted"]:
@@ -274,9 +303,9 @@ def _eval(desc: StageDesc, ctx: StageContext) -> StageOutcome:
         return StageOutcome("interrupted", {}, res.get("producers", []))
     results = {r["custom_id"]: r for r in read_jsonl(res["results_path"])}
     preds, items = [], []
-    labels = cfg["contract"].get("labels", [])
     from jsonschema import Draft202012Validator
     validator = Draft202012Validator(schema) if schema else None
+    script = SC.script_for(cfg, ctx.inputs_dir)
     trunc = 0
     for r in val:
         row = results.get(r["id"])
@@ -288,21 +317,13 @@ def _eval(desc: StageDesc, ctx: StageContext) -> StageOutcome:
             lat = (row.get("streamweights") or {}).get("latency_s")
         if finish == "length":
             trunc += 1
-        if cfg["task"]["type"] == "classification":
-            sc = K.score_class(text, r["output"], labels)
-            rec = {"pred": sc["pred"], "correct": sc["correct"], "valid": sc["valid"]}
-        else:
-            sc = K.score_json(text, r["output"], schema, validator)
-            rec = {"pred": sc["pred"], "correct": sc["record"], "parseable": sc["parseable"],
-                   "schema_valid": sc["schema_valid"], "fields": sc["fields"],
-                   "extra_fields": sc["extra"]}
+        sc, rec = SC.score_row(cfg, schema, validator, text, r, script)
         items.append(sc)
         preds.append({"id": r["id"], "gold": r["output"], "text": text, "finish_reason": finish,
                       "completion_tokens": toks, "latency_s": lat, "failed": sc["failed"],
                       **rec, "comparator": comparator})
     golds = [r["output"] for r in val]
-    metrics = (K.agg_class(items, golds, labels) if cfg["task"]["type"] == "classification"
-               else K.agg_json(items, schema, golds))
+    metrics = SC.aggregate(cfg, items, golds, schema)
     metrics["truncated"] = trunc
     metrics["view"] = view
     metrics["prompt_cached_run"] = bool(res.get("cached"))
@@ -314,3 +335,102 @@ def _eval(desc: StageDesc, ctx: StageContext) -> StageOutcome:
                         notes={"engine_run_id": res.get("run_id"), "model": model,
                                "reused": bool(res.get("cached")),
                                "conditions": executed_conditions(rr, choose_engine(runtime.ENV.engine).name)})
+
+
+def _judge(desc: StageDesc, ctx: StageContext) -> StageOutcome:
+    """The judge model assesses the comparators' outputs on the validation rows: pointwise for
+    each judged comparator, pairwise (both orders) for each pair. One batch job, one model load.
+    A comparator whose model is the judge is not judged (see judge.plan_judging)."""
+    from .. import decoding as dec_mod
+    from .. import runtime
+    cfg = _config(ctx)
+    val = read_jsonl(ctx.inputs_dir / "val.jsonl")
+    rubric, source = J.rubric_for(ctx.inputs_dir)
+    judged, pairs = desc.params["judged"], desc.params["pairs"]
+    excluded = desc.params.get("excluded", {})
+    files = desc.params.get("pred_files") or {}
+    preds = {}
+    for c in judged:
+        f = Path(files[c]) if c in files else ctx.dep_dir("baseline" if c == "baseline"
+                                                           else f"eval:{c}") / "predictions.jsonl"
+        preds[c] = {p["id"]: p for p in read_jsonl(f)}
+    body = dec_mod.request_fields({**J.DECODING}, J.MAX_TOKENS)
+    reqs = []
+
+    def add(cid, msgs):
+        reqs.append({"custom_id": cid, "method": "POST", "url": "/v1/chat/completions",
+                     "body": {"messages": msgs, **body}, "expected": "judged"})
+    text_of = lambda c, r: preds[c].get(r["id"], {}).get("text")
+    for c in judged:
+        for r in val:
+            add(f"pt:{c}:{r['id']}", J.pointwise_messages(rubric, r["input"], text_of(c, r),
+                                                          _ref(cfg, r)))
+    for x, y in pairs:
+        for r in val:
+            add(f"pw:{x}:{y}:xa:{r['id']}", J.pairwise_messages(rubric, r["input"], text_of(x, r),
+                                                                 text_of(y, r), _ref(cfg, r)))
+            add(f"pw:{x}:{y}:ya:{r['id']}", J.pairwise_messages(rubric, r["input"], text_of(y, r),
+                                                                 text_of(x, r), _ref(cfg, r)))
+    f = ctx.stage_dir / "judge.jsonl"
+    write_jsonl(f, reqs)
+    runtime.ENV.state = str(ctx.stage_dir / "state")
+    runtime.ENV.in_build = True
+    res = _backend().eval(desc.params["judge"], f)
+    if res.get("interrupted"):
+        return StageOutcome("interrupted", {}, res.get("producers", []))
+    results = {r["custom_id"]: r for r in read_jsonl(res["results_path"])}
+
+    def reply(cid):
+        row = results.get(cid)
+        if row and not row.get("error") and row.get("response"):
+            return row["response"]["body"]["choices"][0]["message"]["content"]
+        return None
+    records, point_metrics, cal_items = [], {}, []
+    for c in judged:
+        scores = []
+        for r in val:
+            raw = reply(f"pt:{c}:{r['id']}")
+            sc, why = J.parse_pointwise(raw)
+            scores.append(sc)
+            records.append({"kind": "pointwise", "comparator": c, "id": r["id"], "score": sc,
+                            "rationale": why, "judge_reply": raw, "output": text_of(c, r),
+                            "reference": _ref(cfg, r)})
+            cal_items.append({"reference": _ref(cfg, r), "output": text_of(c, r), "score": sc})
+        point_metrics[c] = J.pointwise_summary(scores)
+    pair_metrics = []
+    for x, y in pairs:
+        rows = []
+        for r in val:
+            ra, rb = reply(f"pw:{x}:{y}:xa:{r['id']}"), reply(f"pw:{x}:{y}:ya:{r['id']}")
+            (v1, w1), (v2, w2) = J.parse_pairwise(ra), J.parse_pairwise(rb)
+            m1 = J.to_models(v1, "x", "y")             # x was shown as A
+            m2 = J.to_models(v2, "y", "x")             # y was shown as A
+            verdict, dis = J.combine_orders(m1, m2)
+            rows.append({"verdict": verdict, "disagreed": dis, "picks": [v1, v2]})
+            records.append({"kind": "pairwise", "pair": [x, y], "id": r["id"], "verdict": verdict,
+                            "disagreed": dis,
+                            "orders": [{"a": x, "b": y, "picked": v1, "rationale": w1, "judge_reply": ra},
+                                       {"a": y, "b": x, "picked": v2, "rationale": w2, "judge_reply": rb}]})
+        pair_metrics.append({"pair": [x, y], **J.pairwise_summary(rows)})
+    metrics = {"judge": desc.params["judge"], "label": "one model's assessment, not accuracy",
+               "rows": len(val), "pointwise": point_metrics, "pairwise": pair_metrics,
+               "excluded": excluded, "calibration": J.calibration(cal_items),
+               "prompt_cached_run": bool(res.get("cached"))}
+    write_jsonl(ctx.out_dir / "judgments.jsonl", records)
+    write_json(ctx.out_dir / "metrics.json", metrics)
+    from ..cli_build import _row_producers
+    return StageOutcome("done", metrics, _row_producers(res["results_path"]),
+                        notes={"engine_run_id": res.get("run_id"), "model": desc.params["judge"],
+                               "reused": bool(res.get("cached")),
+                               "conditions": executed_conditions(list(results.values()),
+                                                                 choose_engine_name())})
+
+
+def choose_engine_name() -> str:
+    from .. import runtime
+    from ..engine_select import choose_engine
+    return choose_engine(runtime.ENV.engine).name
+
+
+def _ref(cfg: dict, row: dict) -> str:
+    return K.target_text(cfg, row["output"])

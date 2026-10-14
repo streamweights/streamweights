@@ -69,7 +69,7 @@ class FakeExecutor:
         out.mkdir(parents=True, exist_ok=True)
         cfg = C.parse((ctx.inputs_dir / "streamweights.toml").read_bytes())
         val = read_jsonl(ctx.inputs_dir / "val.jsonl")
-        labels = cfg["contract"]["labels"]
+        labels = cfg["contract"].get("labels", [])
         prod = [{"engine": "fake", "hardware": "cpu", "numerics": {"base": "float32"},
                  "os": "test", "host": "h", "quanta": "all"}]
         if desc.kind in ("baseline", "eval"):
