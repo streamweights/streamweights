@@ -28,3 +28,27 @@ Adapted from databricks-dolly-15k (Databricks, CC BY-SA 3.0; passages from Wikip
 CC BY-SA 3.0 permits redistribution and adaptation with attribution, and requires the same
 license on the data files: see `NOTICE.txt`. The license was read from the dataset card on the
 Hub (`license: cc-by-sa-3.0`) on 2026-10-13.
+
+## A captured result
+
+`--tiny`, 58 training, 13 validation and 13 final-test rows, student `qwen2.5:0.5b`, teacher and judge
+`qwen2.5:1.5b`, on the Apple GPU (`docs/reports/data/020-judged-mlx.json` in the repository has the
+whole run, and the same run on torch-cpu is `020-judged-torch-cpu.json`):
+
+```
+spill init dolly-qa-tiny/dolly-qa.csv --input prompt --output answer --project dolly --teacher qwen2.5:1.5b --judge qwen2.5:1.5b
+spill build dolly
+```
+
+| comparator | token F1 | judge score (1 to 5) |
+|---|---|---|
+| nearest training answer (TF-IDF, no model) | 0.108 | 2.462 |
+| student, prompted, untrained | 0.441 | 4.846 |
+| student, trained | 0.590 | 4.538 |
+| teacher | 0.459 | reference only: it is the judge |
+
+Token F1 is overlap with the reference answer, not accuracy; the judge score is one model's assessment,
+not accuracy. Judged in both orders, the trained student against the untrained one won 0, tied 11 and
+lost 2 of 13 rows, and the two orders disagreed on 8; the judge agreed with a word-for-word check on
+80% of the 15 rows whose reference has at most 5 words. These are 13 rows and a 1.5B judge: they
+show what the workflow reports, not that one model is better than another.

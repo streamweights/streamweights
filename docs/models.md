@@ -9,13 +9,21 @@ description: Models spill runs, with sizes and measured pass times: Qwen2.5 0.5B
 | tag | params | family (state) | bf16 | 8-bit | on 48 GB | disk needed |
 |---|---|---|---|---|---|---|
 | qwen2.5:0.5b | 0.5B | Qwen2/2.5 (verified) | 0.9 GB | 0.7 GB | resident | 21 GB+ |
+| qwen2.5:1.5b | 1.5B | Qwen2/2.5 (verified) | 2.9 GB | 1.5 GB | resident | 23 GB+ |
 | qwen2.5:7b | 7B | Qwen2/2.5 (verified) | 14.2 GB | 7.5 GB | resident | 34 GB+ |
 | qwen2.5:32b | 32B | Qwen2/2.5 (verified) | 61 GB | 33 GB | streamed | 81 GB+ |
 | llama3.3:70b | 70B | Llama 3.x (verified) | 131 GB | 70 GB | streamed | 151 GB+ |
 
-`qwen2.5:7b` is the default student for `spill build`; `llama3.3:70b` is the default
-teacher. Any Hugging Face repo id with a supported architecture also works
-(`spill run org/name file.jsonl`). `spill models` prints the live table for your machine.
+For a project made by `spill init`, the student defaults to `qwen2.5:0.5b` on every machine, the
+smallest curated model, so a first result takes minutes; `spill plan` states the reason for this
+machine and what else it could train. There is no default teacher and no default judge: you name one
+(`--teacher`, `--judge`), or accept the judge `spill plan` recommends for the machine
+(`--judge recommended`). Each of the three roles takes any curated tag above or any Hugging Face repo
+id with a supported architecture (`spill run org/name file.jsonl`); an unsupported architecture is
+refused in one line naming its family. The older folder workflow (`spill build <folder>`) still
+defaults to `qwen2.5:7b` and `llama3.3:70b` on Apple silicon. `spill models` prints the live table
+for your machine. Pinned revisions with every file's sha256 are in `streamweights/models.yaml`
+(`qwen2.5:0.5b` and `qwen2.5:1.5b` share one tokenizer, which is what logit distillation needs).
 
 Disk: each model needs its size plus a 20 GB floor that downloads never cross. Downloads
 check the disk before the first byte, show one line with speed and ETA, and resume after an

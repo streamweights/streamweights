@@ -56,10 +56,14 @@ One shape per file. Plain rows without a `custom_id` are numbered `row-000001`, 
 prompt plus the teacher's answer becomes a training row):
 
 ```json
-{"custom_id": "q1", "messages": [{"role": "user", "content": "..."}], "completion": "...", "completion_token_ids": [], "finish_reason": "stop", "teacher": {"model": "llama3.3:70b", "quant": "bf16", "weight_hash": "..."}, "logprobs": []}
+{"custom_id": "q1", "messages": [{"role": "user", "content": "..."}], "completion": "...", "completion_token_ids": [], "finish_reason": "stop", "teacher": {"model": "llama3.3:70b", "quant": "bf16", "weight_hash": "...", "tokenizer_sha256": "..."}, "logprobs": []}
 ```
 
 With `--score` the record has `target` and `positions` instead of `completion` and `logprobs`.
+`spill tune <student> <that file> --distill-loss kl|ce|mix [--kd-temp T] [--kd-alpha A]` trains on the
+teacher's per-token top-k when the teacher's `tokenizer_sha256` is the student's; the default is `mix` then,
+and `ce` otherwise. A teacher with another tokenizer contributes its text only, and `kl` or `mix` is refused
+in one line saying so. [Teachers and training rows](#teachers-and-training-rows) has the loss.
 
 ## Results
 
@@ -94,16 +98,19 @@ with run manifests and state) or in `~/.streamweights/adapters/<name>`.
 
 ## Project folders (`spill init`)
 
-A guided project starts from a CSV or JSONL of labeled examples and lives in one folder. The
+A guided project starts from a CSV or JSONL of examples, an input and the output you want, and lives in one folder. The
 folder is the unit: it holds the configuration, the data, the immutable history and the pointers
 to the model files it was built on. Python never needs to see it twice.
 
 ```
 tickets/
   streamweights.toml        the versioned project config
-  schema.json               JSON Schema (task json only); system.txt if you gave --system
+  schema.json               JSON Schema (json outputs only); system.txt if you gave --system
+  rubric.md                 optional: the rubric a judge scores against (see below)
+  score.py                  only with --score script:<file>: your scoring function, copied in
   data/source/<role>-<file>     your files, copied verbatim, hashed in the config
   data/{train,val,test}.jsonl   canonical rows with stable ids
+  data/unlabeled.jsonl          only with --unlabeled: prompts a teacher answers (inputs only)
   data/integrity.json           class coverage and conflicting-label report
   runs/<run id>/            a completed run: immutable
   exports/<id>/             an export record: immutable once complete
@@ -120,14 +127,14 @@ and says to upgrade; nothing is guessed. Sections:
 | section | records |
 |---|---|
 | `[project]` | name, `layout` (`project`, or `legacy-flat` for a migrated flat folder), creation time |
-| `[task]` | `type` (`classification` or `json`), the column mapping (`input`, `output`, optional `group`), optional `system` text |
-| `[contract]` | classification: `labels` and where they came from (declared, or derived from the training rows only) and the label normalization; json: `schema_file`, its sha256, where it came from, and the comparison rules |
+| `[task]` | `type` (`classification` for exact scoring, `json`, or `open` for judge scoring), the column mapping (`input`, `output`, optional `group`), optional `system` text |
+| `[contract]` | classification: `labels` and where they came from (declared, or derived from the training rows only) and the label normalization; json: `schema_file`, its sha256, where it came from, and the comparison rules; open: the note that scores are against your reference |
 | `[data]` | each source file with its sha256, the canonical files |
 | `[split]` | `mode` (`generated`, `supplied` or `mixed`), `seed`, fractions, the duplicate and group normalization, the sha256 and size of each split |
-| `[model]` | `student`, `teacher` (empty unless you asked), `engine` |
-| `[training]` | epochs, learning rate, LoRA rank and alpha, seed, micro-batch, checkpoint interval |
-| `[evaluation]` | metric and metric version, protocol version, decoding, max tokens, precision, postprocessing |
-| `[baseline]` | the embedding model, pooling, classifier settings (classification) |
+| `[model]` | `student` and `student_why` (why it is the default, or `chosen with --student`), `teacher` and `judge` (empty unless you named one; `judge = "none"` opts out of the teacher judging), `engine`. Each is a curated tag or a Hugging Face repo in a supported family |
+| `[training]` | epochs, learning rate, LoRA rank and alpha, seed, micro-batch, checkpoint interval; with a teacher: `distill_loss` (`auto`, `kl`, `ce` or `mix`), `kd_temp`, `kd_alpha`, `kd_topk` |
+| `[evaluation]` | `scoring` (`exact`, `json`, `judge` or `script`), metric and metric version, protocol version, decoding, max tokens, precision, postprocessing; with a script, `script_file` and `script_sha256` |
+| `[baseline]` | classification: the embedding model, pooling, classifier settings; open: the nearest-training-answer baseline (TF-IDF, no model) |
 
 Changing data, prompts, the schema or vocabulary, training settings, the evaluation protocol or a
 model's files makes the next build a **new run**. The engine and the machine are not part of a
@@ -146,6 +153,82 @@ set and value, arrays in order unless the schema marks them `x-unordered`. A fie
 the output is wrong, a field absent from both is right, an extra top-level field makes the record
 wrong. Unparseable, schema-invalid, failed and truncated outputs all count as wrong.
 
+### How outputs are scored
+
+`spill init` reads your outputs and states its choice, in the init line, in `spill plan` and in the
+report. `--score exact|json|judge|script:<file>` overrides it.
+
+| scoring | chosen when | what it computes |
+|---|---|---|
+| `exact` | the outputs are strings that form a small label set: at most 200 distinct values, each short, with no sentence punctuation, 80% of rows sharing their label with another row | exact match after normalization, macro-F1, and the embedding baseline |
+| `json` | every output is a JSON object | parse, schema, field-level and whole-record accuracy (metric version 2) |
+| `judge` | anything else | reference overlap against your outputs, always, labeled as overlap and never as accuracy: token F1 (bag of words), ROUGE-L (longest common word subsequence) and exact match, on words that are NFKC, casefolded runs of word characters. A judge named or accepted adds its own assessment |
+| `script:<file>` | never automatically | your Python file's `score(row) -> float`, called once per evaluation row with `{"id", "input", "gold", "text", "pred"}` (`text` is the model's raw output); the mean is `script_score` |
+
+A project made before scoring selection, with a recorded task type, maps to `exact` (classification)
+or `json` and keeps its metric versions and its protocol fingerprint, so its runs still compare with
+new runs on the same rows.
+
+### Judged evaluation
+
+A judge is one model's assessment of each output against a rubric. It is named in `[model] judge`
+(or `--judge <model>`), accepted with `--judge recommended`, or is the teacher when you named a teacher
+and no judge. Nothing is downloaded unless you name or accept it.
+
+* **Pointwise.** Each output gets an integer from 1 to 5 against the rubric and against your reference.
+  The judge replies `Rationale: ...` then `Score: n`; a reply with no score is counted as unparseable,
+  not as a number.
+* **Pairwise.** Two models' outputs on the same input are compared twice, with the two positions swapped.
+  The two verdicts are combined: the same answer twice is a win or a loss, anything else (a flip, or a tie
+  against a win) is a tie and counts as an order disagreement. The report gives the win, tie and loss rates,
+  how often the two orders disagreed, and how often the judge picked the first position.
+* **Calibration.** Where a reference is at most 5 words, the judge's score (4 or more means "judged right")
+  is compared with whether the reference appears word for word in the output; the agreement is reported.
+  It is omitted when no row qualifies.
+* **Self-judging.** A judge never scores its own outputs. A comparator whose model is the judge (the teacher
+  when the teacher judges, or the student when the student judges) is reported as reference only and left out
+  of the judged rankings, and the report says so.
+* **Records.** `runs/<id>/judgments.jsonl` has one line per judged output (`kind: pointwise`: comparator, id,
+  score, rationale, the judge's reply, the output and the reference) and one per pair and row (`kind: pairwise`:
+  both orders, each with the pick and the rationale, and the combined verdict). `spill evaluate` and
+  `spill test` judge again on their rows and write the same fields into their records.
+
+The rubric is `rubric.md` in the project if it exists, otherwise this default:
+
+```
+Score the answer from 1 to 5.
+5: fully correct and complete for the task input, and it follows any instructions given.
+4: correct, with a small omission or a small wording problem.
+3: partly correct, or correct but missing something that matters.
+2: mostly wrong or off-topic, with some relevant content.
+1: wrong, empty, or unrelated.
+When a reference answer is given, treat it as a good answer, not the only one: an answer that
+says the same thing in other words deserves the same score. Judge the content, not the style.
+```
+
+The rubric text, the judge model's identity (revision and file hashes), the two prompt templates and the
+judge's decoding are all in the evaluation-protocol fingerprint. Change any of them and `spill compare` calls
+the runs incompatible and does not rank them, naming which part differs.
+
+### Teachers and training rows
+
+With labeled examples and no teacher, the student trains on your labels alone. A teacher runs only if you
+name one or the project has unlabeled prompts (`--unlabeled <file>`: a CSV or JSONL with your input column,
+or `prompt`). Unlabeled prompts that match any training, validation or test input are removed at `init`, so
+no evaluation input can reach the teacher. Teachers answer the training partition and the unlabeled prompts
+only. Each training row keeps its origin (`own`, `teacher` or `teacher_unlabeled`); your labels are repeated
+twice for each teacher answer.
+
+When the teacher and the student share a tokenizer (the same `tokenizer.json`), the teacher also keeps its
+top-k log-probabilities at each token (`kd_topk`, default 20) and the student can learn from them:
+`kl` is the KL from the teacher's top-k distribution, with the remaining probability in one "other" bucket,
+to the student's, at temperature `kd_temp`; `ce` is cross-entropy on the teacher's tokens; `mix` is
+`kd_alpha` of the first and the rest of the second. `auto` is `mix` when the log-probs are present and the
+tokenizers match, otherwise `ce` on the teacher's text. A training line carries them as
+`"teacher": {"token_ids": [...], "top_ids": [[...]], "top_lps": [[...]], "tokenizer_sha256": "..."}`, one entry
+per teacher token; `spill tune --distill-loss kl|ce|mix` reads such files, and a `spill distill --logprobs K`
+output is converted to them when the tokenizers match.
+
 ### Rows and ids
 
 `{"id": "r-<12 hex>", "input": "...", "output": "label" or {...}, "group": "...", "source":
@@ -161,7 +244,8 @@ pair gets a `-<n>` suffix. The same example has the same id in any order.
 | `predictions/<comparator>.jsonl` | one line per validation row: gold, raw output, parsed prediction, flags, finish reason |
 | `disagreements.jsonl` | rows where a comparator and the trained student differ: `improvement` or `regression` |
 | `inputs/` | the frozen train and validation rows, config, schema and identity. The final-test rows are not copied; their sha256 is in the manifest |
-| `artifacts/` | the adapter and the training rows with their origin (`own` or `teacher`) |
+| `judgments.jsonl` | with a judge: every verdict and rationale |
+| `artifacts/` | the adapter and the training rows with their origin (`own`, `teacher` or `teacher_unlabeled`) |
 
 The run is installed read-only, and only the accepted outputs of the winning owner reach it
 (see [portability](portability.md#completion-is-a-fenced-transition)). `REPORT.md` at the project
@@ -195,8 +279,10 @@ bounded history. See [portability](portability.md).
 
 `evaluation.metric` in streamweights.toml selects the primary metric; it must be one the task
 supports (classification: `accuracy`, `macro_f1`; json: `whole_record_accuracy`,
-`mean_field_accuracy`, `schema_valid_rate`, `parseable_rate`) or the build refuses with a message
-naming the choices. Metric versions: classification 1, JSON 2. JSON version 2 changed one rule: an
+`mean_field_accuracy`, `schema_valid_rate`, `parseable_rate`; open: `token_f1`, `rouge_l`, `exact_match`,
+`judge_mean`; every task: `script_score` with a scoring script) or the build refuses with a message
+naming the choices. A judge makes `judge_mean` the primary metric of an open-ended project. Metric
+versions: classification 1, JSON 2, open 1. JSON version 2 changed one rule: an
 output that parses but fails the schema earns no credit at all (no field-level and no whole-record
 credit; trimming and number equality never rescue it) but still counts toward the parseable rate.
 Version 1 compared fields before checking validity. Runs built with different metric versions are

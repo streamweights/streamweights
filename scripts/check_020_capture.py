@@ -14,8 +14,8 @@ from pathlib import Path
 def step(cap, prefix):
     s = next((s for s in cap["steps"] if s["command"].startswith(prefix)), None)
     assert s is not None, f"no step {prefix!r}"
-    assert s["exit"] == 0, f"{prefix} exited {s['exit']}"
-    return s["stdout"]
+    assert (s["exit"] != 0) == s.get("expect_fail", False), f"{prefix} exited {s['exit']}"
+    return s["stdout"] + (s["stderr_tail"] if s.get("expect_fail") else "")
 
 
 def judged(cap):
@@ -69,7 +69,20 @@ def kd(cap):
     assert len(re.findall(r"^run-\S+  run-\S+/original", cmp, re.M)) == 2
 
 
-CHECKS = {"judged": judged, "nojudge": nojudge, "labeled": labeled, "kd": kd}
+def deadline(cap):
+    plans = [s for s in cap["steps"] if s["command"].startswith("spill plan")]
+    roomy, tight = plans[0]["stdout"], plans[1]["stdout"]
+    assert re.search(r"deadline: 30m from now .* combinations on this machine are estimated to finish", roomy)
+    assert "(recommended)" in roomy and ("[assumed]" in roomy or "[measured]" in roomy)
+    assert "to finish in time (nothing is downloaded or run to find out)" in roomy and "download" in roomy
+    assert "0 of" in tight and "nothing is estimated to fit. The closest:" in tight
+    assert "nothing was lowered to meet the deadline" in tight
+    refused = next(s for s in cap["steps"] if s["command"].startswith("!") or s.get("expect_fail"))
+    assert refused["exit"] != 0 and "the build was not started" in refused["stdout"] + refused["stderr_tail"]
+    assert not cap["models_downloaded"] and not cap["models_changed"]
+
+
+CHECKS = {"deadline": deadline, "judged": judged, "nojudge": nojudge, "labeled": labeled, "kd": kd}
 
 
 def check(path) -> str:

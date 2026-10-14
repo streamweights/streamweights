@@ -2,11 +2,21 @@
 description: The streamweights technical plan: the loop, the developer-experience rules, the components, what is done and what comes next.
 ---
 
-streamweights: technical plan (v4)
+streamweights: technical plan (v5)
 
 Repo and package: streamweights. Command: spill. Local by default.
 
-v4 changes the front door. v3 made the loop (run, distill, tune, eval) the product. After Phase 3.5 the loop is one command over a folder of files, `spill build`, and the product reads as: a 70B model doesn't fit on your laptop, build your own model from it anyway. The wedge (run the unmodified full-size model over an eval set) is still the engine under it and is still a command on its own.
+## Vision
+
+streamweights is a developer tool for building your own model for your own task, learning from large models, on hardware you have. (The same statement, with the direction, is [VISION.md](https://github.com/streamweights/streamweights/blob/main/VISION.md).)
+
+* **One kind of project.** Examples of an input and the output you want. Labeling, extraction and open-ended answers are the same workflow; how outputs are scored is chosen from the outputs and stated.
+* **Large models are first-class**, as teachers and as judges, even when they are bigger than the machine. Both are optional, and neither is downloaded unless you name it or accept a stated recommendation.
+* **Honest evaluation.** The eval set is the central artifact; splits, leakage rules, the reserved final test and protocol fingerprints stay. A judged score is one model's assessment, never accuracy.
+* **Portable pieces.** A job is a sequence of small checkpointed quanta that can continue on another machine.
+* **The direction** is deadline-driven execution on whatever capacity meets the deadline, starting with the developer's own machines and accounts. The first step, planning against a deadline locally, exists; remote execution does not.
+
+v5 restores that after v4 narrowed the front door to two task types and a student-only default. v4 had made the loop (run, distill, tune, eval) one command over a folder of files, `spill build`; v5 keeps all of that and puts the large teacher and the judge back at the center. The wedge (run the unmodified full-size model over an eval set) is still the engine under it and is still a command on its own.
 
 1. The wedge, and the loop it starts
 
@@ -21,7 +31,7 @@ distill the teacher's completions with top-k log-probs, or its log-probs over su
 tune    train a LoRA adapter on that data against the full-precision base
 eval    the same eval set through several models, one table, reproducible from a manifest
 export  merge an adapter into its base and ship it: safetensors, GGUF, Ollama
-build   all of it from a folder: evals.jsonl, train.jsonl and/or prompts.jsonl
+build   all of it from a folder: evals.jsonl, train.jsonl and/or prompts.jsonl, or from a project made by spill init
 
 The eval set is the central artifact: it is what you measure a base against, what you distill from, and what decides whether a tuned adapter is better. Every command is a run against it, every run writes a manifest, and a number in a table can always be traced to the exact weights, adapter and input that produced it.
 
@@ -51,7 +61,7 @@ Local-resident    Developer machine or cloud box    MLX resident or PyTorch resi
 Burst (parked)    Developer's own cloud account    vLLM    Interactive    Paid    Not on the roadmap
 
 4. Components
-CLI (spill init | plan | build | report | compare | test | bundle | move | example | run | distill | tune | eval | export | check | doctor | runs | adapters | tail | resume | status | models): the primary interface.
+CLI (spill init | plan | build | report | compare | evaluate | test | bundle | move | example | run | distill | tune | eval | export | check | doctor | runs | adapters | tail | resume | status | models): the primary interface.
 Build: the stage planner and runner over a folder; per-role prompts (the untrained models get instructions.txt, the tuned student never does); resumable state in the folder.
 Job engine: OpenAI-batch-compatible; JSONL in, streamed results JSONL, progress, ETA, per-row checkpoint, resumable. Batch size from the memory budget (KV-bound, admission by measured memory). Shared-prefix reuse: the prefix every row shares is computed once and attended to by all.
 Tuner: LoRA against the full-precision base, resident on models that fit and streamed (two weight streams per step) on models that do not.
@@ -76,14 +86,18 @@ Build anywhere (complete): `spill build` runs through the engine interface on ML
 
 One complete workflow (complete): bring your examples, build a model, understand the result, export it, and continue the same work on another machine. `spill init` (CSV or JSONL, classification or JSON extraction, a frozen task contract, leakage-aware splits), `spill plan`, `spill build` (a small student through supervised LoRA; a teacher only on request, sequence-level), `spill report`, `spill compare`, `spill test` (the only scorer of the final test, one record per use), `spill export` (verified in llama.cpp and Transformers before the record is finalized), `spill bundle`, `spill move` and `spill resume <uri>` (a fenced handoff of one authoritative control object per run, on local disk with flock and on S3 with conditional writes). Runs, exports and tests are immutable records; stages are serializable descriptions run by a local executor or a separate process. Measured in docs/reports/015-workflow.md. Untested: real AWS S3, CUDA, network filesystems, power loss, Windows.
 
-Deferred, each a separate future assignment: KL or logit distillation losses; expanded quantization support; teacher-quantization sweeps; generic free-text quality evaluation; new model families; garbage collection of orphaned payloads and checkpoints; remote execution services; cloud provisioning, scheduling and multi-cloud orchestration; automatic cost optimization; row-level resume inside a stopped eval or distill stage; warm-starting a new run from a parent run's adapter.
+Restore the vision (complete, directive 020): any task, a large teacher at the center, and honest evaluation of open-ended output. `spill init` takes any input and output columns; the scoring method (`exact`, `json`, `judge` or a `script:<file>` override) is chosen from the outputs and stated in `spill plan` and the report, and a project made before it keeps its method and its protocol fingerprint. Open-ended output is always scored by overlap with your reference, labeled as overlap, and by a judge when you name or accept one: pointwise 1 to 5 against a rubric, and pairwise in both orders with the order disagreements reported, a calibration figure against exact match where one exists, the judge's identity, rubric, prompts and decoding in the protocol fingerprint, and a judge never scoring its own outputs. With labels and no `--teacher` the build has no teacher stage and loads no model beyond the student and the embedding baseline; a teacher, or unlabeled prompts, adds one. Logit distillation is back: `--distill-loss kl|ce|mix` on MLX and PyTorch, resident and streamed, checked against a float64 reference. Student, teacher and judge each take a curated tag or a Hugging Face repo, are recorded in streamweights.toml and shown by `spill plan`; an unsupported architecture is refused in one line naming its family. `spill example dolly-qa` is an open-ended sample on a CC BY-SA dataset. `spill plan --deadline` lists which combinations of models and engine on this machine are estimated to fit, each labeled measured or assumed, and downloads nothing. Measured on qwen2.5:0.5b with a qwen2.5:1.5b teacher and judge on MLX (Metal) and torch-cpu in docs/reports/020-restore-vision.md.
+
+Deferred, each a separate future assignment: expanded quantization support; teacher-quantization sweeps; new model families; garbage collection of orphaned payloads and checkpoints; remote execution services; cloud provisioning, scheduling and multi-cloud orchestration; automatic cost optimization; row-level resume inside a stopped eval or distill stage; warm-starting a new run from a parent run's adapter.
 
 Next, in this order:
 
-1. The verification batch: the full banking77 proof run on the 70B teacher and 7B student on the Mac (with docs/img/paths.svg drawn from its measured times); the CUDA gates on a real GPU (`docker run --gpus all ghcr.io/streamweights/spill:cuda python -m streamweights.verify_cuda`, plus the tiny build with `--engine torch-cuda`), and with them a streamed run of a model bigger than RAM on the torch engines; a cross-cloud resume demo (start a tune on one cloud's spot GPU, finish it on another's, from one bucket). Gate for the proof run: a stranger following only the README.
-2. PyPI release and launch, after the verification batch: publish `streamweights`, switch the install lines to `pip install streamweights`, tag 0.1.0.
-3. Phase 6, vision-language models. Qwen2.5-VL first: the vision tower stays resident (it is small and runs once per image), the decoder streams as today. A public document-image example ships with it, in the same folder shape as banking77. Gate: streamed output identical to resident execution on 20 prompts with images.
-4. Phase 7, mixture-of-experts: Mixtral, Qwen MoE, DeepSeek. Route a batch, group tokens by expert, read only the experts the batch needs per layer. Gate: one MoE family verified.
+1. The scale proof: a 7B student with a 70B teacher and a 70B judge, overnight, on the Mac, through the same `spill init`, `plan`, `build`, `report`, `export` commands (with docs/img/paths.svg drawn from its measured times). Directive 020 ran only the 0.5B and 1.5B models; every 7B and 70B number in these docs is from earlier phases or from the cost model, labeled as such. Gate: a stranger following only the README.
+2. CUDA verification: the CUDA gates on a real GPU (`docker run --gpus all ghcr.io/streamweights/spill:cuda python -m streamweights.verify_cuda`, plus the tiny build with `--engine torch-cuda`), and with them a streamed run of a model bigger than RAM on the torch engines.
+3. Deadline-driven execution across machines: from planning against a deadline on this machine to running on whatever capacity meets it, starting with the developer's own machines and accounts (a cross-cloud resume demo: start a tune on one cloud's spot GPU, finish it on another's, from one bucket). Remote execution, provisioning and scheduling are all still unbuilt.
+4. PyPI release and launch, after the scale proof: publish `streamweights`, switch the install lines to `pip install streamweights`, tag 0.1.0.
+5. Phase 6, vision-language models. Qwen2.5-VL first: the vision tower stays resident (it is small and runs once per image), the decoder streams as today. A public document-image example ships with it, in the same folder shape as banking77. Gate: streamed output identical to resident execution on 20 prompts with images.
+6. Phase 7, mixture-of-experts: Mixtral, Qwen MoE, DeepSeek. Route a batch, group tokens by expert, read only the experts the batch needs per layer. Gate: one MoE family verified.
 
 Also open: batched prefill GEMMs. Prefill is one sequence at a time inside each layer; batching rows into one GEMM per layer raises the achieved FLOP/s that every estimate divides by, and shortens teacher stages.
 
@@ -102,4 +116,4 @@ Python 3.10 or newer (developed on 3.12), uv, FastAPI, Typer. MLX and mlx-lm on 
 
 ## Status and roadmap (moved from the README)
 
-Done: run, distill (sequence-level), tune, eval, build and export on Apple silicon and PyTorch; the guided project workflow (see the [README](https://github.com/streamweights/streamweights#readme)) with immutable runs, evaluation and final-test records, verified exports, bundles and fenced handoff; portable jobs, headless mode, containers and scheduler examples ([examples/schedulers](https://github.com/streamweights/streamweights/tree/main/examples/schedulers)). Open: the CUDA gates on a real GPU, real AWS S3, a larger representative evaluation than the 120-row examples, the 70B and 7B proof run (its banking77 table arrives with the full proof run), then a release. Deferred to separate assignments: logit or KL distillation, more quantization, free-text quality evaluation, garbage collection of orphaned payloads, remote execution services (this page). Reports are in [reports](reports/index.md); guides at https://streamweights.github.io/streamweights/. Feedback: [Discussions](https://github.com/streamweights/streamweights/discussions) or an issue, with `spill doctor` output for hardware reports.
+Done: run, distill (sequence-level and logit), tune, eval, build and export on Apple silicon and PyTorch; the guided project workflow (see the [README](https://github.com/streamweights/streamweights#readme)) for any input and output, with a large teacher and a judge as options, immutable runs, evaluation and final-test records, verified exports, bundles and fenced handoff; deadline planning on this machine; portable jobs, headless mode, containers and scheduler examples ([examples/schedulers](https://github.com/streamweights/streamweights/tree/main/examples/schedulers)). Open, in order: the scale proof (7B student, 70B teacher and judge, overnight), the CUDA gates on a real GPU, deadline-driven execution across machines, real AWS S3, a larger representative evaluation than the 120-row and 84-row examples, then a release. Deferred to separate assignments: more quantization, garbage collection of orphaned payloads, remote execution services (this page). Reports are in [reports](reports/index.md); guides at https://streamweights.github.io/streamweights/. Feedback: [Discussions](https://github.com/streamweights/streamweights/discussions) or an issue, with `spill doctor` output for hardware reports.

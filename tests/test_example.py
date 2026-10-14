@@ -84,3 +84,29 @@ def test_cli_example(tmp_path, monkeypatch):
     assert r.exit_code == 0 and "next: spill build banking77-quick" in r.output
     r = CliRunner().invoke(app, ["example", "banking77", "--quick"])
     assert r.exit_code == 1 and "already exists" in r.output
+
+
+def test_dolly_qa_is_an_open_ended_example_with_a_recorded_license(tmp_path):
+    import csv
+    from streamweights.project.init import create_project
+    src = Path(E.DATA) / "dolly-qa"
+    notice = (src / "NOTICE.txt").read_text()
+    assert "CC BY-SA" in notice or "Attribution-ShareAlike 3.0" in notice
+    assert "bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a" in notice and "creativecommons.org/licenses/by-sa/3.0" in notice
+    assert "cc-by-sa-3.0" in (src / "README.md").read_text() and "A captured result" in (src / "README.md").read_text()
+    for variant, n in (("tiny", 84), ("", 359)):
+        d = src / variant if variant else src
+        rows = list(csv.DictReader(open(d / "dolly-qa.csv", newline="")))
+        assert len(rows) == n and set(rows[0]) == {"prompt", "answer"}
+        assert len({r["prompt"] for r in rows}) == n, "every input is unique"
+        short = sum(len(r["answer"].split()) <= 5 for r in rows)
+        assert short >= n // 5, "some answers are short enough for a word-for-word check"
+    f = E.create("dolly-qa", False, tmp_path, False, True)
+    assert f.name == "dolly-qa-tiny" and sorted(p.name for p in f.iterdir()) == ["NOTICE.txt", "README.md", "dolly-qa.csv"]
+    res = create_project(f / "dolly-qa.csv", tmp_path / "p", {"input": "prompt", "output": "answer"})
+    assert res.task == "judge" and res.sizes == {"train": 58, "val": 13, "test": 13}
+    full = E.create("dolly-qa", False, tmp_path, False, False)
+    assert full.name == "dolly-qa"
+    with pytest.raises(SpillError) as e:
+        E.create("dolly-qa", True, tmp_path / "x")
+    assert "two sizes" in e.value.line()

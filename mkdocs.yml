@@ -1,6 +1,6 @@
 site_name: streamweights
 site_description: >-
-  Build a small model for your task, on hardware you control. Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux.
+  Build a small model for your task, on hardware you control. Bring examples of your task. Learn from a large model running on your own machine, train a small one, measure it honestly, and export it.
 site_url: https://streamweights.github.io/streamweights/
 repo_url: https://github.com/streamweights/streamweights
 repo_name: streamweights/streamweights
@@ -55,6 +55,7 @@ nav:
       - Scorer and protocol: reports/017-scorer-and-protocol.md
       - Export diagnosis: reports/017-export-diagnosis.md
       - README pass: reports/018-readme-pass.md
+      - Restore the vision: reports/020-restore-vision.md
   - Reference:
       - Commands: cli.md
       - Formats: formats.md

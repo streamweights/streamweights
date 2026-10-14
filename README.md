@@ -2,16 +2,17 @@
 
 **Build a small model for your task, on hardware you control.**
 
-Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux.
+Bring examples of your task. Learn from a large model running on your own machine, train a small one, measure it honestly, and export it.
 
 ## What it does
 
-streamweights (command: `spill`) turns examples you already have into a small model that does one job. Two jobs are supported:
+streamweights (command: `spill`) turns examples of an input and the output you want into a small model of your own. Any task of that shape works:
 
-- **Text classification.** Route support tickets: "Can I change my PIN at any ATM?" becomes `change_pin`.
-- **Structured JSON extraction.** Pull fields out of text: "Order A-1655: please replace my wool blanket" becomes `{"order_id": "A-1655", "action": "replace", "product": "wool blanket"}`.
+- **Labeling.** Route support tickets: "Can I change my PIN at any ATM?" becomes `change_pin`.
+- **Extraction.** Pull fields out of text: "Order A-1655: please replace my wool blanket" becomes `{"order_id": "A-1655", "action": "replace", "product": "wool blanket"}`.
+- **Open-ended answers.** Read a passage and a question, and answer in your own words.
 
-It also scores your model against simpler approaches on examples it never saw, so you can tell whether it was worth building. Data stays local by default; remote storage is used when explicitly configured.
+It scores your model against simpler approaches on examples it never saw, so you can tell whether it was worth building: by exact match for labels, field by field for JSON, and for open-ended answers by overlap with your reference and by a judge you name. A large model can teach the small one and judge its answers, on your own machine, even when it is bigger than your memory; both are optional. Data stays local by default; remote storage is used when explicitly configured.
 
 ## Try it
 
@@ -19,7 +20,7 @@ It also scores your model against simpler approaches on examples it never saw, s
 
 **Disk.** Models are 0.93 GB and 92 MB; a run and an export write about 1.6 GB. Downloads also keep a 20 GB free-space reserve (`SPILL_MIN_FREE_GB`), so the example needs about 23 GB free. Lower the reserve with `SPILL_MIN_FREE_GB=2`; the risk is a nearly full disk. `spill plan` prints exact figures first.
 
-**Time.** Installing and downloading depend on your connection and are not training time. With the models on disk, the build below took 15 s on an M4 Pro.
+**Time.** Installing and downloading depend on your connection and are not training time. With the models on disk, the build below took 13 s on an M4 Pro.
 
 ```
 # setup
@@ -34,7 +35,7 @@ spill build tickets
 ```
 stage 1/4: embedding + logistic regression baseline
 ...
-stage 2/4: tune qwen2.5:0.5b on 84 training rows; estimate 13 s (measurement)
+stage 2/4: tune qwen2.5:0.5b on 84 training rows (84 yours); estimate 11 s (measurement)
 ...
 ```
 ```
@@ -48,21 +49,21 @@ python tickets/exports/*/run_safetensors.py "Can I change my PIN at any ATM?"
 change_pin
 ```
 
-Excerpts are verbatim from a real Apple GPU run with `SPILL_MIN_FREE_GB=2`, not the default ([full capture](docs/reports/data/018-readme-capture.json)). Scores are below.
+Excerpts are verbatim from a real Apple GPU run with `SPILL_MIN_FREE_GB=2`, not the default ([full capture](docs/reports/data/020-readme-capture.json)). Scores are below.
 
 **Inspect.** `spill plan tickets` states models, downloads, disk and time per stage, loading nothing:
 
 ```
    qwen2.5:0.5b: 0.93 GB already on disk
    embedding:minilm: 92 MB already on disk
-total: 13 s plus unknown (baseline: no measurement on this machine yet); model loading is not included
+total: 12 s plus unknown (baseline: no measurement on this machine yet); model loading is not included
 ```
 
 `spill report tickets` prints the full report of the run, shown next. The [guide](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md) explains each command.
 
 ## Use your own data
 
-**The example is over. From here you bring your own file.** Put your examples in a CSV with a header row. These two snippets show the shape only; a usable file needs many more rows (the bundled example has 120).
+**The example is over. From here you bring your own file.** Put your examples in a CSV with a header row. These snippets show the shape only; a usable file needs many more rows (the bundled example has 120).
 
 Classification, `my-tickets.csv`, columns `text,label`:
 
@@ -94,6 +95,15 @@ text,json
 }
 ```
 
+Open-ended answers, `answers.csv`, columns `prompt,answer`. The output is any text:
+
+```
+prompt,answer
+"Passage: Final Fantasy is a Japanese science fantasy franchise created by Hironobu Sakaguchi. Question: Who created it?",Hironobu Sakaguchi
+```
+
+**How outputs are scored is chosen from your outputs, and `init`, `plan` and the report say which.** JSON objects are scored field by field, a small label set (at most 200 distinct values) by exact match, and anything else as open-ended: by overlap with your reference, never called accuracy, and by a judge if you name one (`--judge <model>`) or accept the one `spill plan` recommends. Without a judge it still builds, and `plan` shows the recommended judge, its download size and judging time, and downloads nothing. `--score exact|json|judge|script:<file>` overrides the choice. **With your own labeled examples no teacher is needed.**
+
 Point `spill init` at your columns, then build, export and ask exactly as above:
 
 ```
@@ -110,8 +120,14 @@ spill build orders
 spill export orders
 python orders/exports/*/run_safetensors.py "Order B-2201: cancel the glass vase"
 ```
+```
+# open-ended answers, judged by a model you name
+spill init answers.csv --input prompt --output answer --project answers
+spill plan answers
+spill build answers --judge qwen2.5:1.5b
+```
 
-`init` checks every row and names the file, row, problem and fix. More on the format: [CSV guide](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#your-own-data-in-detail), [formats](docs/formats.md); bundled examples: [sample projects](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#sample-projects).
+`init` checks every row and names the file, row, problem and fix. More on the format: [CSV guide](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#your-own-data-in-detail), [formats](docs/formats.md); bundled examples, including an open-ended one: [sample projects](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#sample-projects).
 
 ## Understand the result
 
@@ -130,6 +146,22 @@ The embedding baseline (MiniLM + logistic regression) scored 0.111 higher than t
 
 The simple baseline won here, which is the point: the tool helps you discover whether fine-tuning beats a simpler approach before you rely on it. The `verified` line on the export is not a quality claim; [how to check an exported model's quality](docs/reports/017-export-diagnosis.md).
 
+## Large teacher and judge
+
+Both are optional, and each is a model you name. **A teacher** answers your training prompts, and the student learns from its answers and, when the two share a tokenizer, from its probabilities (`--teacher`, `--distill-loss`; [when it is worth it](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#when-a-teacher-is-useful)). It is worth it for prompts without answers, or a model much better at your task than one you can run; with labeled examples none runs unless you ask. **A judge** scores open-ended output from 1 to 5 against a rubric (`rubric.md`, or the [default](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#open-ended-output-and-judges)) and compares two models in both orders. Its scores are one model's assessment, never accuracy, and it never scores its own outputs. Either may be bigger than your memory and is read from disk ([Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB MacBook Pro.](docs/reports/002-phase1.md)). Nothing is downloaded unless you name it or accept the model `spill plan` recommends.
+
+A real result: `spill example dolly-qa --tiny`, `qwen2.5:1.5b` as teacher and judge, `qwen2.5:0.5b` as the student, Apple GPU, 13 validation rows ([capture](docs/reports/data/020-judged-mlx.json), [report 020](docs/reports/020-restore-vision.md)):
+
+```
+nearest training answer (TF-IDF, no model)  judge score 1-5 (one model's assessment, not accuracy) 2.462  (13 rows)
+student, prompted, untrained                judge score 1-5 (one model's assessment, not accuracy) 4.846  (13 rows)
+student, trained                            judge score 1-5 (one model's assessment, not accuracy) 4.538  (13 rows)
+teacher                                     judge score 1-5 (one model's assessment, not accuracy) reference only, judge is the same model  (13 rows)
+  trained vs untrained, both orders: trained won 0, tied 11, lost 2 of 13 rows; the two orders disagreed on 8 (62%); a disagreement counts as a tie.
+```
+
+The judge preferred the untrained student while overlap with the references favored the trained one, and it disagreed with itself across the two orders on 8 of 13 rows: a small judge is a rough instrument.
+
 ## Go further
 
 - **Continue an interrupted training run on another supported machine.** Stop a build on one Mac or Linux machine and finish it on another, on either engine: [step-by-step walkthrough](docs/portability.md#continuing-on-another-machine-step-by-step). A build started on one OS and finished on the other is checked on every push.
@@ -137,7 +169,7 @@ The simple baseline won here, which is the point: the tool helps you discover wh
   [![Relay workflow status: a build started on one OS and finished on the other, every push](https://github.com/streamweights/streamweights/actions/workflows/relay.yml/badge.svg)](https://github.com/streamweights/streamweights/actions/workflows/relay.yml)
 - **JSON extraction.** `spill example snips --tiny` is a runnable text-to-JSON project ([guide](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#sample-projects)).
 - **Offline bundles.** `spill bundle` packs a project and its models for machines with no network ([portability](docs/portability.md#a-portable-project-and-an-offline-bundle)).
-- **Large teachers.** A teacher bigger than your memory can be read from disk, optionally ([guide](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#when-a-teacher-is-useful), [Measured: Llama 3.3 70B, 141 GB unquantized, run on a 48 GB MacBook Pro.](docs/reports/002-phase1.md)).
+- **Also.** `spill example dolly-qa --tiny` (open-ended answers), `--distill-loss kl|ce|mix` (a teacher's per-token probabilities), and `spill plan --deadline 2h`, which lists the combinations of models and engine on this machine estimated to finish in time and downloads nothing ([guide](docs/guides/turn-a-csv-of-examples-into-an-evaluated-model.md#deadlines)).
 
 ## Support and limitations
 
@@ -148,6 +180,6 @@ The simple baseline won here, which is the point: the tool helps you discover wh
 | NVIDIA CUDA | built, untested ([docs/linux.md](docs/linux.md), [issue #1](https://github.com/streamweights/streamweights/issues/1)) |
 | Windows, network filesystems | untested |
 
-Limitations: validation so far is on small models and 120-row examples; CUDA is untested; an exported model can differ in quality from the trained one.
+Limitations: validation so far is on small models (0.5B and 1.5B) and examples of 84 to 120 rows; a small judge is a rough instrument; CUDA is untested; an exported model can differ in quality from the trained one.
 
 Documentation: [docs site](https://streamweights.github.io/streamweights/), [evidence by platform](docs/linux.md#evidence-by-platform), [architecture](docs/architecture.md), [prior art](docs/prior-art.md) (AirLLM, slowllama, Unsloth, FlexGen, DeepSpeed), [plan and status](docs/plan.md), [reports](docs/reports/index.md). Feedback: [Discussions](https://github.com/streamweights/streamweights/discussions) or an issue, with `spill doctor` output for hardware reports. Apache-2.0.

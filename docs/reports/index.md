@@ -25,3 +25,4 @@ Every number in the README and the guides comes from one of these reports, measu
 | [017 Scorer and protocol](017-scorer-and-protocol.md) | JSON scorer version 2, historical JSON accounting, decoding settings applied, evaluation records, compare outcomes, replication |
 | [017 Export diagnosis](017-export-diagnosis.md) | controlled merge, runtime and quantization comparison for JSON and classification exports; the merge-dtype default |
 | [018 README pass](018-readme-pass.md) | README counts before and after, the real MLX capture, and where each moved block lives |
+| [020 Restore the vision](020-restore-vision.md) | any task as one kind of project, a 1.5B teacher and judge on MLX and torch-cpu, judged evaluation with its calibration and its failures, logit distillation, deadline planning |

@@ -194,6 +194,37 @@ action = "shell"
 expect = "json"
 reason = "the JSON answer must parse and carry the schema's required keys"
 
+# ---- open-ended answers: the README's answers.csv fixture, a judge replaced by `none` (only the 0.5B may load here)
+[[rule]]
+pattern = 'spill init answers\.csv --input prompt --output answer --project answers'
+action = "run"
+[[rule]]
+pattern = 'spill plan answers'
+action = "run"
+[[rule]]
+pattern = 'spill build answers --judge qwen2\.5:1\.5b'
+action = "substitute"
+sub = {"--judge qwen2.5:1.5b" = "--judge none"}
+reason = "the judge is a 1.5B model, outside this harness's allow-list; `--judge none` runs the same build with reference overlap only. The 1.5B build is the vision-gate job (scripts/capture_020.py)"
+[[rule]]
+pattern = 'spill example dolly-qa --tiny'
+action = "run"
+[[rule]]
+pattern = 'spill example dolly-qa'
+action = "run"
+[[rule]]
+pattern = 'spill plan tickets --deadline 2h'
+action = "run"
+reason = "plan loads and downloads nothing; the deadline lists combinations from the registry"
+[[rule]]
+pattern = 'spill (plan|build) (<project> )?--deadline 2h|spill plan --deadline 2h'
+action = "reference"
+reason = "a command or flag named in prose; the deadline planner is exercised by tests/test_deadline.py and the run above"
+[[rule]]
+pattern = 'spill distill --logprobs K|spill tune --distill-loss kl\|ce\|mix|spill tune <student> <that file> --distill-loss kl\|ce\|mix \[--kd-temp T\] \[--kd-alpha A\]'
+action = "reference"
+reason = "a flag or usage synopsis named in prose; the losses are exercised by tests/test_kd.py and tests/test_kd_mlx.py"
+
 # ---- the older folder workflow, larger models replaced by explicit tiny equivalents
 [[rule]]
 pattern = 'spill example banking77 --quick && spill build banking77-quick'

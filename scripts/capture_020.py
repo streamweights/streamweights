@@ -15,6 +15,8 @@ Flows
   labeled   a labeled classification project with no teacher: no teacher stage; SPILL_ALLOWED_MODELS
             lets only the student and the embedding baseline through
   kd        the same teacher and student trained with --distill-loss ce and with mix, compared
+  deadline  spill plan --deadline with room to spare and with none, and a build that refuses to start
+            (a step starting with "!" is expected to fail)
 
 With --engine mlx the script fails unless MLX's default device is the GPU (Metal). With
 --engine torch-cpu it forces the PyTorch CPU engine. Model downloads are detected by listing the
@@ -58,6 +60,14 @@ FLOWS = {
          "--project", "tickets"],
         ["spill", "plan", "tickets"],
         ["spill", "build", "tickets"],
+    ],
+    "deadline": [
+        ["spill", "example", "dolly-qa", "--tiny"],
+        ["spill", "init", "dolly-qa-tiny/dolly-qa.csv", "--input", "prompt", "--output", "answer",
+         "--project", "dolly", "--teacher", "qwen2.5:1.5b"],
+        ["spill", "plan", "dolly", "--deadline", "30m"],
+        ["spill", "plan", "dolly", "--deadline", "5s"],
+        ["!spill", "build", "dolly", "--deadline", "5s"],
     ],
     "kd": [
         ["spill", "example", "dolly-qa", "--tiny"],
@@ -113,6 +123,8 @@ def main():
            "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "steps": []}
     for cmd in FLOWS[a.flow]:
         t0 = time.monotonic()
+        expect_fail = cmd[0].startswith("!")
+        cmd = [cmd[0].lstrip("!"), *cmd[1:]]
         if cmd[0] == "spill":
             argv = [sys.executable, "-m", "streamweights.cli", *cmd[1:]]
             if cmd[1] in ("plan", "build", "export", "evaluate", "test") and "--engine" not in cmd:
@@ -124,15 +136,17 @@ def main():
                                text=True, env=env, cwd=run, timeout=1800)
             shown = f'python {cmd[1]} "..."'
         res["steps"].append({"command": shown, "exit": p.returncode,
+                             "expect_fail": expect_fail,
                              "seconds": round(time.monotonic() - t0, 1), "stdout": p.stdout,
                              "stderr_tail": p.stderr[-800:]})
         print(shown, p.returncode, flush=True)
-        if p.returncode != 0:
+        if (p.returncode != 0) != expect_fail:
             break
     after = models_listing(ROOT / "models")
     res["models_downloaded"] = {k: v for k, v in after.items() if k not in before}
     res["models_changed"] = {k: v for k, v in after.items() if k in before and before[k] != v}
-    res["ok"] = all(s["exit"] == 0 for s in res["steps"]) and len(res["steps"]) == len(FLOWS[a.flow])
+    res["ok"] = all((s["exit"] != 0) == s.get("expect_fail", False) for s in res["steps"]) \
+        and len(res["steps"]) == len(FLOWS[a.flow])
     res["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     Path(a.out).write_text(json.dumps(res, indent=1))
     if not a.keep:

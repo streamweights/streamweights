@@ -30,10 +30,11 @@ def test_no_placeholders_or_em_dashes():
 
 
 HEADLINE = "**Build a small model for your task, on hardware you control.**"
-SUPPORT = ("Bring labeled examples. Fine-tune locally, compare against simple baselines, and "
-           "export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux.")
-SECTIONS = ["What it does", "Try it", "Use your own data", "Understand the result", "Go further",
-            "Support and limitations"]
+SUPPORT = ("Bring examples of your task. Learn from a large model running on your own machine, train a "
+           "small one, measure it honestly, and export it.")
+SECTIONS = ["What it does", "Try it", "Use your own data", "Understand the result",
+            "Large teacher and judge", "Go further", "Support and limitations"]
+README_CAP = 1100       # prose words: 018 halved the README (cap 681); 020 added a section and an example
 
 
 def _section(title: str) -> str:
@@ -52,13 +53,14 @@ def test_readme_shape():
     for img in re.findall(r"!\[([^\]]*)\]", README):
         assert len(img) > 20, "image alt text must be descriptive"
     from scripts.readme_counts import count
-    before = __import__("json").loads((ROOT / "docs/reports/data/018-readme-counts-before.json").read_text())
-    assert count(README)["prose_words"] <= before["prose_words"] / 2 + 10, "the README grew back"
+    assert count(README)["prose_words"] <= README_CAP, "the README grew back"
 
 
-def test_what_it_does_names_both_jobs_without_implementation_terms():
+def test_what_it_does_spans_labeling_extraction_and_open_ended_answers_without_implementation_terms():
     s = _section("What it does").lower()
-    assert "text classification" in s and "json extraction" in s
+    assert "labeling" in s and "extraction" in s and "open-ended answers" in s
+    assert "two jobs" not in s and "any task" in s
+    assert "optional" in s and "judge" in s
     for term in ("lora", "mlx", "pytorch", "embedding", "bf16", "adapter", "fenc", "lineage", "distill"):
         assert term not in s, term
 
@@ -85,7 +87,7 @@ def test_disk_prerequisite_matches_the_code_and_the_capture_difference_is_stated
     s = _section("Try it")
     assert "20 GB free-space reserve (`SPILL_MIN_FREE_GB`)" in s and "about 23 GB free" in s
     assert "nearly full disk" in s and "with `SPILL_MIN_FREE_GB=2`, not the default" in s
-    cap = json.loads((ROOT / "docs/reports/data/018-readme-capture.json").read_text())
+    cap = json.loads((ROOT / "docs/reports/data/020-readme-capture.json").read_text())
     assert "SPILL_MIN_FREE_GB" in (ROOT / "scripts/capture_readme.py").read_text()
     assert "SPILL_MIN_FREE_GB=2" in (ROOT / "docs/reports/018-readme-pass.md").read_text()
     assert cap["ok"]
@@ -102,6 +104,11 @@ def test_own_data_section_shows_formats_schema_and_the_same_commands():
     for cmd in ("spill build my-tickets", "spill export my-tickets", "spill build orders",
                 "spill export orders"):
         assert cmd in s, cmd
+    assert "prompt,answer" in s and "spill init answers.csv --input prompt --output answer --project answers" in s
+    assert "spill build answers --judge qwen2.5:1.5b" in s
+    assert "chosen from your outputs" in s and "--score exact|json|judge|script:<file>" in s
+    assert "With your own labeled examples no teacher is needed" in s
+    assert "judge if you name one" in s and "accept the one `spill plan` recommends" in s
     shown = re.search(r"`schema.json` says.*?```\n(.*?)```", s, re.S).group(1)
     fixture = ROOT / "tests/fixtures/own-data/schema.json"
     import json
@@ -119,9 +126,10 @@ def test_understand_the_result_shows_the_baseline_win_and_links_the_export_check
 
 def test_go_further_and_support_sections():
     s = _section("Go further")
-    for need in ("Continue an interrupted training run", "JSON extraction", "Offline bundles", "Large teachers",
-                 "docs/portability.md#continuing-on-another-machine-step-by-step", "[Measured: Llama 3.3 70B"):
+    for need in ("Continue an interrupted training run", "JSON extraction", "Offline bundles", "dolly-qa",
+                 "--deadline", "docs/portability.md#continuing-on-another-machine-step-by-step"):
         assert need in s, need
+    assert "Large teachers" not in s, "the large teacher moved up, to its own section after the result"
     assert s.index("Continue an interrupted") < s.index("JSON extraction")
     assert "spill move" not in s and "s3://" not in s, "the S3 walkthrough lives in docs/portability.md"
     walk = (ROOT / "docs/portability.md").read_text()
@@ -136,12 +144,24 @@ def test_go_further_and_support_sections():
         assert link in t, link
 
 
+def test_large_teacher_and_judge_follow_the_result_and_say_both_are_optional():
+    names = re.findall(r"^## (.+)$", README, re.M)
+    assert names.index("Large teacher and judge") == names.index("Understand the result") + 1
+    s = _section("Large teacher and judge")
+    for need in ("Both are optional", "A teacher", "A judge", "worth it", "never accuracy",
+                 "never scores its own outputs", "Nothing is downloaded unless you name it or accept",
+                 "bigger than your memory", "[Measured: Llama 3.3 70B", "rough instrument"):
+        assert need in s, need
+
+
 def test_moved_pages_are_in_the_nav_and_one_click_from_the_readme():
     nav = (ROOT / "mkdocs.yml").read_text()
     for page in ("prior-art.md", "architecture.md", "portability.md", "plan.md", "reports/018-readme-pass.md",
+                 "reports/020-restore-vision.md",
                  "guides/turn-a-csv-of-examples-into-an-evaluated-model.md"):
         assert page in nav, page
-        assert page.split("/")[-1] in README or page in README or page == "reports/018-readme-pass.md", page
+        assert page.split("/")[-1] in README or page in README or page in (
+            "reports/018-readme-pass.md"), page
     for anchor in ("your-own-data-in-detail", "sample-projects", "when-a-teacher-is-useful"):
         assert f"#{anchor}" in README
 
@@ -154,7 +174,7 @@ def test_readme_concept_names_are_only_linked_names():
 
 def test_every_output_line_in_the_readme_is_from_the_real_mlx_capture():
     import json
-    cap = json.loads((ROOT / "docs/reports/data/018-readme-capture.json").read_text())
+    cap = json.loads((ROOT / "docs/reports/data/020-readme-capture.json").read_text())
     assert cap["ok"] and cap["device"].startswith("Device(gpu"), "the capture is a real Metal run"
     captured = "\n".join(s["stdout"] for s in cap["steps"])
     commands = {s["command"] for s in cap["steps"]} | {"pip install git+https://github.com/streamweights/streamweights"}
@@ -175,6 +195,20 @@ def test_every_output_line_in_the_readme_is_from_the_real_mlx_capture():
         cells = next(l for l in report.splitlines() if l.startswith(f"| {name} |")).split("|")[1:-1]
         assert (cells[0].strip(), cells[1].strip(), cells[3].strip()) == (name, acc, rows), name
     assert "```" not in re.search(r"^\| comparator.*?\n\n", _section("Understand the result"), re.S | re.M).group(0)
+
+
+def test_the_judged_result_in_the_readme_is_from_the_real_metal_capture():
+    import json
+    cap = json.loads((ROOT / "docs/reports/data/020-judged-mlx.json").read_text())
+    assert cap["ok"] and cap["device"].startswith("Device(gpu") and cap["engine"] == "mlx"
+    captured = next(s["stdout"] for s in cap["steps"] if s["command"].startswith("spill build"))
+    shown = 0
+    for block in re.findall(r"```\n(.*?)```", _section("Large teacher and judge"), re.S):
+        for line in block.splitlines():
+            assert line.rstrip() in captured, f"README shows output that was not captured: {line!r}"
+            shown += 1
+    assert shown == 5
+    assert "13 validation rows" in _section("Large teacher and judge")
 
 
 def _slug(heading: str) -> str:

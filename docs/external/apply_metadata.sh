@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 HEAD="Build a small model for your task, on hardware you control."
-SUP="Bring labeled examples. Fine-tune locally, compare against simple baselines, and export to GGUF or safetensors. Pause and resume supported training runs across Mac and Linux."
+SUP="Bring examples of your task. Learn from a large model running on your own machine, train a small one, measure it honestly, and export it."
 
 gh api -X PATCH repos/streamweights/streamweights -f description="$HEAD $SUP" -f homepage="https://streamweights.github.io/streamweights/"
 
